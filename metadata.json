@@ -1,0 +1,6 @@
+{
+  "name": "Creator Co-Op",
+  "description": "Enterprise portal for legal and financial coordination in the creator economy with automated splits, contracts, and matching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
