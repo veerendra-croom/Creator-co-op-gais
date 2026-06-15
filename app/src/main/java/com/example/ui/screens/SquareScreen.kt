@@ -302,7 +302,50 @@ fun PostCard(post: Post, viewModel: MainViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            var reactions by remember {
+                mutableStateOf(
+                    mapOf(
+                        "🔥" to (10..45).random(),
+                        "🚀" to (5..20).random(),
+                        "👏" to (15..50).random(),
+                        "💡" to (3..15).random()
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Dynamic reactions block
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                reactions.forEach { (emoji, count) ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SurfaceLightColor)
+                            .clickable {
+                                reactions = reactions.toMutableMap().also {
+                                    it[emoji] = (it[emoji] ?: 0) + 1
+                                }
+                                viewModel.toastMessage.value = "You reacted $emoji to this thread! ✨"
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag("reaction_chip_${emoji}"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(emoji, fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(count.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Action row: upvote, downvote, comments
             HorizontalDivider(color = ColorDivider)

@@ -26,6 +26,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     fun getPostsBySpace(spaceName: String) = postDao.getPostsBySpace(spaceName)
     fun getPostById(id: String) = postDao.getPostById(id)
+    fun getUserById(id: String): Flow<User?> = userDao.getUserById(id)
+    suspend fun getUserByEmail(email: String): User? = userDao.getUserByEmail(email)
     fun getCommentsForPost(postId: String) = commentDao.getCommentsForPost(postId)
     fun getProjectById(id: String) = projectDao.getProjectById(id)
     fun getPitchesForProject(projectId: String) = pitchDao.getPitchesForProject(projectId)
@@ -210,15 +212,83 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                 phone = "+1 (555) 0192",
                 displayName = "VibeCreative Studio",
                 avatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
-                primaryRole = "Channel Manager",
-                secondaryRolesJson = "[\"Editor\", \"Thumbnail Designer\"]",
+                primaryRole = "Co-Op Member",
+                secondaryRolesJson = "[\"Video Editing\", \"Thumbnail Design\"]",
                 karmaScore = 120,
-                isVerifiedPro = false,
-                stripeAccountId = "acct_1NJ29F",
+                isVerifiedPro = true,
+                stripeAccountId = "acct_demo_me",
                 portfolioLinksJson = "[\"youtube.com/vibe_creative\", \"behance.net/vibe_creative\"]",
                 availableBalance = 3450.00,
                 pendingBalance = 1500.00,
                 treasuryBalance = 800.00
+            ))
+
+            userDao.insertUser(User(
+                id = "user_manager",
+                email = "manager@coop.com",
+                phone = "+1 (555) 0101",
+                displayName = "Lexi Manager",
+                avatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
+                primaryRole = "Co-Op Member",
+                secondaryRolesJson = "[\"Channel Strategy\", \"Sponsor Relations\"]",
+                karmaScore = 200,
+                isVerifiedPro = true,
+                stripeAccountId = "acct_demo_manager",
+                portfolioLinksJson = "[\"youtube.com/lexi_channel\"]",
+                availableBalance = 4250.00,
+                pendingBalance = 2000.00,
+                treasuryBalance = 1200.00
+            ))
+
+            userDao.insertUser(User(
+                id = "user_editor",
+                email = "editor@coop.com",
+                phone = "+1 (555) 0202",
+                displayName = "Jack Editor",
+                avatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde",
+                primaryRole = "Co-Op Member",
+                secondaryRolesJson = "[\"Video Editing\", \"VFX & Motion Graphics\"]",
+                karmaScore = 150,
+                isVerifiedPro = true,
+                stripeAccountId = "acct_demo_editor",
+                portfolioLinksJson = "[\"behance.net/jack_edits\"]",
+                availableBalance = 2100.00,
+                pendingBalance = 800.00,
+                treasuryBalance = 400.00
+            ))
+
+            userDao.insertUser(User(
+                id = "user_admin",
+                email = "admin@coop.com",
+                phone = "+1 (555) 0303",
+                displayName = "Alex Admin",
+                avatarUrl = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
+                primaryRole = "Co-Op Member",
+                secondaryRolesJson = "[\"Mediation Rules\", \"Contract Design\"]",
+                karmaScore = 500,
+                isVerifiedPro = true,
+                stripeAccountId = "acct_demo_admin",
+                portfolioLinksJson = "[]",
+                availableBalance = 98500.00,
+                pendingBalance = 0.0,
+                treasuryBalance = 24500.00
+            ))
+
+            userDao.insertUser(User(
+                id = "user_mcn",
+                email = "mcn@coop.com",
+                phone = "+1 (555) 0404",
+                displayName = "Alpha MCN Group",
+                avatarUrl = "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
+                primaryRole = "Co-Op Member",
+                secondaryRolesJson = "[\"Compliance Audit\", \"Enterprise Match\"]",
+                karmaScore = 800,
+                isVerifiedPro = true,
+                stripeAccountId = "acct_demo_mcn",
+                portfolioLinksJson = "[]",
+                availableBalance = 153000.00,
+                pendingBalance = 12000.00,
+                treasuryBalance = 34000.00
             ))
         }
 

@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
 fun MainContent(viewModel: MainViewModel) {
     val context = LocalContext.current
     val showSplash by viewModel.showSplash.collectAsState()
+    val currentUserId by viewModel.currentUserId.collectAsState()
     val isOnboarded by viewModel.isOnboarded.collectAsState()
     val toastMsg by viewModel.toastMessage.collectAsState()
 
@@ -60,7 +61,15 @@ fun MainContent(viewModel: MainViewModel) {
 
     Box(modifier = Modifier.fillMaxSize().background(PrimaryBackground)) {
         AnimatedContent(
-            targetState = if (showSplash) "SPLASH" else if (!isOnboarded) "ONBOARDING" else "DASHBOARD",
+            targetState = if (showSplash) {
+                "SPLASH"
+            } else if (currentUserId == null) {
+                "AUTH"
+            } else if (!isOnboarded) {
+                "ONBOARDING"
+            } else {
+                "DASHBOARD"
+            },
             transitionSpec = {
                 fadeIn() togetherWith fadeOut()
             },
@@ -71,6 +80,7 @@ fun MainContent(viewModel: MainViewModel) {
                     viewModel = viewModel,
                     onSplashComplete = { viewModel.completeSplash() }
                 )
+                "AUTH" -> AuthScreen(viewModel = viewModel)
                 "ONBOARDING" -> OnboardingScreen(viewModel = viewModel)
                 "DASHBOARD" -> CreatorCoOpDashboard(viewModel = viewModel)
             }

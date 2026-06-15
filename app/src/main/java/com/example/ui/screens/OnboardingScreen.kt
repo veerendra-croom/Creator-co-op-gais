@@ -84,11 +84,24 @@ fun OnboardingScreen(
 @Composable
 fun StepRoleSelection(viewModel: MainViewModel) {
     val roles = listOf(
-        "Channel Manager" to "Runs channel analytics, content calendars, and sponsors.",
-        "Video Editor" to "Slices high-vibe cinematic audio and visual sequences.",
-        "Script Writer" to "Formulates storylines, hooks, and viral scripts.",
-        "2D Animator" to "Draws custom frames, transitions, and character models.",
-        "Thumbnail Designer" to "Maxes out video CTR with hyper-focused custom grids."
+        "Channel Manager" to "Runs channel analytics, content strategy, budgets, and sponsors.",
+        "Video Editor" to "Slices high-vibe cinematic pacing, audio sync, and visual sequences.",
+        "Script Writer" to "Formulates hook structures, storylines, and viral-engineered scripts.",
+        "2D Animator" to "Draws custom frames, fluid transitions, and character animations.",
+        "Thumbnail Designer" to "Maxes out CTR with psychological high-contrast visual grids.",
+        "Voice Actor / Host" to "Provides custom voice-overs, narration, or on-camera presentations.",
+        "VFX & GFX Artist" to "Applies motion graphics, 3D modeling, and dynamic visual effects.",
+        "Sound Designer" to "Engages audiences with spatial audio mixes and soundscapes.",
+        "Platform Admin" to "Manages system disputes, workspace mediation, and platform-wide moderation.",
+        "Enterprise / MCN" to "Orchestrates multi-channel networks and bulk contract compliance workflows.",
+        "Content Researcher" to "Researches trending topics, SEO keywords, and background facts for scripts.",
+        "Live Stream Producer" to "Directs real-time streams, overlays, and technical audio/video feeds.",
+        "Social Media Manager" to "Orchestrates promotional short-form pieces, Twitter/Instagram, and audience reach.",
+        "Sponsor Relations / BD" to "Secures sponsorship brand deals, handles communications, and reviews CPMs.",
+        "Legal & Compliance Lead" to "Reviews channel IP rights, co-op agreements, and legal/tax forms compliance.",
+        "Data Analyst / Strategist" to "Parses watch-time drops, YouTube Analytics, and designs thumbnail A/B tests.",
+        "Creative Director" to "Establishes stylistic branding, formatting blueprints, and visual directions.",
+        "Community Moderator" to "Guards live chat streams, moderates community spaces (Discord/Reddit), and gathers feedback."
     )
     
     val selectedRoles by viewModel.userRoleSelects.collectAsState()
@@ -100,14 +113,14 @@ fun StepRoleSelection(viewModel: MainViewModel) {
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "Select your creative roles",
+            text = "Design your creative specialties",
             color = Color.White,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "These act as contract template descriptors to protect your equity share.",
+            text = "All Co-Op members are equal. Select the expertise areas you will bring to projects and contracts to structure partnerships.",
             color = TextSecondary,
             fontSize = 14.sp
         )

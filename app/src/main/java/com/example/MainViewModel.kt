@@ -19,7 +19,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Current Navigation State
     val currentTab = MutableStateFlow("SQUARE") // "SQUARE", "SYNDICATE", "WORKSPACES", "PROFILE"
     val showSplash = MutableStateFlow(true)
-    val isOnboarded = MutableStateFlow(false)
     val onboardingStep = MutableStateFlow(1) // 1: Role, 2: Portfolio, 3: Payout
 
     // Form inputs / temporary session inputs for onboarding
@@ -52,6 +51,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val toastMessage = MutableStateFlow<String?>(null)
     val projectFormError = MutableStateFlow<String?>(null)
 
+    // Persistent authentication identity state
+    private val sharedPrefs = application.getSharedPreferences("creator_coop_prefs", android.content.Context.MODE_PRIVATE)
+    val currentUserId = MutableStateFlow<String?>(sharedPrefs.getString("active_user_id", null))
+
     init {
         viewModelScope.launch {
             repository.prepopulateIfEmpty()
@@ -62,22 +65,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Throwable) {
                 // Ensure complete offline stability
             }
-
-            // Check if user is onboarded
-            repository.myUser.firstOrNull()?.let { user ->
-                if (user.primaryRole.isNotEmpty() && user.portfolioLinksJson != "[]") {
-                     isOnboarded.value = true
-                }
-            }
         }
     }
 
-    // Expose Data Streams
-    val myUser: StateFlow<User?> = repository.myUser.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = null
-    )
+    // Expose Data Streams dynamically based on active user session ID
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val myUser: StateFlow<User?> = currentUserId.flatMapLatest { id ->
+        if (id == null) flowOf(null) else repository.getUserById(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val isOnboarded: StateFlow<Boolean> = myUser.map { user ->
+        user != null && user.primaryRole.isNotEmpty() && user.portfolioLinksJson != "[]"
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun getMyDisplayRole(): String {
+        val user = myUser.value ?: return "Co-Op Member"
+        val clean = user.secondaryRolesJson.trim().removeSurrounding("[", "]")
+        if (clean.isBlank()) return "Co-Op Member"
+        val first = clean.split(",").firstOrNull()?.replace("\"", "")?.trim()
+        return if (first.isNullOrBlank()) "Co-Op Member" else first
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val postsList: StateFlow<List<Post>> = combine(
@@ -167,23 +175,90 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun completeOnboardingStep3(stripeConfigured: Boolean) {
         viewModelScope.launch {
-            val userMeta = myUser.value ?: User(
-                id = "me",
-                email = "appcroom@gmail.com",
-                phone = "+1 (555) 0192",
-                displayName = "VibeCreative Studio",
+            val currentUser = myUser.value
+            if (currentUser != null) {
+                val updatedUser = currentUser.copy(
+                    primaryRole = "Co-Op Member",
+                    secondaryRolesJson = "[" + userRoleSelects.value.joinToString(",") { "\"$it\"" } + "]",
+                    isVerifiedPro = true,
+                    stripeAccountId = if (stripeConfigured) "acct_demo_" + UUID.randomUUID().toString().substring(0,6) else "",
+                    portfolioLinksJson = "[" + userPortfolioLinks.value.joinToString(",") { "\"$it\"" } + "]"
+                )
+                repository.saveUser(updatedUser)
+                currentTab.value = "SQUARE"
+                toastMessage.value = "Welcome to Creator Co-Op! Onboarding Completed! 🎉"
+            } else {
+                toastMessage.value = "Error: No active user session!"
+            }
+        }
+    }
+
+    fun registerNewUser(email: String, phone: String, displayName: String) {
+        viewModelScope.launch {
+            val trimmedEmail = email.trim()
+            val existing = repository.getUserByEmail(trimmedEmail)
+            if (existing != null) {
+                // For demo/MVPs and prepopulated ecosystem states, gracefully adopt details and sign in
+                val updatedUser = existing.copy(
+                    phone = if (phone.isNotBlank()) phone.trim() else existing.phone,
+                    displayName = if (displayName.isNotBlank()) displayName.trim() else existing.displayName
+                )
+                repository.saveUser(updatedUser)
+                
+                // Persist session
+                sharedPrefs.edit().putString("active_user_id", existing.id).apply()
+                currentUserId.value = existing.id
+                toastMessage.value = "Ecosystem account loaded successfully! ✨ Welcome, ${updatedUser.displayName}!"
+                return@launch
+            }
+            val newId = "user_" + UUID.randomUUID().toString().substring(0, 8)
+            val newUser = User(
+                id = newId,
+                email = trimmedEmail,
+                phone = phone.trim(),
+                displayName = displayName.trim(),
                 avatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
-                primaryRole = userRoleSelects.value.firstOrNull() ?: "Channel Manager",
-                secondaryRolesJson = "[" + userRoleSelects.value.joinToString(",") { "\"$it\"" } + "]",
+                primaryRole = "",
+                secondaryRolesJson = "[]",
+                portfolioLinksJson = "[]",
                 karmaScore = 50,
                 isVerifiedPro = false,
-                stripeAccountId = if (stripeConfigured) "acct_demo_" + UUID.randomUUID().toString().substring(0,6) else "",
-                portfolioLinksJson = "[" + userPortfolioLinks.value.joinToString(",") { "\"$it\"" } + "]"
+                stripeAccountId = "",
+                availableBalance = 0.0,
+                pendingBalance = 0.0,
+                treasuryBalance = 0.0
             )
-            repository.saveUser(userMeta)
-            isOnboarded.value = true
-            currentTab.value = "SQUARE"
-            toastMessage.value = "Welcome to Creator Co-Op! Onboarding Completed! 🎉"
+            repository.saveUser(newUser)
+            
+            // Persist session
+            sharedPrefs.edit().putString("active_user_id", newId).apply()
+            currentUserId.value = newId
+            onboardingStep.value = 1
+            toastMessage.value = "Account created successfully! Welcome, ${displayName.trim()}! 🎉"
+        }
+    }
+
+    fun loginWithEmail(email: String) {
+        viewModelScope.launch {
+            val trimmedEmail = email.trim()
+            val matchedUser = repository.getUserByEmail(trimmedEmail)
+            if (matchedUser != null) {
+                // Persist session
+                sharedPrefs.edit().putString("active_user_id", matchedUser.id).apply()
+                currentUserId.value = matchedUser.id
+                toastMessage.value = "Welcome back, ${matchedUser.displayName}! 👋"
+            } else {
+                toastMessage.value = "No active account found for '$trimmedEmail'. Try signing up!"
+            }
+        }
+    }
+
+    fun logoutSession() {
+        viewModelScope.launch {
+            sharedPrefs.edit().remove("active_user_id").apply()
+            currentUserId.value = null
+            onboardingStep.value = 1
+            toastMessage.value = "You have logged out successfully."
         }
     }
 
@@ -206,7 +281,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 id = "comment_" + UUID.randomUUID().toString(),
                 postId = postId,
                 authorName = "You (Pro Member)",
-                authorRole = myUser.value?.primaryRole ?: "Contributor",
+                authorRole = getMyDisplayRole(),
                 text = text,
                 timestamp = System.currentTimeMillis(),
                 timestampMs = timestampMs
@@ -225,7 +300,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 id = "post_" + UUID.randomUUID().toString(),
                 title = title,
                 authorName = "You (Pro Member)",
-                authorRole = myUser.value?.primaryRole ?: "Contributor",
+                authorRole = getMyDisplayRole(),
                 authorAvatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
                 body = body,
                 spaceName = space,
@@ -264,7 +339,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val project = Project(
                 id = "proj_" + UUID.randomUUID().toString(),
-                managerId = "me",
+                managerId = currentUserId.value ?: "me",
                 title = title,
                 niche = niche,
                 contentStrategy = strategy,
@@ -293,7 +368,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 projectId = projectId,
                 applicantId = "me",
                 applicantName = "You (Contributor)",
-                applicantRole = myUser.value?.primaryRole ?: "Freelancer",
+                applicantRole = getMyDisplayRole(),
                 applicantAvatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb",
                 message = message,
                 portfolioLink = portfolioLink,
@@ -380,7 +455,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 channel = activeChannel.value,
                 senderId = "me",
                 senderName = myUser.value?.displayName ?: "Pro Contributor",
-                senderRole = myUser.value?.primaryRole ?: "Creator",
+                senderRole = getMyDisplayRole(),
                 text = text,
                 timestamp = System.currentTimeMillis(),
                 fileName = fileName,

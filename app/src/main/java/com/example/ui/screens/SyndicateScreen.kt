@@ -65,6 +65,12 @@ fun SyndicateScreen(
 fun ViewModeToggle(viewModel: MainViewModel) {
     val mode by viewModel.syndicateViewMode.collectAsState()
     
+    val tabs = listOf(
+        "PROJECTS" to "Browse Board",
+        "SWIPER" to "Co-Op Match",
+        "CREATE" to "Post Project"
+    )
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -73,7 +79,7 @@ fun ViewModeToggle(viewModel: MainViewModel) {
             .background(SurfaceColor)
             .padding(4.dp)
     ) {
-        listOf("PROJECTS" to "Browse Board", "SWIPER" to "Co-Op Match", "CREATE" to "Post Project").forEach { (m, label) ->
+        tabs.forEach { (m, label) ->
             val isActive = mode == m
             Box(
                 modifier = Modifier
@@ -461,6 +467,10 @@ fun ProjectDetailsView(viewModel: MainViewModel) {
             Text("Project Briefing & Pitch", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
 
+        val user by viewModel.myUser.collectAsState()
+        val isOwner = project!!.managerId == (user?.id ?: "me") || (user?.id ?: "me") == "user_manager"
+        val incomingPitches by viewModel.selectedProjectPitches.collectAsState()
+
         LazyColumn(
             modifier = Modifier.weight(1f).padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -500,54 +510,151 @@ fun ProjectDetailsView(viewModel: MainViewModel) {
                 }
             }
 
-            // Input form to submit proposal / pitch
-            item {
-                Text("PROPOSE YOUR CO-OP PITCH", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SurfaceColor)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        OutlinedTextField(
-                            value = pitchMessage,
-                            onValueChange = { pitchMessage = it },
-                            label = { Text("Short introduction & samples *", color = TextSecondary) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = AccentRed,
-                                unfocusedBorderColor = ColorDivider
-                            ),
-                            modifier = Modifier.fillMaxWidth().height(100.dp).testTag("pitch_message_input")
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = portfolioLink,
-                            onValueChange = { portfolioLink = it },
-                            label = { Text("Demonstrative portfolio URL link", color = TextSecondary) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = AccentRed,
-                                unfocusedBorderColor = ColorDivider
-                            ),
-                            modifier = Modifier.fillMaxWidth().testTag("pitch_portfolio_input")
-                        )
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        Button(
-                            onClick = {
-                                if (pitchMessage.isNotBlank()) {
-                                    viewModel.submitProjectPitch(project!!.id, pitchMessage, portfolioLink)
-                                } else {
-                                    viewModel.toastMessage.value = "Introduction explanation is mandatory!"
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                            modifier = Modifier.fillMaxWidth().testTag("submit_pitch_button")
+            if (isOwner) {
+                // Partner Creator view: view incoming pitches & accept/reject
+                item {
+                    Text("RECEIVED CO-OP PROPOSALS (${incomingPitches.size})", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    if (incomingPitches.isEmpty()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = SurfaceColor)
                         ) {
-                            Text("Transmit Pitch Proposal", color = Color.White)
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("No proposals received for this project yet. Creative talent will pitch here shortly.", color = TextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            incomingPitches.forEach { pitch ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("pitch_card_${pitch.id}"),
+                                    colors = CardDefaults.cardColors(containerColor = SurfaceColor)
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .clip(CircleShape)
+                                            ) {
+                                                AsyncImage(model = pitch.applicantAvatarUrl, contentDescription = "Avatar", modifier = Modifier.fillMaxSize())
+                                            }
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                Text(pitch.applicantName, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                Text(pitch.applicantRole, color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(pitch.message, color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
+                                        
+                                        if (pitch.portfolioLink.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text("Portfolio: ${pitch.portfolioLink}", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                        
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        
+                                        if (pitch.status == "PENDING") {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = { viewModel.rejectPitch(pitch) },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceLightColor),
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                ) {
+                                                    Text("DECLINE", color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Button(
+                                                    onClick = { viewModel.acceptPitch(pitch) },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ColorSuccess),
+                                                    modifier = Modifier.weight(1f).testTag("accept_pitch_button_${pitch.id}"),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                ) {
+                                                    Text("ACCEPT & GENERATE CONTRACT", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (pitch.status == "ACCEPTED") ColorSuccess.copy(alpha = 0.15f) else ColorError.copy(alpha = 0.15f))
+                                                    .padding(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = "PITCH STATUS: ${pitch.status}",
+                                                    color = if (pitch.status == "ACCEPTED") ColorSuccess else ColorError,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Creative Talent view: display pitch proposal input form if not pitched already
+                item {
+                    Text("PROPOSE YOUR CO-OP PITCH", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SurfaceColor)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            OutlinedTextField(
+                                value = pitchMessage,
+                                onValueChange = { pitchMessage = it },
+                                label = { Text("Short introduction & samples *", color = TextSecondary) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = AccentRed,
+                                    unfocusedBorderColor = ColorDivider
+                                ),
+                                modifier = Modifier.fillMaxWidth().height(100.dp).testTag("pitch_message_input")
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = portfolioLink,
+                                onValueChange = { portfolioLink = it },
+                                label = { Text("Demonstrative portfolio URL link", color = TextSecondary) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = AccentRed,
+                                    unfocusedBorderColor = ColorDivider
+                                ),
+                                modifier = Modifier.fillMaxWidth().testTag("pitch_portfolio_input")
+                            )
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            Button(
+                                onClick = {
+                                    if (pitchMessage.isNotBlank()) {
+                                        viewModel.submitProjectPitch(project!!.id, pitchMessage, portfolioLink)
+                                    } else {
+                                        viewModel.toastMessage.value = "Introduction explanation is mandatory!"
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                                modifier = Modifier.fillMaxWidth().testTag("submit_pitch_button")
+                            ) {
+                                Text("Transmit Pitch Proposal", color = Color.White)
+                            }
                         }
                     }
                 }
