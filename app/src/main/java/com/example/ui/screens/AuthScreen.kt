@@ -1,11 +1,13 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -22,17 +24,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.MainViewModel
+import com.example.ui.viewmodels.AuthViewModel
 import com.example.ui.theme.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
-    viewModel: MainViewModel,
+    authViewModel: AuthViewModel,
     modifier: Modifier = Modifier
 ) {
     var isLoginMode by remember { mutableStateOf(true) }
@@ -41,208 +44,175 @@ fun AuthScreen(
     // Form states
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    
+    val isLoading by authViewModel.isLoading.collectAsState()
+    val toastMessage by authViewModel.toastMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Validation states
-    var emailError by remember { mutableStateOf<String?>(null) }
-    var passwordError by remember { mutableStateOf<String?>(null) }
-    var nameError by remember { mutableStateOf<String?>(null) }
-    var phoneError by remember { mutableStateOf<String?>(null) }
-
-    fun validateInputs(): Boolean {
-        var isValid = true
-
-        if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            emailError = "Please enter a valid email address."
-            isValid = false
-        } else {
-            emailError = null
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            authViewModel.resetToast()
         }
-
-        if (password.length < 6) {
-            passwordError = "Password must be at least 6 characters long."
-            isValid = false
-        } else {
-            passwordError = null
-        }
-
-        if (!isLoginMode) {
-            if (displayName.isBlank()) {
-                nameError = "Display name is required."
-                isValid = false
-            } else {
-                nameError = null
-            }
-
-            if (phone.isBlank()) {
-                phoneError = "Phone number is required."
-                isValid = false
-            } else {
-                phoneError = null
-            }
-        }
-
-        return isValid
     }
 
+    // Form validation
+    var emailError by remember { mutableStateOf<String?>(null) }
+    val authError by authViewModel.authError.collectAsState()
+
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "CREATOR CO-OP",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = PrimaryBackground
-                )
-            )
-        },
-        containerColor = PrimaryBackground
+        containerColor = PrimaryBackground,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(PrimaryBackground)
-                .padding(horizontal = 24.dp)
                 .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Widescreen hero banner (full width) with bottom rounding
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.img_hero_banner),
+                    contentDescription = "Hero Banner",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, PrimaryBackground.copy(alpha = 0.9f))
+                            )
+                        )
+                )
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
-            // App Brand Display
-            Icon(
-                imageVector = Icons.Default.Groups,
-                contentDescription = "Core Logo",
-                tint = AccentRed,
-                modifier = Modifier.size(72.dp)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            // Premium brand logo
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(SurfaceColor)
+                    .padding(4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.img_app_logo),
+                    contentDescription = "Creator Co-Op Logo",
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Secure Autonomous Sign In",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
+                text = "CREATOR CO-OP",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black,
                 color = Color.White,
+                letterSpacing = 1.sp,
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "Zero Mock Data Auth System | Local Room DB & Supabase Sync",
-                fontSize = 12.sp,
+                text = "Connect, Align, and Collaborate with Top Creators",
+                fontSize = 13.sp,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(top = 4.dp, start = 24.dp, end = 24.dp)
             )
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Mode Selector
-            TabRow(
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TabRow(
                 selectedTabIndex = if (isLoginMode) 0 else 1,
                 containerColor = SurfaceColor,
-                contentColor = AccentRed,
+                contentColor = AccentBlue,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[if (isLoginMode) 0 else 1]),
-                        color = AccentRed
+                        color = AccentBlue
                     )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 Tab(
+                    modifier = Modifier.heightIn(min = 48.dp),
                     selected = isLoginMode,
-                    onClick = { isLoginMode = true },
+                    onClick = { 
+                        isLoginMode = true 
+                        emailError = null
+                    },
                     text = { Text("Log In", fontWeight = FontWeight.Bold, fontSize = 14.sp) },
                     selectedContentColor = Color.White,
-                    unselectedContentColor = TextSecondary,
-                    modifier = Modifier.testTag("tab_login_mode")
+                    unselectedContentColor = TextSecondary
                 )
                 Tab(
+                    modifier = Modifier.heightIn(min = 48.dp),
                     selected = !isLoginMode,
-                    onClick = { isLoginMode = false },
+                    onClick = { 
+                        isLoginMode = false 
+                        emailError = null
+                    },
                     text = { Text("Sign Up", fontWeight = FontWeight.Bold, fontSize = 14.sp) },
                     selectedContentColor = Color.White,
-                    unselectedContentColor = TextSecondary,
-                    modifier = Modifier.testTag("tab_signup_mode")
+                    unselectedContentColor = TextSecondary
                 )
+            }
+
+            AnimatedVisibility(visible = authError != null || emailError != null) {
+                val err = authError ?: emailError
+                err?.let { message ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                        colors = CardDefaults.cardColors(containerColor = AccentRed.copy(alpha = 0.1f)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.3f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Error, null, tint = AccentRed, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(message, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                            if (message.contains("Email not confirmed", ignoreCase = true)) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                TextButton(
+                                    onClick = { authViewModel.resendConfirmationEmail(email) },
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                    colors = ButtonDefaults.textButtonColors(contentColor = AccentRed)
+                                ) {
+                                    Text("RESEND EMAIL", fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.sp)
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            // Inputs
-            if (!isLoginMode) {
-                // Name Field
-                Text(
-                    text = "Display Name *",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = displayName,
-                    onValueChange = { displayName = it },
-                    placeholder = { Text("e.g. Jack Editor", color = TextSecondary) },
-                    isError = nameError != null,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = AccentRed,
-                        unfocusedBorderColor = ColorDivider,
-                        focusedContainerColor = SurfaceColor,
-                        unfocusedContainerColor = SurfaceColor
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("auth_name_field"),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                nameError?.let {
-                    Text(it, color = AccentRed, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Phone Field
-                Text(
-                    text = "E.164 Phone Number *",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    placeholder = { Text("e.g. +1 (555) 0101", color = TextSecondary) },
-                    isError = phoneError != null,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = AccentRed,
-                        unfocusedBorderColor = ColorDivider,
-                        focusedContainerColor = SurfaceColor,
-                        unfocusedContainerColor = SurfaceColor
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("auth_phone_field"),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                phoneError?.let {
-                    Text(it, color = AccentRed, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
 
             // Email Field
             Text(
@@ -257,28 +227,49 @@ fun AuthScreen(
                 value = email,
                 onValueChange = { email = it },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                placeholder = { Text("e.g. manager@coop.com", color = TextSecondary) },
-                isError = emailError != null,
+                placeholder = { Text("Enter your email address", color = TextSecondary) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
-                    focusedBorderColor = AccentRed,
+                    focusedBorderColor = AccentBlue,
                     unfocusedBorderColor = ColorDivider,
                     focusedContainerColor = SurfaceColor,
                     unfocusedContainerColor = SurfaceColor
                 ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("auth_email_field"),
+                modifier = Modifier.fillMaxWidth().testTag("auth_email_field"),
                 shape = RoundedCornerShape(10.dp)
             )
-            emailError?.let {
-                Text(it, color = AccentRed, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+
+            if (!isLoginMode) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Username *",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    placeholder = { Text("Choose a unique username", color = TextSecondary) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = ColorDivider,
+                        focusedContainerColor = SurfaceColor,
+                        unfocusedContainerColor = SurfaceColor
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("auth_username_field"),
+                    shape = RoundedCornerShape(10.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Password Field (Secure input)
+            // Password Field
             Text(
                 text = "Password *",
                 color = Color.White,
@@ -290,75 +281,67 @@ fun AuthScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                placeholder = { Text("••••••••", color = TextSecondary) },
-                isError = passwordError != null,
+                placeholder = { Text("Enter your password", color = TextSecondary) },
+                trailingIcon = {
+                    val icon = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                    val description = if (isPasswordVisible) "Hide password" else "Show password"
+                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        Icon(imageVector = icon, contentDescription = description, tint = TextSecondary)
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White,
-                    focusedBorderColor = AccentRed,
+                    focusedBorderColor = AccentBlue,
                     unfocusedBorderColor = ColorDivider,
                     focusedContainerColor = SurfaceColor,
                     unfocusedContainerColor = SurfaceColor
                 ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("auth_password_field"),
+                modifier = Modifier.fillMaxWidth().testTag("auth_password_field"),
                 shape = RoundedCornerShape(10.dp)
             )
-            passwordError?.let {
-                Text(it, color = AccentRed, fontSize = 11.sp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
-            }
 
             Spacer(modifier = Modifier.height(30.dp))
 
             // Action Button
             Button(
                 onClick = {
-                    if (validateInputs()) {
-                        if (isLoginMode) {
-                            viewModel.loginWithEmail(email)
+                    if (email.isNotBlank()) {
+                        if (password.isNotBlank()) {
+                            if (isLoginMode) {
+                                authViewModel.login(email, password)
+                            } else {
+                                if (username.isNotBlank()) {
+                                    authViewModel.register(email, password, username)
+                                } else {
+                                    emailError = "Please choose a username"
+                                }
+                            }
                         } else {
-                            viewModel.registerNewUser(email, phone, displayName)
+                            emailError = "Please enter your password"
                         }
+                    } else {
+                        emailError = "Please enter your email address"
                     }
                 },
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
                     .testTag("auth_submit_button"),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                colors = ButtonDefaults.buttonColors(containerColor = if (isLoading) AccentBlue.copy(alpha = 0.5f) else AccentBlue),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = if (isLoginMode) "SIGN IN TO ECOSYSTEM" else "REGISTER NEW ACCOUNT",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Quick demo accounts advice
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor.copy(alpha = 0.5f))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
                     Text(
-                        text = "💡 Quick Testing Credentials:",
+                        text = if (isLoginMode) "SIGN IN" else "SIGN UP",
                         color = Color.White,
-                        fontSize = 11.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "• Partner A: manager@coop.com\n• Partner B: editor@coop.com\n• Partner C: admin@coop.com\n• Partner D: mcn@coop.com\nAll roles are equal Co-Op Members initially. Log in and customize specialties dynamically inside profile tabs! Any password works.",
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp
                     )
                 }
             }
@@ -366,4 +349,5 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
+}
 }

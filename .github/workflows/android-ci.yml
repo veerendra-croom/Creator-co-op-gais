@@ -1,0 +1,48 @@
+name: Android CI/CD validation pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - development
+  pull_request:
+    branches:
+      - main
+      - development
+
+jobs:
+  build:
+    name: Build & Test Android App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Step A - Source Retrieval
+        uses: actions/checkout@v4
+
+      - name: Step B - Java SDK Provisioning
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Step C - Gradle Caching Optimization
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Step D - Execution Permission Allocation
+        run: chmod +x gradlew
+
+      - name: Step E - Static Code Validation Pass
+        run: ./gradlew lintDebug
+
+      - name: Step F - Local Headless Testing Suite Build
+        run: ./gradlew testDebugUnitTest --continue
+
+      - name: Step G - Production Compilation Assembly
+        run: ./gradlew assembleRelease

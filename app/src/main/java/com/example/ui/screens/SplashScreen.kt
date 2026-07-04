@@ -13,18 +13,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.MainViewModel
+import com.example.ui.viewmodels.GlobalViewModel
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
-    viewModel: MainViewModel,
+    globalViewModel: GlobalViewModel,
     onSplashComplete: () -> Unit
 ) {
     var startAnimation by remember { mutableStateOf(false) }
@@ -63,33 +64,23 @@ fun SplashScreen(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier
+                .padding(24.dp)
+                .graphicsLayer(
+                    scaleX = scaleAnim,
+                    scaleY = scaleAnim,
+                    alpha = alphaAnim
+                ),
             verticalArrangement = Arrangement.Center
         ) {
             // Animated Custom Brand Emblem
-            Box(
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.img_app_logo),
+                contentDescription = "Creator Co-Op Logo",
                 modifier = Modifier
-                    .size(100.dp)
+                    .size(120.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(AccentRed)
-                    .padding(4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(PrimaryBackground),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "CO",
-                        color = AccentRed,
-                        fontSize = 38.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -106,7 +97,7 @@ fun SplashScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Co-own. Collaborate. Compound.",
+                text = "Create and Collaborate Together",
                 color = TextSecondary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
@@ -142,14 +133,14 @@ fun SplashScreen(
                         .align(Alignment.CenterStart)
                         .offset(x = (alignAnim * 128).dp)
                         .clip(CircleShape)
-                        .background(AccentRed)
+                        .background(AccentBlue)
                 )
             }
         }
 
         // Substring Footer
         Text(
-            text = "SECURED SMART CONTRACT ESCROWS",
+            text = "COLLABORATIVE TEAM FORMATION",
             color = AccentBlue.copy(alpha = 0.8f),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,

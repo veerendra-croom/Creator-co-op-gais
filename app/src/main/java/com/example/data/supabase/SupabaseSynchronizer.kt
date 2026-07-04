@@ -4,201 +4,165 @@ import android.content.Context
 import android.util.Log
 import com.example.data.model.*
 import com.example.data.repository.AppRepository
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object SupabaseSynchronizer {
+    private val json = Json { 
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+    }
     private const val TAG = "SupabaseSynchronizer"
 
-    val api: SupabaseService by lazy {
-        SupabaseConfig.retrofit.create(SupabaseService::class.java)
-    }
-
-    /**
-     * Pulls latest states from Supabase and overwrites local cache to keep data synchronized.
-     * Wrapped in robust try-catch so incomplete network properties do not crash the app.
-     */
     suspend fun syncDownEverything(context: Context, repository: AppRepository) = withContext(Dispatchers.IO) {
-        if (!SupabaseConfig.isNetworkAvailable(context)) {
-            Log.d(TAG, "Sync down skipped: No network available")
-            return@withContext
-        }
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        val client = SupabaseConfig.client
 
-        val url = SupabaseConfig.supabaseUrl
-        if (url.startsWith("https://your-project")) {
-            Log.d(TAG, "Sync down skipped: Supabase URL properties are still placeholders")
-            return@withContext
-        }
-
-        Log.d(TAG, "Starting full Supabase sync down...")
-
-        // Synchronize Users
+        // User Profiles
         try {
-            val userResponse = api.getUsers()
-            if (userResponse.isSuccessful) {
-                userResponse.body()?.forEach { user ->
-                    try { repository.userDao.insertUser(user) } catch (e: Exception) { Log.e(TAG, "Fail saving sync user", e) }
-                }
-                Log.d(TAG, "Synced down users successfully")
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed syncing down users", e)
-        }
+            val response = client.postgrest.from("user_profiles").select().data
+            val data = json.decodeFromString<List<UserProfile>>(response)
+            data.forEach { repository.userDao.insertUser(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync user_profiles fail", e) }
 
-        // Synchronize posts
+        // Workspaces
         try {
-            val postsResponse = api.getPosts()
-            if (postsResponse.isSuccessful) {
-                postsResponse.body()?.let { posts ->
-                    if (posts.isNotEmpty()) {
-                        try { repository.postDao.insertPosts(posts) } catch (e: Exception) { Log.e(TAG, "Fail saving sync posts", e) }
-                        Log.d(TAG, "Synced down posts successfully (${posts.size} items)")
-                    }
-                }
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed syncing down posts", e)
-        }
+            val response = client.postgrest.from("workspaces").select().data
+            val data = json.decodeFromString<List<Workspace>>(response)
+            data.forEach { repository.workspaceDao.insertWorkspace(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync workspaces fail", e) }
 
-        // Synchronize comments
+        // Members
         try {
-            val commentResponse = api.getComments()
-            if (commentResponse.isSuccessful) {
-                commentResponse.body()?.forEach { comment ->
-                    try { repository.commentDao.insertComment(comment) } catch (e: Exception) { Log.e(TAG, "Fail saving sync comment", e) }
-                }
-                Log.d(TAG, "Synced down comments successfully")
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed syncing down comments", e)
-        }
+            val response = client.postgrest.from("workspace_members").select().data
+            val data = json.decodeFromString<List<WorkspaceMember>>(response)
+            data.forEach { repository.workspaceMemberDao.insertMember(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync workspace_members fail", e) }
 
-        // Synchronize projects
+        // Tasks
         try {
-            val projectsResponse = api.getProjects()
-            if (projectsResponse.isSuccessful) {
-                projectsResponse.body()?.let { projects ->
-                    if (projects.isNotEmpty()) {
-                        try { repository.projectDao.insertProjects(projects) } catch (e: Exception) { Log.e(TAG, "Fail saving sync projects", e) }
-                        Log.d(TAG, "Synced down projects successfully (${projects.size} items)")
-                    }
-                }
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed syncing down projects", e)
-        }
+            val response = client.postgrest.from("production_tasks").select().data
+            val data = json.decodeFromString<List<ProductionTask>>(response)
+            data.forEach { repository.productionTaskDao.insertTask(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync production_tasks fail", e) }
 
-        // Synchronize pitches
+        // Agreements
         try {
-            val pitchesResponse = api.getPitches()
-            if (pitchesResponse.isSuccessful) {
-                pitchesResponse.body()?.forEach { pitch ->
-                    try { repository.pitchDao.insertPitch(pitch) } catch (e: Exception) { Log.e(TAG, "Fail saving sync pitch", e) }
-                }
-                Log.d(TAG, "Synced down pitches successfully")
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed syncing down pitches", e)
-        }
+            val response = client.postgrest.from("team_agreements_table").select().data
+            val data = json.decodeFromString<List<TeamAgreement>>(response)
+            data.forEach { repository.agreementDao.insertAgreement(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync team_agreements fail", e) }
 
-        // Synchronize messages
+        // Acknowledgments
         try {
-            val messagesResponse = api.getMessages()
-            if (messagesResponse.isSuccessful) {
-                messagesResponse.body()?.forEach { message ->
-                    try { repository.messageDao.insertMessage(message) } catch (e: Exception) { Log.e(TAG, "Fail saving sync message", e) }
-                }
-                Log.d(TAG, "Synced down chat messages successfully")
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed syncing down chat messages", e)
-        }
+            val response = client.postgrest.from("agreement_acknowledgments_table").select().data
+            val data = json.decodeFromString<List<AgreementAcknowledgment>>(response)
+            data.forEach { repository.agreementDao.insertAcknowledgment(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync acknowledgments fail", e) }
 
-        // Synchronize contracts
+        // Messages
         try {
-            val contractsResponse = api.getContracts()
-            if (contractsResponse.isSuccessful) {
-                contractsResponse.body()?.forEach { contract ->
-                    try { repository.contractDao.insertContract(contract) } catch (e: Exception) { Log.e(TAG, "Fail saving sync contract", e) }
-                }
-                Log.d(TAG, "Synced down contracts successfully")
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "Failed syncing down contracts", e)
-        }
+            val response = client.postgrest.from("messages").select().data
+            val data = json.decodeFromString<List<Message>>(response)
+            data.forEach { repository.messageDao.insertMessage(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync messages fail", e) }
 
-        Log.d(TAG, "Full Supabase sync down completed.")
+        // Endorsements
+        try {
+            val response = client.postgrest.from("endorsements").select().data
+            val data = json.decodeFromString<List<Endorsement>>(response)
+            repository.endorsementDao.insertEndorsements(data)
+        } catch (e: Exception) { Log.e(TAG, "Sync endorsements fail", e) }
+
+        // Posts
+        try {
+            val response = client.postgrest.from("posts").select().data
+            val data = json.decodeFromString<List<Post>>(response)
+            repository.postDao.insertPosts(data)
+        } catch (e: Exception) { Log.e(TAG, "Sync posts fail", e) }
+
+        // Reports (Admin only handled by policies)
+        try {
+            val response = client.postgrest.from("reports_table").select().data
+            val data = json.decodeFromString<List<Report>>(response)
+            data.forEach { repository.reportDao.insertReport(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync reports fail", e) }
+
+        // Audit Logs
+        try {
+            val response = client.postgrest.from("admin_audit_logs_table").select().data
+            val data = json.decodeFromString<List<AuditLog>>(response)
+            data.forEach { repository.auditLogDao.insertLog(it) }
+        } catch (e: Exception) { Log.e(TAG, "Sync logs fail", e) }
     }
 
-    // --- UPLOAD SYNCHRONIZATION WRAPPERS ---
-
-    suspend fun syncUpUser(context: Context, user: User) = withContext(Dispatchers.IO) {
+    suspend fun syncUpReport(context: Context, report: Report) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try {
-            val response = api.upsertUser(user = user)
-            Log.d(TAG, "syncUpUser response: ${response.code()} successful=${response.isSuccessful}")
-        } catch (e: Throwable) {
-            Log.e(TAG, "Network exception in syncUpUser", e)
-        }
+        try { SupabaseConfig.client.postgrest.from("reports_table").upsert(report) } catch (e: Exception) { Log.e(TAG, "syncUpReport fail", e) }
     }
 
-    suspend fun syncUpPost(context: Context, post: Post) = withContext(Dispatchers.IO) {
+    suspend fun syncUpAuditLog(context: Context, log: AuditLog) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try {
-            val response = api.upsertPost(post = post)
-            Log.d(TAG, "syncUpPost response: ${response.code()} successful=${response.isSuccessful}")
-        } catch (e: Throwable) {
-            Log.e(TAG, "Network exception in syncUpPost", e)
-        }
+        try { SupabaseConfig.client.postgrest.from("admin_audit_logs_table").insert(log) } catch (e: Exception) { Log.e(TAG, "syncUpAuditLog fail", e) }
     }
 
-    suspend fun syncUpComment(context: Context, comment: Comment) = withContext(Dispatchers.IO) {
+    suspend fun syncDeletePost(context: Context, id: String) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try {
-            val response = api.insertComment(comment = comment)
-            Log.d(TAG, "syncUpComment response: ${response.code()}")
-        } catch (e: Throwable) {
-            Log.e(TAG, "Network exception in syncUpComment", e)
-        }
+        try { SupabaseConfig.client.postgrest.from("forum_posts_table").delete { filter { eq("post_id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeletePost fail", e) }
     }
 
-    suspend fun syncUpProject(context: Context, project: Project) = withContext(Dispatchers.IO) {
+    suspend fun syncDeleteComment(context: Context, id: String) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try {
-            val response = api.upsertProject(project = project)
-            Log.d(TAG, "syncUpProject response: ${response.code()}")
-        } catch (e: Throwable) {
-            Log.e(TAG, "Network exception in syncUpProject", e)
-        }
+        // Assuming there is a comments table in Supabase
+        try { SupabaseConfig.client.postgrest.from("forum_comments_table").delete { filter { eq("comment_id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteComment fail", e) }
     }
 
-    suspend fun syncUpPitch(context: Context, pitch: Pitch) = withContext(Dispatchers.IO) {
+    suspend fun syncUpUser(context: Context, user: UserProfile) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try {
-            val response = api.upsertPitch(pitch = pitch)
-            Log.d(TAG, "syncUpPitch response: ${response.code()}")
-        } catch (e: Throwable) {
-            Log.e(TAG, "Network exception in syncUpPitch", e)
-        }
+        try { SupabaseConfig.client.postgrest.from("user_profiles").upsert(user) } catch (e: Exception) { Log.e(TAG, "syncUpUser fail", e) }
+    }
+
+    suspend fun syncUpWorkspace(context: Context, workspace: Workspace) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("workspaces").upsert(workspace) } catch (e: Exception) { Log.e(TAG, "syncUpWorkspace fail", e) }
+    }
+
+    suspend fun syncUpWorkspaceMember(context: Context, member: WorkspaceMember) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("workspace_members").upsert(member) } catch (e: Exception) { Log.e(TAG, "syncUpWorkspaceMember fail", e) }
+    }
+
+    suspend fun syncUpProductionTask(context: Context, task: ProductionTask) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("production_tasks").upsert(task) } catch (e: Exception) { Log.e(TAG, "syncUpProductionTask fail", e) }
     }
 
     suspend fun syncUpMessage(context: Context, message: Message) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try {
-            val response = api.insertMessage(message = message)
-            Log.d(TAG, "syncUpMessage response: ${response.code()}")
-        } catch (e: Throwable) {
-            Log.e(TAG, "Network exception in syncUpMessage", e)
-        }
+        try { SupabaseConfig.client.postgrest.from("messages").insert(message) } catch (e: Exception) { Log.e(TAG, "syncUpMessage fail", e) }
     }
 
-    suspend fun syncUpContract(context: Context, contract: Contract) = withContext(Dispatchers.IO) {
+    suspend fun syncUpAgreement(context: Context, agreement: TeamAgreement) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try {
-            val response = api.upsertContract(contract = contract)
-            Log.d(TAG, "syncUpContract response: ${response.code()}")
-        } catch (e: Throwable) {
-            Log.e(TAG, "Network exception in syncUpContract", e)
-        }
+        try { SupabaseConfig.client.postgrest.from("team_agreements_table").upsert(agreement) } catch (e: Exception) { Log.e(TAG, "syncUpAgreement fail", e) }
+    }
+
+    suspend fun syncUpAcknowledgment(context: Context, acknowledgment: AgreementAcknowledgment) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("agreement_acknowledgments_table").upsert(acknowledgment) } catch (e: Exception) { Log.e(TAG, "syncUpAcknowledgment fail", e) }
+    }
+
+    suspend fun syncUpPost(context: Context, post: Post) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("posts").upsert(post) } catch (e: Exception) { Log.e(TAG, "syncUpPost fail", e) }
+    }
+
+    suspend fun syncUpComment(context: Context, comment: Comment) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("comments").insert(comment) } catch (e: Exception) { Log.e(TAG, "syncUpComment fail", e) }
     }
 }

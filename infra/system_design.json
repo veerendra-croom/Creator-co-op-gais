@@ -1,0 +1,226 @@
+{
+  "system_architecture": {
+    "module_1_profile_taxonomy": {
+      "channel": {
+        "name": "TechPulse",
+        "subscribers": 45000,
+        "monthly_revenue": 3000.0,
+        "niche": "Tech / AI Research",
+        "style": "Highly edited documentaries (10min)"
+      },
+      "software_stack": [
+        "Adobe Premiere Pro",
+        "Adobe After Effects"
+      ],
+      "equity_structure": {
+        "manager": 0.4,
+        "editor": 0.3,
+        "writer": 0.2,
+        "treasury": 0.1
+      }
+    },
+    "module_2_the_square_forum": {
+      "featured_post": {
+        "title": "Documentary Burnout: Why Tech Channels are Harder than Ever to Solo",
+        "body": "Hey Creator community. I've hit the wall with TechPulse. 45k subs in and I'm spending 60 hours a week on research and motion graphics. My documentaries are hitting that 10-minute sweet spot but I can't sustain the Premiere/AE grind alone while deep-diving into AI research. I'm looking to spin up a Syndicate to scale this. Who else is feeling the documentary burnout?",
+        "space": "Strategy",
+        "tags": [
+          "Burnout",
+          "Scaling",
+          "Syndicate"
+        ],
+        "automated_engagement": [
+          {
+            "user": "EditWizard_99",
+            "comment": "Preach. AE renders alone are a full-time job. Have you considered splitting equity for a dedicated VFX hand?",
+            "upvotes": 12
+          },
+          {
+            "user": "ScriptNinja",
+            "comment": "AI research is moving so fast I spend 4 days just reading papers before I write a single line. The solo model is dead.",
+            "upvotes": 8
+          },
+          {
+            "user": "GrowthHacker",
+            "comment": "Syndicates are the only way to retain 100% sanity while giving up 30% revenue. Following this.",
+            "upvotes": 5
+          }
+        ]
+      }
+    },
+    "module_3_syndicate_matchmaker": {
+      "project_card": {
+        "pitch": "Scaling TechPulse (45k Subs) into a high-production AI documentary powerhouse. Seeking long-term partners for revenue-share skin in the game.",
+        "open_roles": [
+          {
+            "role": "Video Editor",
+            "requirements": [
+              "Adobe Premiere",
+              "After Effects",
+              "10min documentary experience"
+            ],
+            "equity": 0.3
+          },
+          {
+            "role": "Scriptwriter",
+            "requirements": [
+              "AI/Tech Research depth",
+              "Long-form storytelling"
+            ],
+            "equity": 0.2
+          }
+        ],
+        "financial_projection": {
+          "current_adsense": 3000.0,
+          "target_growth": "2x within 6 months"
+        }
+      }
+    },
+    "module_4_legal_pipeline": {
+      "contract_summary": {
+        "agreement_type": "Automated Revenue Share Syndicate Agreement",
+        "parties": [
+          "Channel Manager",
+          "Video Editor",
+          "Scriptwriter"
+        ],
+        "clauses": [
+          {
+            "id": "REV_DIST_01",
+            "title": "Revenue Distribution Schedule",
+            "content": "Gross revenue shall be split 40% Manager, 30% Editor, 20% Writer, with 10% retained in the Channel Treasury for operational assets."
+          },
+          {
+            "id": "SEC_7_4_PERFORMANCE",
+            "title": "Performance Standards & Penalty Clause",
+            "content": "Should an Editor/Writer miss two (2) consecutive production deadlines without a verified medical exemption, their individual equity share shall be reduced by five percent (5%). This delta shall be re-allocated to the Channel Treasury."
+          }
+        ]
+      }
+    },
+    "module_5_escrow_splitter": {
+      "simulation_ledger": {
+        "incoming_pool": 3000.0,
+        "distributions": {
+          "manager_share": 1200.0,
+          "editor_share": 900.0,
+          "writer_share": 600.0,
+          "treasury_share": 300.0
+        },
+        "status": "CALCULATED_SUCCESS"
+      }
+    },
+    "security_rbac": {
+      "roles": {
+        "PUBLIC_USER": {
+          "status": "UNREGISTERED",
+          "allow": [
+            "READ_PUBLIC_POSTS",
+            "READ_OPEN_PROJECTS",
+            "READ_PUBLIC_PROFILES"
+          ],
+          "deny": [
+            "POST_COMMENTS",
+            "SUBMIT_PITCHES",
+            "EXECUTE_PAYOUTS",
+            "READ_PRIVATE_CHATS"
+          ],
+          "ui_visibility": [
+            "TheSquareView",
+            "SyndicateBoard_Preview"
+          ],
+          "ui_locked": [
+            "WorkspaceTab",
+            "WalletTab",
+            "PitchButton"
+          ]
+        },
+        "REGISTERED_USER": {
+          "status": "VERIFIED",
+          "allow": [
+            "POST_FORUM",
+            "SUBMIT_PITCHES",
+            "JOIN_WORKSPACES",
+            "TRIGGER_CASH_OUT"
+          ],
+          "deny": [
+            "DELETE_OTHER_POSTS",
+            "BYPASS_SMART_CONTRACTS",
+            "SYSTEM_FREEZE"
+          ],
+          "ui_visibility": [
+            "AllTabs",
+            "ActivePitchInterface",
+            "WalletDashboard"
+          ]
+        },
+        "PLATFORM_ADMIN": {
+          "status": "SUPERUSER",
+          "allow": [
+            "MODERATE_CONTENT",
+            "READ_PRIVATE_CONTRACT_LOGS",
+            "SYSTEM_FREEZE_PAYOUTS",
+            "RESOLVE_DISPUTES"
+          ],
+          "ui_visibility": [
+            "AdminControlPanel",
+            "SecretAuditLogs"
+          ]
+        }
+      }
+    },
+    "notification_engine": {
+      "event_stream": [
+        {
+          "id": "EVENT_001",
+          "type": "MILESTONE_UPLOAD",
+          "priority": "MEDIUM",
+          "targeting": "TEAM_ONLY",
+          "payload": {
+            "title": "Project Update: TechPulse",
+            "body": "VFX Wizard uploaded 'Final_Draft_V1.mp4'. Ready for manager review.",
+            "deep_link": "/workspace/techpulse/assets"
+          }
+        },
+        {
+          "id": "EVENT_002",
+          "type": "SECURITY_BREACH",
+          "priority": "CRITICAL",
+          "targeting": "ADMIN_ONLY",
+          "payload": {
+            "title": "SECURITY ALERT",
+            "body": "Unauthorized DB write attempt on financial_ledgers_table blocked for user Guest_9821.",
+            "mitigation": "IP_BAN_TMP"
+          }
+        },
+        {
+          "id": "EVENT_003",
+          "type": "FINANCIAL_SETTLEMENT",
+          "priority": "HIGH",
+          "targeting": "TEAM_ONLY",
+          "payload": {
+            "title": "Payout Executed: TechPulse",
+            "body": "AdSense deposit of $3,000 processed. Your share has been allocated to your wallet.",
+            "deep_link": "/wallet"
+          }
+        }
+      ]
+    },
+    "governance_engine": {
+      "dispute_TP_001": {
+        "status": "APPROVED_AND_EXECUTED",
+        "consensus": 0.6,
+        "threshold": 0.5,
+        "mutation": {
+          "editor_new_equity": 0.25,
+          "treasury_new_equity": 0.15,
+          "event": "SEC_7_4_PERFORMANCE_TRIGGERED"
+        },
+        "admin_audit": {
+          "escrow_hold": true,
+          "appeal_window_days": 7
+        }
+      }
+    }
+  }
+}

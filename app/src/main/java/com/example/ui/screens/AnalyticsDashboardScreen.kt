@@ -1,0 +1,243 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.ui.theme.*
+import com.example.ui.viewmodels.AnalyticsViewModel
+import com.example.ui.viewmodels.FunnelStep
+
+@Composable
+fun AnalyticsDashboardScreen(
+    analyticsViewModel: AnalyticsViewModel,
+    onBack: () -> Unit
+) {
+    val userActivity by analyticsViewModel.userActivity.collectAsState()
+    val funnelData by analyticsViewModel.funnelData.collectAsState()
+    val pmfMetrics by analyticsViewModel.pmfMetrics.collectAsState()
+    val referralStats by analyticsViewModel.referralStats.collectAsState()
+    val churnAlerts by analyticsViewModel.churnAlerts.collectAsState()
+    val toastMessage by analyticsViewModel.toastMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            analyticsViewModel.resetToast()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = PrimaryBackground
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Text("Founder Control Center", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                }
+                
+                Row {
+                    IconButton(onClick = { analyticsViewModel.exportData("CSV") }) {
+                        Icon(Icons.Default.Download, contentDescription = "Export", tint = AccentBlue)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                // ... (rest of the sections remain the same)
+                // 1. PMF & STICKINESS
+                item {
+                    DashboardSectionHeader("PMF & STICKINESS")
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        pmfMetrics.forEach { (label, value) ->
+                            AnalyticsCard(label, value.toString(), "", AccentBlue, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+
+                // 2. ACTIVATION FUNNEL
+                item {
+                    DashboardSectionHeader("ACTIVATION FUNNEL")
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, ColorDivider)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            funnelData.forEachIndexed { index, step ->
+                                FunnelRow(step.name, step.count, if (index > 0) funnelData[index-1].count else 0)
+                            }
+                        }
+                    }
+                }
+
+                // 3. BETA USER HEALTH
+                item {
+                    DashboardSectionHeader("BETA USER HEALTH (Active Ranking)")
+                    if (userActivity.isEmpty()) {
+                        Text("No activity recorded.", color = TextSecondary, fontSize = 12.sp)
+                    } else {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                userActivity.take(5).forEach { (userId, count) ->
+                                    UserActivityRow(userId, count)
+                                    Divider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4. CHURN & ALERTS
+                if (churnAlerts.isNotEmpty()) {
+                    item {
+                        DashboardSectionHeader("CHURN ALERTS", color = AccentRed)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            churnAlerts.forEach { alert ->
+                                AlertCard(alert)
+                            }
+                        }
+                    }
+                }
+
+                // 5. REFERRAL MONITORING
+                item {
+                    DashboardSectionHeader("REFERRAL MONITORING")
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AnalyticsCard("Portfolio Shares", referralStats["Portfolio Shares"]?.toString() ?: "0", "", NeonEmerald, modifier = Modifier.weight(1f))
+                        AnalyticsCard("Viral Coeff", "%.2f".format(referralStats["Viral Coeff"] ?: 0f), "", NeonEmerald, modifier = Modifier.weight(1f))
+                    }
+                }
+
+                // EXPORT ACTIONS
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = { analyticsViewModel.exportData("CSV") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = BorderStroke(1.dp, ColorDivider)
+                        ) {
+                            Text("Export CSV")
+                        }
+                        OutlinedButton(
+                            onClick = { analyticsViewModel.exportData("JSON") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = BorderStroke(1.dp, ColorDivider)
+                        ) {
+                            Text("Export JSON")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(40.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DashboardSectionHeader(title: String, color: Color = Color.White) {
+    Text(
+        text = title,
+        color = if (color == Color.White) TextSecondary else color,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Black,
+        letterSpacing = 1.5.sp,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+}
+
+@Composable
+fun FunnelRow(name: String, count: Int, prevCount: Int) {
+    val conversion = if (prevCount > 0) (count.toFloat() / prevCount * 100).toInt() else 100
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(name, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text("$count", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Spacer(modifier = Modifier.width(16.dp))
+        Text("$conversion%", color = if (conversion > 80) NeonEmerald else AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+    }
+}
+
+@Composable
+fun UserActivityRow(userId: String, count: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(AccentBlue.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+            Text(userId.take(1).uppercase(), color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(userId, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text("$count events", color = TextSecondary, fontSize = 11.sp)
+    }
+}
+
+@Composable
+fun AlertCard(message: String) {
+    Surface(
+        color = AccentRed.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.ErrorOutline, null, tint = AccentRed, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(message, color = Color.White, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+fun AnalyticsCard(title: String, value: String, change: String, tint: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, ColorDivider)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(title, color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+        }
+    }
+}

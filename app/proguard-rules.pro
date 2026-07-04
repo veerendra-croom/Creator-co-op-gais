@@ -1,21 +1,44 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Control optimization and shrinking profile explicitly.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# 1. Attributes & Source files configuration
+-keepattributes SourceFile,LineNumberTable,*Annotation*,Signature,InnerClasses,EnclosingMethod
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# 2. General Kotlin support rules
+-dontwarn kotlin.**
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# 3. Kotlinx Serialization DTO Keeping
+# Prevents shrinking or renaming of all @Serializable models (User, Project, Pitch, Transaction) 
+# and their synthetic Companion serializers to avoid reflection failures.
+-keep class com.example.data.model.** { *; }
+-keepclassmembers class com.example.data.model.** { *; }
+
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable *;
+}
+-keepclassmembers class **$Serializer {
+    *;
+}
+-keepclassmembers class ** {
+    *** Companion;
+}
+-keepclassmembers class ** {
+    *** Companion$*;
+}
+
+# 4. Local Room Database Security & Structural Keeps
+# Keeps generated database schemas, internal mappings, and Daos perfectly unified.
+-keep class * extends androidx.room.RoomDatabase
+-keep class com.example.data.local.** { *; }
+-keepclassmembers class com.example.data.local.** { *; }
+-dontwarn androidx.room.**
+
+# 5. Network & Networking Utilities
+# Preserve OkHttp & Ktor client configurations from static reverse-engineering and shrinking anomalies.
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-dontwarn okhttp3.**
+-dontwarn io.ktor.**
+-keep class io.ktor.** { *; }

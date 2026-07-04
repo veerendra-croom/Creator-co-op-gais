@@ -21,9 +21,9 @@ Status	Pre-Development
 
 1.1 Problem Statement
 Independent digital creators (editors, writers, hosts, animators) face three compounding problems:
-▸	No trusted infrastructure to form and legally bind revenue-sharing production teams with strangers online.
-▸	Manual, error-prone revenue splitting via bank transfers, screenshots, and informal agreements.
-▸	No single platform that combines community discovery, contract management, production tools, and financial automation for the creator economy.
+▸	No trusted infrastructure to form non-financial collaboration agreements with team members.
+▸	Manual, error-prone expectation management via scattered chat apps and informal verbal agreements.
+▸	No single platform that combines community discovery, project management, production tools, and alignment logs for the creator economy.
 
 1.2 Target Users — Personas
 Persona A — The Freelance Editor	Age 18–32. Skilled video/audio editor seeking equity deals instead of one-time Fiverr gigs. Needs portfolio visibility, stable recurring income.

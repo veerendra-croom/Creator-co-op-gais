@@ -1,0 +1,71 @@
+{
+  "e2e_integration_test_blueprint": {
+    "project": "Creator Co-Op",
+    "test_environment": "Supabase Local + Android Emulator CI + Roborazzi/Espresso",
+    "suite_1_backend_webhook_injection": {
+      "objective": "Verify the Escrow Splitter Edge Function calculates accurate distributions for incoming monetization.",
+      "injection_sql": {
+        "description": "Mimic raw AdSense deposit for TechPulse Syndicate.",
+        "query": "INSERT INTO financial_ledgers_table (project_id, contract_id, incoming_pool_amount, payout_status) VALUES ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', 'e1ee-b0-c0-d0', 3000.00, 'PENDING') RETURNING ledger_id;"
+      },
+      "edge_function_assertions": [
+        {
+          "step": "Trigger Check",
+          "logic": "Ensure 'financial_ledgers_table' INSERT webhook successfully reaches 'escrow-splitter' endpoint."
+        },
+        {
+          "step": "Mathematical Fidelity",
+          "assertions": {
+            "manager_payout": "Assert equal 1200.00 (40%)",
+            "editor_payout": "Assert equal 900.00 (30%)",
+            "writer_payout": "Assert equal 600.00 (20%)",
+            "treasury_payout": "Assert equal 300.00 (10%)"
+          },
+          "precision_rule": "Scale to 2 decimal places using BigNumber to avoid IEEE 754 floating-point drift."
+        },
+        {
+          "step": "State Persistence",
+          "logic": "Verify 'financial_ledgers_table' row status updates to 'SETTLED' and 'distribution_line_items' JSONB matches the calculated array."
+        }
+      ]
+    },
+    "suite_2_android_offline_recovery": {
+      "objective": "Verify local Room SQLite persistence and ViewModel state restoration during network instability.",
+      "scenario": "Network Interruption Post-Split",
+      "test_logic_android": {
+        "step_1_pre_check": "Load 'CreatorWalletDashboard' while online. Assert total balance is $3,000.00.",
+        "step_2_simulated_disconnect": "Execute 'adb shell svc wifi disable' and 'adb shell svc data disable'.",
+        "step_3_dao_verification": "val cachedTxs = transactionDao.getTransactionsForUser('me').first(); assertThat(cachedTxs).isNotEmpty();",
+        "step_4_viewmodel_bind": "Assert 'allTransactions' StateFlow continues to emit the 4 new distribution entries from the local SQLite cache.",
+        "step_5_ui_indicator": "Assert 'NetworkErrorBanner' is visible while 'DonutChart' remains rendered using Room-cached data."
+      }
+    },
+    "suite_3_compose_reactive_ui": {
+      "objective": "Verify UI node mutations and interaction throttling using ComposeTestRule.",
+      "ui_assertions": [
+        {
+          "test_name": "PieChartVisibility",
+          "assertion": "composeTestRule.onNodeWithTag('wallet_pie_card').assertExists().assertIsDisplayed();",
+          "visual_verification": "Using Roborazzi to screenshot-compare the 'DonutChart' canvas against the 40/30/20/10 reference template."
+        },
+        {
+          "test_name": "LedgerListReactiveUpdate",
+          "assertion": "composeTestRule.onNodeWithTag('transaction_ledger_list').onChildren().assertAny(hasText('YouTube AdSense (May)'));"
+        },
+        {
+          "test_name": "CashOutThrottling",
+          "logic": [
+            "1. Click 'cashout_button_interactive'",
+            "2. Immediately assert 'cashout_button_interactive' is !isEnabled",
+            "3. Assert CircularProgressIndicator is displayed in button content",
+            "4. Verify that a second click attempt within the 2.5s simulated window does not trigger a second repository.insertTransaction() call."
+          ]
+        },
+        {
+          "test_name": "SuccessBannerAppearance",
+          "assertion": "composeTestRule.waitUntil(3000) { hasText('Successfully routed').isVisible() }"
+        }
+      ]
+    }
+  }
+}

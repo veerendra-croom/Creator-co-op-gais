@@ -1,0 +1,194 @@
+{
+  "frontend_state_machine_blueprint": {
+    "project_name": "Creator Co-Op",
+    "version": "1.0.0-PROTOTYPE",
+    "base_state_management": "Jetpack Compose StateFlow / MVVM / Supabase Realtime",
+    "screen_state_matrix": {
+      "flow_1_onboarding_identity": {
+        "panel_id": "onboarding_flow",
+        "states": {
+          "INITIAL_LOADING": {
+            "components": [
+              "Animated Logo Splash (Lottie)",
+              "Identity Preference Placeholder Skeletons"
+            ],
+            "actions": [
+              "session_check_lookup",
+              "user_profile_metadata_prewarm"
+            ]
+          },
+          "SUCCESS_DATA_RENDER": {
+            "components": [
+              "Role Selection Grid (Founder, Editor, Writer)",
+              "Portfolio Tag Input Field (Autocomplete)",
+              "Social Link Verification Badge"
+            ],
+            "primary_cta": "Finalize Creator Profile",
+            "dynamic_loops": "Trending Portfolio Tags Fetch"
+          },
+          "EMPTY_OR_ZERO_STATE": {
+            "message": "Welcome, Creator. Ready to build your Syndicate?",
+            "action_string": "Tap to start Role Selection"
+          },
+          "SYSTEM_ERROR_BOUNDARY": {
+            "handling": "Auth Lock Overlay - Redirect to Google/Stripe Onboarding",
+            "error_codes": [
+              "AUTH_SESSION_EXPIRED",
+              "STRIPE_ID_MISMATCH"
+            ]
+          }
+        }
+      },
+      "flow_2_syndicate_matchmaker": {
+        "panel_id": "syndicate_board",
+        "states": {
+          "INITIAL_LOADING": {
+            "components": [
+              "Card Stack Skeleton Shimmer",
+              "Filter Chip Horizon Bar"
+            ]
+          },
+          "SUCCESS_DATA_RENDER": {
+            "components": [
+              "Interactive Project Swiper (Reddit/LinkedIn hybrid)",
+              "Equity Pie Chart Visualization (40/30/20 split logic)",
+              "Live Metrics Ribbon (Sub counts, AdSense revenue)"
+            ],
+            "primary_cta": "Submit Pitch for Revenue Share",
+            "dynamic_loops": "Real-time Pitch Counter per Project"
+          },
+          "EMPTY_OR_ZERO_STATE": {
+            "message": "No Syndicates currently looking for your role.",
+            "action_string": "Adjust Portfolio Tags to see more projects"
+          },
+          "SYSTEM_ERROR_BOUNDARY": {
+            "handling": "Permissions Block - Unauthorized Role UI Blur",
+            "error_msg": "PUBLIC_USER must Register to submit Project Pitches."
+          }
+        }
+      },
+      "flow_3_team_workspace_hub": {
+        "panel_id": "active_workspace",
+        "states": {
+          "INITIAL_LOADING": {
+            "components": [
+              "Chat Stream List Skeleton",
+              "Contract Vault Shimmer"
+            ]
+          },
+          "SUCCESS_DATA_RENDER": {
+            "components": [
+              "Multi-User Encrypted Workspace Chat",
+              "Asset Pipeline Progress Tracker",
+              "Digital Contract Vault Overlay"
+            ],
+            "primary_cta": "Sign Pending Agreement",
+            "dynamic_loops": "Supabase Realtime Message Sync"
+          },
+          "EMPTY_OR_ZERO_STATE": {
+            "message": "You aren't in any active Syndicates yet.",
+            "action_string": "Browse the Board to join a team"
+          },
+          "SYSTEM_ERROR_BOUNDARY": {
+            "handling": "Workspace Lockdown Mode",
+            "error_msg": "User ID no longer associated with Project_ID_001. Access Revoked."
+          }
+        }
+      },
+      "flow_4_financial_wallet": {
+        "panel_id": "creator_wallet",
+        "states": {
+          "INITIAL_LOADING": {
+            "components": [
+              "Balance Card Skeleton",
+              "Ledger Entry Shimmer"
+            ]
+          },
+          "SUCCESS_DATA_RENDER": {
+            "components": [
+              "Split-Balance Header (Cleared vs. Escrow)",
+              "Detailed Revenue Ledger (Split history line items)",
+              "Financial Performance Graph"
+            ],
+            "primary_cta": "Transfer to Bank (Stripe)",
+            "dynamic_loops": "Webhook-driven balance updates"
+          },
+          "EMPTY_OR_ZERO_STATE": {
+            "message": "Zero balance. Waiting for first Syndicate payout.",
+            "action_string": "Review Active Project Milestones"
+          },
+          "SYSTEM_ERROR_BOUNDARY": {
+            "handling": "Ledger Freeze State - Dispute Flagging UI",
+            "error_msg": "Wallet Locked due to active Syndicate Contract Dispute. Contact Support/Admin."
+          }
+        }
+      }
+    },
+    "smart_contract_signature_pathway": {
+      "journey_steps": [
+        {
+          "frame": 1,
+          "name": "Contract Notification Alert",
+          "ui_action": "Floating Banner: 'Project: TechPulse sent a Revenue Share Agreement'",
+          "backend_call": "select_smart_contract_details"
+        },
+        {
+          "frame": 2,
+          "name": "Terms Review Modal",
+          "ui_action": "Scrollable legal text view highlighting SEC_7_4_PERFORMANCE penalty logic",
+          "user_validation": "Must scroll to bottom to enable 'Accept' button"
+        },
+        {
+          "frame": 3,
+          "name": "Identity Verification",
+          "ui_action": "Biometric (Fingerprint/FaceID) prompt or Digital Signature pad",
+          "security_check": "MATCH_USER_ROLE_UID"
+        },
+        {
+          "frame": 4,
+          "name": "Submission Shimmer",
+          "ui_action": "Button transition to loading spinner; 'Updating Immutable Ledger...'",
+          "backend_call": "POST /v1/contracts/sign - triggers Supabase UPDATE"
+        },
+        {
+          "frame": 5,
+          "name": "Success Mutation",
+          "ui_action": "Confetti Overlay; Status Chip morphs from 'PENDING' to 'ACTIVE'",
+          "next_step": "Redirect to Financial Planner with active split chart"
+        }
+      ]
+    },
+    "stripe_cashout_feedback_loop": {
+      "transaction_flow": {
+        "amount": 450.0,
+        "steps": [
+          {
+            "visual": "Modal: 'Confirm Payout to Chase Bank x-4242?'",
+            "state": "USER_CONFIRMATION",
+            "button_animation": "Standard M3 Ripple"
+          },
+          {
+            "visual": "Full-screen Pulsing Glow; 'Validating Split Ledger...'",
+            "state": "LEDGER_VALIDATION",
+            "logic": "Verify cleared_balance >= 450.00"
+          },
+          {
+            "visual": "Linear Progress Bar with Stripe Logo fading in.",
+            "state": "PROCESSING_RAILS",
+            "logic": "Call Edge Function -> Stripe Connect API Transfer"
+          },
+          {
+            "visual": "Emerald Checkmark Banner; 'Funds are en-route!'",
+            "state": "SUCCESS_SETTLEMENT",
+            "persistence": "Update financial_ledgers_table row to SETTLED"
+          }
+        ],
+        "error_states": {
+          "INSUFFICIENT_FUNDS": "Shake animation on balance text; Red toast error.",
+          "RAIL_TIMEOUT": "Yellow warning banner; 'Bank rails slow. Payout in process - check later.'",
+          "ROLE_UNAUTHORIZED": "Locked Wallet Overlay for PUBLIC_USER role."
+        }
+      }
+    }
+  }
+}

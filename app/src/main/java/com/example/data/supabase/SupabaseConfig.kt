@@ -5,14 +5,18 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.util.Log
 import com.example.BuildConfig
-import okhttp3.Interceptor
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.realtime.Realtime
+import io.github.jan.supabase.storage.Storage
+import io.github.jan.supabase.storage.storage
+import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
-import okhttp3.Response
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import io.ktor.client.engine.okhttp.OkHttp
+import kotlinx.serialization.json.Json
+import io.github.jan.supabase.serializer.KotlinXSerializer
 
 object SupabaseConfig {
     private const val TAG = "SupabaseConfig"
@@ -45,36 +49,72 @@ object SupabaseConfig {
         }
     }
 
-    private val moshi: Moshi = Moshi.Builder()
-        .addLast(KotlinJsonAdapterFactory())
-        .build()
+    // Official Supabase SDK Client
+    val client: SupabaseClient by lazy {
+        val okHttpClient = OkHttpClient.Builder().build()
 
-    private val authInterceptor = Interceptor { chain ->
-        val originalRequest = chain.request()
-        val requestWithHeaders = originalRequest.newBuilder()
-            .header("apikey", supabaseKey)
-            .header("Authorization", "Bearer $supabaseKey")
-            .header("Content-Type", "application/json")
-            .header("Prefer", "return=representation") // So writes return the representation
-            .build()
-        chain.proceed(requestWithHeaders)
-    }
-
-    private val okHttpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .addInterceptor(authInterceptor)
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+        createSupabaseClient(
+            supabaseUrl = supabaseUrl,
+            supabaseKey = supabaseKey
+        ) {
+            defaultSerializer = KotlinXSerializer(Json {
+                ignoreUnknownKeys = true
+                coerceInputValues = true
+                encodeDefaults = true
             })
-            .build()
+            httpEngine = OkHttp.create {
+                preconfigured = okHttpClient
+            }
+            install(Postgrest)
+            install(Auth) {
+                sessionManager = object : io.github.jan.supabase.auth.SessionManager {
+                    private var currentSession: io.github.jan.supabase.auth.user.UserSession? = null
+                    override suspend fun saveSession(session: io.github.jan.supabase.auth.user.UserSession) {
+                        currentSession = session
+                    }
+                    override suspend fun loadSession(): io.github.jan.supabase.auth.user.UserSession? {
+                        return currentSession
+                    }
+                    override suspend fun deleteSession() {
+                        currentSession = null
+                    }
+                }
+                codeVerifierCache = object : io.github.jan.supabase.auth.CodeVerifierCache {
+                    private var currentVerifier: String? = null
+                    override suspend fun saveCodeVerifier(codeVerifier: String) {
+                        currentVerifier = codeVerifier
+                    }
+                    override suspend fun loadCodeVerifier(): String? {
+                        return currentVerifier
+                    }
+                    override suspend fun deleteCodeVerifier() {
+                        currentVerifier = null
+                    }
+                }
+            }
+            install(Realtime)
+            install(Storage)
+        }
     }
 
-    val retrofit: Retrofit by lazy {
-        Retrofit.Builder()
-            .baseUrl(if (supabaseUrl.endsWith("/")) supabaseUrl else "$supabaseUrl/")
-            .client(okHttpClient)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
+    /**
+     * Uploads a file to a Supabase Storage bucket.
+     * @param bucket The name of the bucket (e.g., "avatars", "media").
+     * @param path The destination path/filename in the bucket.
+     * @param byteArray The file data.
+     * @return The public URL of the uploaded file.
+     */
+    suspend fun uploadFile(bucket: String, path: String, byteArray: ByteArray): String? {
+        return try {
+            val bucketInstance = client.storage.from(bucket)
+            bucketInstance.upload(path, byteArray) {
+                upsert = true
+            }
+            client.storage.from(bucket).publicUrl(path)
+        } catch (e: Exception) {
+            Log.e(TAG, "Storage upload failed: ${e.message}", e)
+            null
+        }
     }
 
     fun isNetworkAvailable(context: Context): Boolean {
