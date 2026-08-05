@@ -105,7 +105,7 @@ fun KnowledgeBaseScreen(onBack: () -> Unit) {
                     Text("No matching protocols found in archive.", color = TextSecondary, fontSize = 14.sp)
                 }
             } else {
-                items(articles) { article ->
+                items(articles, key = { it.title }) { article ->
                     ArticleItem(title = article.title, subtitle = article.subtitle, category = article.category)
                 }
             }

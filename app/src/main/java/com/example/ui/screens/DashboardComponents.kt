@@ -42,15 +42,14 @@ fun DashboardKPICard(label: String, value: String, icon: androidx.compose.ui.gra
             Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(12.dp))
             Text(text = value, fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.White)
-            Text(text = label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary, letterSpacing = 0.5.sp)
+            Text(text = label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextSecondary, letterSpacing = 0.5.sp)
         }
     }
 }
 
 @Composable
 fun ActivityTimelineItem(title: String, description: String, timestamp: Long) {
-    val formatter = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
-    val timeStr = formatter.format(Date(timestamp))
+    val relativeTime = remember(timestamp) { com.example.util.DateTimeUtils.getRelativeTimeSpanString(timestamp) }
     
     Row(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -68,7 +67,7 @@ fun ActivityTimelineItem(title: String, description: String, timestamp: Long) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(description, color = TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(timeStr, color = TextSecondary, fontSize = 11.sp)
+            Text(relativeTime, color = TextSecondary, fontSize = 12.sp)
         }
     }
 }
@@ -241,7 +240,7 @@ fun StatCard(modifier: Modifier, label: String, value: String, icon: androidx.co
             Icon(imageVector = icon, contentDescription = null, tint = color.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
-            Text(text = label, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = TextSecondary, letterSpacing = 1.sp)
+            Text(text = label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextSecondary, letterSpacing = 1.sp)
         }
     }
 }
@@ -315,7 +314,7 @@ fun SectionTitle(title: String) {
     Text(
         text = title,
         color = AccentRed,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         fontWeight = FontWeight.Black,
         letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
@@ -339,7 +338,7 @@ fun DashboardTaskItem(task: ProductionTask, workspaceName: String, onClick: (() 
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
                     .background(
                         when (task.kanbanLane.uppercase()) {
@@ -371,7 +370,7 @@ fun DashboardTaskItem(task: ProductionTask, workspaceName: String, onClick: (() 
                         "REVIEW" -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.primary
                     },
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(modifier = Modifier.width(16.dp))
@@ -385,7 +384,7 @@ fun DashboardTaskItem(task: ProductionTask, workspaceName: String, onClick: (() 
                 Text(
                     text = workspaceName,
                     color = TextSecondary,
-                    fontSize = 11.sp
+                    fontSize = 12.sp
                 )
             }
             Surface(
@@ -396,7 +395,7 @@ fun DashboardTaskItem(task: ProductionTask, workspaceName: String, onClick: (() 
                 Text(
                     text = task.kanbanLane,
                     color = TextSecondary,
-                    fontSize = 9.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
@@ -415,7 +414,7 @@ fun SpecialtyChip(label: String) {
         Text(
             text = label,
             color = Color.White,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
@@ -427,11 +426,13 @@ fun PortfolioItem(title: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 60.dp)
+            .heightIn(min = 64.dp)
             .background(SurfaceColor, RoundedCornerShape(12.dp))
             .border(1.dp, ColorDivider, RoundedCornerShape(12.dp))
-            .clickable { /* View Masterpiece */ }
-            .padding(10.dp),
+            .clickable { 
+                /* View Masterpiece placeholder */
+            }
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Thumbnail with beautiful ambient overlay
@@ -451,9 +452,12 @@ fun PortfolioItem(title: String) {
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text("Published Masterpiece", color = TextSecondary, fontSize = 11.sp)
+            Text("Published Masterpiece", color = TextSecondary, fontSize = 12.sp)
         }
-        IconButton(onClick = {}) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        IconButton(onClick = {
+            android.widget.Toast.makeText(context, "Opening asset: $title", android.widget.Toast.LENGTH_SHORT).show()
+        }, modifier = Modifier.size(48.dp)) {
             Icon(Icons.Default.Launch, contentDescription = "View", tint = AccentBlue, modifier = Modifier.size(20.dp))
         }
     }
@@ -486,13 +490,14 @@ fun SettingsRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 56.dp)
                 .clickable { onClick() }
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
             Spacer(modifier = Modifier.width(16.dp))
-            Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             Icon(Icons.Default.ChevronRight, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
         }
         if (!isLast) {

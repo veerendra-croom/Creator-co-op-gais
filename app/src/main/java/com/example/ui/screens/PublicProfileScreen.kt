@@ -38,6 +38,7 @@ fun PublicProfileScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val repository = remember { (context.applicationContext as com.example.CreatorCoopApp).container.repository }
     var isConnected by remember { mutableStateOf(false) }
     var connectionCount by remember { mutableIntStateOf(142) }
     var showInviteDialog by remember { mutableStateOf(false) }
@@ -48,16 +49,35 @@ fun PublicProfileScreen(
         profiles.find { it.id == userId || (userId == "me" && it.id == "me") } ?: profiles.find { it.id == "me" }
     }
 
-    val name = profile?.displayName ?: "Alex Mercer"
-    val bio = profile?.bio ?: "Lead Visual Storyteller & Script Blueprint Architect | 10M+ Combined Views"
-    val specialty = profile?.primarySpecialty ?: "Visual Storytelling"
-    val reputation = profile?.reputationScore ?: 98
-    val reliability = profile?.reliabilityBadge ?: "Platinum"
-    val level = profile?.verificationLevel ?: "L3 Expert Verified"
-    val completedProjects = profile?.completedProjectsCount ?: 14
-    val signedAgreements = profile?.signedAgreementsCount ?: 8
-    val onTimeRate = profile?.onTimeDeliveryRate ?: 98
-    val peerRating = profile?.peerRating ?: 4.9
+    val actualUserId = profile?.id ?: userId
+    val completedWorkspacesCount by remember(actualUserId) {
+        globalViewModel.getCompletedWorkspacesCountForUser(actualUserId)
+    }.collectAsState(initial = 0)
+    
+    val endorsements by remember(actualUserId) {
+        globalViewModel.getEndorsementsForUser(actualUserId)
+    }.collectAsState(initial = emptyList())
+
+    val tagCounts = remember(endorsements) {
+        val counts = mutableMapOf<String, Int>()
+        endorsements.forEach { endorsement ->
+            endorsement.tags.forEach { tag ->
+                counts[tag] = (counts[tag] ?: 0) + 1
+            }
+        }
+        counts
+    }
+
+    val name = profile?.displayName ?: profile?.email?.substringBefore("@") ?: "Anonymous User"
+    val bio = profile?.bio ?: "No bio provided yet."
+    val specialty = profile?.primarySpecialty ?: "Creator"
+    val reputation = profile?.reputationScore ?: 100
+    val reliability = profile?.reliabilityBadge ?: "Standard"
+    val level = profile?.verificationLevel ?: "L1 Standard"
+    val completedProjects = profile?.completedProjectsCount ?: 0
+    val signedAgreements = profile?.signedAgreementsCount ?: 0
+    val onTimeRate = profile?.onTimeDeliveryRate ?: 100
+    val peerRating = profile?.peerRating ?: 5.0
 
     val initials = name.split(" ").mapNotNull { it.firstOrNull() }.joinToString("").take(2).uppercase()
 
@@ -87,6 +107,21 @@ fun PublicProfileScreen(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black
             )
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = {
+                    val usernameToShare = if (!profile?.username.isNullOrBlank()) profile?.username else actualUserId
+                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, "Check out $name on Creator Co-Op")
+                        putExtra(android.content.Intent.EXTRA_TEXT, "View $name's public portfolio on Creator Co-Op: https://creatorcoop.app/u/$usernameToShare")
+                    }
+                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Profile"))
+                },
+                modifier = Modifier.testTag("share_profile_button")
+            ) {
+                Icon(Icons.Default.Share, contentDescription = "Share Profile", tint = Color.White)
+            }
         }
 
         LazyColumn(
@@ -256,39 +291,57 @@ fun PublicProfileScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         
                         // Verification Indicators & Badges
-                        Row(
+                        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                        androidx.compose.foundation.layout.FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(DS.Space8),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(DS.Space8),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
+                            UserRoleBadge(role = profile?.globalRole ?: "CREATOR", isPro = profile?.isVerifiedPro == true)
+
+                            SubscriptionTierBadge(isPro = profile?.isVerifiedPro == true)
+
+                            ReliabilityBadge(badge = reliability)
+
                             Surface(
-                                color = NeonEmerald.copy(alpha = 0.15f),
-                                contentColor = NeonEmerald,
+                                color = AccentBlue.copy(alpha = 0.15f),
+                                contentColor = AccentBlue,
                                 shape = DS.RadiusSmall,
-                                border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.3f))
+                                border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.3f))
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = DS.Space8, vertical = DS.Space4),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.VerifiedUser, null, modifier = Modifier.size(10.dp))
+                                    Icon(Icons.Default.WorkspacePremium, null, modifier = Modifier.size(12.dp), tint = AccentBlue)
                                     Spacer(modifier = Modifier.width(DS.Space4))
-                                    Text(level, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    Text("Workspaces Completed: $completedWorkspacesCount", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                                 }
                             }
 
+                            val isAvailable = profile?.availabilityStatus != "NOT_AVAILABLE"
                             Surface(
-                                color = CrispAmber.copy(alpha = 0.15f),
-                                contentColor = CrispAmber,
+                                color = if (isAvailable) NeonEmerald.copy(alpha = 0.15f) else AccentRed.copy(alpha = 0.15f),
+                                contentColor = if (isAvailable) NeonEmerald else AccentRed,
                                 shape = DS.RadiusSmall,
-                                border = BorderStroke(1.dp, CrispAmber.copy(alpha = 0.3f))
+                                border = BorderStroke(1.dp, if (isAvailable) NeonEmerald.copy(alpha = 0.3f) else AccentRed.copy(alpha = 0.3f))
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = DS.Space8, vertical = DS.Space4),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Stars, null, modifier = Modifier.size(10.dp))
-                                    Spacer(modifier = Modifier.width(DS.Space4))
-                                    Text("Badge: $reliability", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isAvailable) NeonEmerald else AccentRed)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isAvailable) "OPEN" else "NOT AVAILABLE",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -332,8 +385,8 @@ fun PublicProfileScreen(
                         horizontalArrangement = Arrangement.spacedBy(DS.Space8)
                     ) {
                         KPICard(
-                            title = "Completed Projects",
-                            value = "$completedProjects Beats",
+                            title = "Workspaces Completed",
+                            value = "$completedWorkspacesCount Completed",
                             icon = Icons.Default.TaskAlt,
                             tint = AccentRed,
                             modifier = Modifier.weight(1f)
@@ -406,7 +459,7 @@ fun PublicProfileScreen(
                         SectionHeader(title = "Expertise Skills Matrix")
                         Spacer(modifier = Modifier.height(DS.Space8))
 
-                        Text("PRIMARY FOCUS", style = MaterialTheme.typography.labelMedium, color = AccentBlue, fontWeight = FontWeight.Bold)
+                        Text("PRIMARY FOCUS", style = MaterialTheme.typography.labelMedium, color = AccentRed, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(DS.Space6))
                         SkillItem(name = specialty, level = "Expert", percentage = 0.95f, color = AccentRed)
                         SkillItem(name = "Short-Form Pacing Flow", level = "Expert", percentage = 0.90f, color = AccentRed)
@@ -417,6 +470,78 @@ fun PublicProfileScreen(
                         Spacer(modifier = Modifier.height(DS.Space6))
                         SkillItem(name = "Retention Mechanics", level = "Advanced", percentage = 0.82f, color = AccentBlue)
                         SkillItem(name = "Cinematography Blueprints", level = "Advanced", percentage = 0.78f, color = AccentBlue)
+                    }
+                }
+            }
+
+            // --- Teammate Endorsements Section ---
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = DS.Space16, vertical = DS.Space8),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    shape = DS.RadiusLarge,
+                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(DS.Space16)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ThumbUp, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(DS.Space8))
+                            Text(
+                                text = "Teammate Endorsements",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(DS.Space12))
+                        
+                        if (endorsements.isEmpty()) {
+                            Text(
+                                text = "No endorsements logged yet. Complete workspaces with other co-op creators to receive endorsements.",
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                            androidx.compose.foundation.layout.FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val allPossibleTags = listOf("Reliable", "Fast Turnaround", "Great Communicator", "Creative", "Organized")
+                                allPossibleTags.forEach { tag ->
+                                    val count = tagCounts[tag] ?: 0
+                                    if (count > 0) {
+                                        Surface(
+                                            color = AccentBlue.copy(alpha = 0.12f),
+                                            shape = RoundedCornerShape(24.dp),
+                                            border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.3f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = DS.Space12, vertical = DS.Space6),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.DoneAll,
+                                                    contentDescription = null,
+                                                    tint = AccentBlue,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "$tag ($count)",
+                                                    color = Color.White,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -473,45 +598,63 @@ fun PublicProfileScreen(
                         modifier = Modifier.padding(bottom = DS.Space12)
                     )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        repeat(5) { i ->
-                            val netName = listOf("Sarah J.", "Mike K.", "Lens Flare Studio", "Aura Media", "EditFlow")[i]
-                            val netInitials = netName.split(" ").map { it.take(1) }.joinToString("")
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .background(SurfaceColor)
-                                        .border(1.dp, ColorDivider, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = netInitials,
-                                        color = AccentBlue,
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 16.sp
-                                    )
-                                    // Mini Verified Badge
+                    val allUsersList by remember {
+                        repository.getAllUsersFlow()
+                    }.collectAsState(initial = emptyList())
+                    val networkNodes = remember(allUsersList, actualUserId) {
+                        allUsersList.filter { it.id != actualUserId && it.displayName.isNotEmpty() }
+                    }
+
+                    if (networkNodes.isEmpty()) {
+                        Text(
+                            text = "No other network nodes connected in the system.",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = DS.Space8)
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            networkNodes.forEach { node ->
+                                val netName = node.displayName
+                                val netInitials = netName.split(" ").map { it.take(1) }.joinToString("")
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Box(
                                         modifier = Modifier
-                                            .size(16.dp)
+                                            .size(56.dp)
                                             .clip(CircleShape)
-                                            .background(NeonEmerald)
-                                            .border(1.dp, SurfaceColor, CircleShape)
-                                            .align(Alignment.BottomEnd),
+                                            .background(SurfaceColor)
+                                            .border(1.dp, ColorDivider, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                        Text(
+                                            text = netInitials,
+                                            color = AccentBlue,
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 16.sp
+                                        )
+                                        if (node.isVerifiedPro) {
+                                            // Mini Verified Badge
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .background(NeonEmerald)
+                                                    .border(1.dp, SurfaceColor, CircleShape)
+                                                    .align(Alignment.BottomEnd),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                            }
+                                        }
                                     }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(netName, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(netName, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -546,33 +689,42 @@ fun PublicProfileScreen(
                         fontWeight = FontWeight.Bold
                     )
                     
-                    val workspaces = listOf(
-                        "TechPulse Main Channel",
-                        "Co-Op Video Production Shard",
-                        "Short Form Syndicate Hub"
-                    )
-                    workspaces.forEach { ws ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(DS.RadiusMedium)
-                                .background(if (selectedWorkspaceForInvite == ws) AccentBlue.copy(alpha = 0.15f) else Color.Transparent)
-                                .clickable { selectedWorkspaceForInvite = ws }
-                                .padding(DS.Space12),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedWorkspaceForInvite == ws,
-                                onClick = { selectedWorkspaceForInvite = ws },
-                                colors = RadioButtonDefaults.colors(selectedColor = AccentBlue)
-                            )
-                            Spacer(modifier = Modifier.width(DS.Space8))
-                            Text(
-                                text = ws,
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                    val realWorkspaces by remember {
+                        repository.allWorkspaces
+                    }.collectAsState(initial = emptyList())
+
+                    if (realWorkspaces.isEmpty()) {
+                        Text(
+                            text = "No workspaces available. Please create a workspace first.",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(DS.Space12)
+                        )
+                    } else {
+                        realWorkspaces.forEach { ws ->
+                            val wsName = ws.name
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(DS.RadiusMedium)
+                                    .background(if (selectedWorkspaceForInvite == wsName) AccentBlue.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable { selectedWorkspaceForInvite = wsName }
+                                    .padding(DS.Space12),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedWorkspaceForInvite == wsName,
+                                    onClick = { selectedWorkspaceForInvite = wsName },
+                                    colors = RadioButtonDefaults.colors(selectedColor = AccentBlue)
+                                )
+                                Spacer(modifier = Modifier.width(DS.Space8))
+                                Text(
+                                    text = wsName,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }

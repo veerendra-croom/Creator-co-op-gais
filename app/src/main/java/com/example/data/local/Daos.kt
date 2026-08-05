@@ -10,6 +10,9 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :id")
     fun getUserById(id: String): Flow<UserProfile?>
 
+    @Query("SELECT * FROM users WHERE id = :id")
+    suspend fun getUserByIdSuspend(id: String): UserProfile?
+
     @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
     suspend fun getUserByEmail(email: String): UserProfile?
 
@@ -73,6 +76,9 @@ interface CommentDao {
     @Query("SELECT * FROM comments WHERE postId = :postId ORDER BY timestamp ASC")
     fun getCommentsForPost(postId: String): Flow<List<Comment>>
 
+    @Query("SELECT * FROM comments ORDER BY timestamp DESC")
+    fun getAllCommentsFlow(): Flow<List<Comment>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComment(comment: Comment)
 
@@ -124,6 +130,9 @@ interface WorkspaceMemberDao {
     @Query("SELECT * FROM workspace_members WHERE workspaceId = :workspaceId AND userId = :userId LIMIT 1")
     fun getMemberInfo(workspaceId: String, userId: String): Flow<WorkspaceMember?>
 
+    @Query("SELECT * FROM workspace_members WHERE workspaceId = :workspaceId AND userId = :userId LIMIT 1")
+    suspend fun getMemberInfoSuspend(workspaceId: String, userId: String): WorkspaceMember?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMember(member: WorkspaceMember)
 
@@ -138,6 +147,24 @@ interface WorkspaceMemberDao {
 
     @Query("SELECT * FROM workspace_members WHERE workspaceId = :workspaceId")
     suspend fun getMembersForWorkspaceList(workspaceId: String): List<WorkspaceMember>
+
+    @Query("SELECT * FROM workspace_members")
+    fun getAllMembersFlow(): Flow<List<WorkspaceMember>>
+
+    @Query("UPDATE workspace_members SET isOnline = :isOnline, lastSeenAt = :lastSeenAt WHERE workspaceId = :workspaceId AND userId = :userId")
+    suspend fun updateMemberPresence(workspaceId: String, userId: String, isOnline: Boolean, lastSeenAt: Long)
+
+    @Query("UPDATE workspace_members SET isTyping = :isTyping, typingText = :typingText WHERE workspaceId = :workspaceId AND userId = :userId")
+    suspend fun updateMemberTyping(workspaceId: String, userId: String, isTyping: Boolean, typingText: String)
+
+    @Query("UPDATE workspace_members SET currentlyViewingTaskId = :taskId WHERE workspaceId = :workspaceId AND userId = :userId")
+    suspend fun updateMemberViewingTask(workspaceId: String, userId: String, taskId: String?)
+
+    @Query("UPDATE workspace_members SET currentlyEditingAssetId = :assetId WHERE workspaceId = :workspaceId AND userId = :userId")
+    suspend fun updateMemberEditingAsset(workspaceId: String, userId: String, assetId: String?)
+
+    @Query("UPDATE workspace_members SET liveStatusUpdate = :statusUpdate, lastSeenAt = :lastSeenAt WHERE workspaceId = :workspaceId AND userId = :userId")
+    suspend fun updateMemberLiveStatus(workspaceId: String, userId: String, statusUpdate: String, lastSeenAt: Long)
 }
 
 @Dao
@@ -150,6 +177,9 @@ interface ProductionTaskDao {
 
     @Query("SELECT * FROM production_tasks WHERE id = :id")
     fun getTaskById(id: String): Flow<ProductionTask?>
+
+    @Query("SELECT * FROM production_tasks WHERE id = :id")
+    suspend fun getTaskByIdSuspend(id: String): ProductionTask?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: ProductionTask)
@@ -201,6 +231,9 @@ interface AgreementDao {
     @Query("SELECT * FROM team_agreements WHERE workspaceId = :workspaceId ORDER BY version DESC")
     fun getAllAgreementsForWorkspace(workspaceId: String): Flow<List<TeamAgreement>>
 
+    @Query("SELECT * FROM team_agreements ORDER BY createdAt DESC")
+    fun getAllAgreementsFlow(): Flow<List<TeamAgreement>>
+
     @Query("SELECT * FROM team_agreements WHERE workspaceId = :workspaceId ORDER BY version DESC LIMIT 1")
     fun getLatestAgreementFlow(workspaceId: String): Flow<TeamAgreement?>
 
@@ -243,7 +276,7 @@ interface AdminDao {
     @Query("SELECT * FROM workspaces ORDER BY createdAt DESC")
     fun getAllWorkspacesForAdmin(): Flow<List<Workspace>>
 
-    @Query("UPDATE workspaces SET is_sponsored = :isSponsored, sponsor_name = :sponsorName, sponsor_logo_url = :sponsorLogoUrl WHERE id = :workspaceId")
+    @Query("UPDATE workspaces SET isSponsored = :isSponsored, sponsorName = :sponsorName, sponsorLogoUrl = :sponsorLogoUrl WHERE id = :workspaceId")
     suspend fun updateWorkspaceSponsorship(workspaceId: String, isSponsored: Boolean, sponsorName: String?, sponsorLogoUrl: String?)
 }
 
@@ -323,6 +356,9 @@ interface AuditLogDao {
 
 @Dao
 interface SyncDao {
+    @Query("SELECT * FROM sync_queue ORDER BY createdAt DESC")
+    fun getAllSyncEventsFlow(): kotlinx.coroutines.flow.Flow<List<SyncEntity>>
+
     @Query("SELECT * FROM sync_queue WHERE syncStatus != 'SYNCED' AND retryCount < 5 ORDER BY createdAt ASC")
     suspend fun getPendingSyncEventsSuspend(): List<SyncEntity>
 
@@ -353,7 +389,7 @@ interface AdDao {
     @Query("SELECT * FROM global_settings_table")
     fun getSettings(): Flow<List<GlobalSetting>>
 
-    @Query("SELECT setting_value FROM global_settings_table WHERE setting_key = :key LIMIT 1")
+    @Query("SELECT settingValue FROM global_settings_table WHERE settingKey = :key LIMIT 1")
     suspend fun getSettingByKey(key: String): String?
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -479,6 +515,9 @@ interface DisputeNoteDao {
     """)
     fun getDisputeNotesAboutUsers(targetUserIds: List<String>, requestingUserId: String): Flow<List<DisputeNote>>
 
+    @Query("SELECT * FROM dispute_notes_table ORDER BY createdAt DESC")
+    fun getAllDisputeNotes(): Flow<List<DisputeNote>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDisputeNote(note: DisputeNote)
 }
@@ -545,12 +584,21 @@ interface ConnectionRequestDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRequest(request: ConnectionRequest)
     
+    @Query("SELECT COUNT(*) FROM connection_requests WHERE senderId = :senderId AND createdAt >= :sinceTime")
+    suspend fun getRequestCountSince(senderId: String, sinceTime: Long): Int
+    
+    @Query("SELECT * FROM connection_requests WHERE id = :id")
+    suspend fun getRequestById(id: String): ConnectionRequest?
+
     @Query("UPDATE connection_requests SET status = :status WHERE id = :id")
     suspend fun updateRequestStatus(id: String, status: String)
 }
 
 @Dao
 interface NotificationDao {
+    @Query("SELECT * FROM notifications ORDER BY createdAt DESC")
+    fun getAllNotificationsFlow(): Flow<List<Notification>>
+
     @Query("SELECT * FROM notifications WHERE userId = :userId ORDER BY createdAt DESC")
     fun getNotificationsForUser(userId: String): Flow<List<Notification>>
     
@@ -562,9 +610,18 @@ interface NotificationDao {
 
     @Query("UPDATE notifications SET isRead = 1 WHERE id = :id")
     suspend fun markAsRead(id: String)
+
+    @Query("UPDATE notifications SET isRead = :isRead WHERE id = :id")
+    suspend fun updateReadState(id: String, isRead: Int)
     
     @Query("UPDATE notifications SET isRead = 1 WHERE userId = :userId")
     suspend fun markAllAsRead(userId: String)
+    
+    @Query("UPDATE notifications SET isPinned = :isPinned WHERE id = :id")
+    suspend fun updatePinnedState(id: String, isPinned: Int)
+
+    @Query("UPDATE notifications SET isArchived = :isArchived WHERE id = :id")
+    suspend fun updateArchivedState(id: String, isArchived: Int)
     
     @Query("DELETE FROM notifications WHERE id = :id")
     suspend fun deleteNotification(id: String)
@@ -724,8 +781,14 @@ interface WorkspaceAssetDao {
     @Query("SELECT * FROM workspace_assets WHERE workspaceId = :workspaceId ORDER BY createdAt DESC")
     fun getAssetsForWorkspace(workspaceId: String): Flow<List<WorkspaceAsset>>
 
+    @Query("SELECT * FROM workspace_assets ORDER BY createdAt DESC")
+    fun getAllAssetsFlow(): Flow<List<WorkspaceAsset>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAsset(asset: WorkspaceAsset)
+
+    @Query("SELECT * FROM workspace_assets WHERE id = :assetId")
+    suspend fun getAssetById(assetId: String): WorkspaceAsset?
 
     @Query("UPDATE workspace_assets SET status = :status WHERE id = :assetId")
     suspend fun updateAssetStatus(assetId: String, status: String)
@@ -739,11 +802,17 @@ interface DeliverableDao {
     @Query("SELECT * FROM deliverables WHERE workspaceId = :workspaceId ORDER BY createdAt DESC")
     fun getDeliverablesForWorkspace(workspaceId: String): Flow<List<Deliverable>>
 
+    @Query("SELECT * FROM deliverables ORDER BY createdAt DESC")
+    fun getAllDeliverablesFlow(): Flow<List<Deliverable>>
+
     @Query("SELECT * FROM deliverables WHERE taskId = :taskId ORDER BY createdAt DESC")
     fun getDeliverablesForTask(taskId: String): Flow<List<Deliverable>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDeliverable(deliverable: Deliverable)
+
+    @Query("SELECT * FROM deliverables WHERE id = :deliverableId")
+    suspend fun getDeliverableById(deliverableId: String): Deliverable?
 
     @Query("UPDATE deliverables SET status = :status, reviewFeedback = :feedback WHERE id = :deliverableId")
     suspend fun updateDeliverableStatus(deliverableId: String, status: String, feedback: String?)

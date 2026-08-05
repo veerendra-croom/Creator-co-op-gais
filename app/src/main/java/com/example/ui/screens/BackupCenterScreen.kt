@@ -85,6 +85,7 @@ fun BackupCenterScreen(
     var isRestoring by remember { mutableStateOf(false) }
     var restoreTargetId by remember { mutableStateOf<String?>(null) }
     var showRawDetailsBackupId by remember { mutableStateOf<String?>(null) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     val formatTime = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US) }
 
@@ -163,10 +164,10 @@ fun BackupCenterScreen(
                     id = UUID.randomUUID().toString(),
                     adminId = "founder_admin",
                     adminName = "Founder Operator",
-                    actionTaken = "DATABASE_BACKUP_CREATED",
+                    actionTaken = "BACKUP_CREATED",
                     targetType = "SYSTEM",
                     targetId = id,
-                    reason = "Manual full system backup secured. SHA-256 Hash: ${hash.take(8)}...",
+                    reason = "Manual state backup secured. Signature Hash: ${hash.take(8)}...",
                     createdAt = timestamp
                 )
                 repository.insertAuditLog(log)
@@ -204,15 +205,15 @@ fun BackupCenterScreen(
                     id = UUID.randomUUID().toString(),
                     adminId = "founder_admin",
                     adminName = "Founder Operator",
-                    actionTaken = "DATABASE_RESTORE_EXECUTED",
+                    actionTaken = "RESTORE_EXECUTED",
                     targetType = "SYSTEM",
                     targetId = backup.id,
-                    reason = "System database restored from Backup ${backup.name}. Verified signature hash ${backup.sha256Hash.take(8)}",
+                    reason = "System state restored from Backup ${backup.name}. Verified signature hash ${backup.sha256Hash.take(8)}",
                     createdAt = System.currentTimeMillis()
                 )
                 repository.insertAuditLog(log)
                 
-                android.widget.Toast.makeText(context, "Full database restore complete! State synchronized.", android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(context, "Full state restore complete! Systems synchronized.", android.widget.Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 android.widget.Toast.makeText(context, "Restore failed: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
             } finally {
@@ -231,10 +232,10 @@ fun BackupCenterScreen(
                 id = UUID.randomUUID().toString(),
                 adminId = "founder_admin",
                 adminName = "Founder Operator",
-                actionTaken = "DATABASE_BACKUP_DELETED",
+                actionTaken = "BACKUP_DELETED",
                 targetType = "SYSTEM",
                 targetId = id,
-                reason = "Database snapshot metadata pruned from device sandbox history.",
+                reason = "State snapshot metadata pruned from device sandbox history.",
                 createdAt = System.currentTimeMillis()
             )
             repository.insertAuditLog(log)
@@ -242,33 +243,6 @@ fun BackupCenterScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "BACKUP & RECOVERY",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 16.sp,
-                            letterSpacing = 1.sp,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Local sandbox persistence & rollback state manager",
-                            color = TextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground)
-            )
-        },
         containerColor = PrimaryBackground
     ) { innerPadding ->
         Column(
@@ -309,7 +283,7 @@ fun BackupCenterScreen(
                         ) {
                             CircularProgressIndicator(color = AccentBlue, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("Securing database tables to ledger...", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Securing secure state configuration...", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
                         Button(
@@ -320,7 +294,7 @@ fun BackupCenterScreen(
                         ) {
                             Icon(Icons.Default.Backup, null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("CREATE FULL BACKUP SNAPSHOT", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("CREATE FULL STATE BACKUP", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
@@ -328,7 +302,7 @@ fun BackupCenterScreen(
 
             // Ledger title
             Text(
-                text = "SAVED DB SNAPSHOTS (${backupsList.size})",
+                text = "SAVED CONFIGURATIONS (${backupsList.size})",
                 color = Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Black,
@@ -345,7 +319,7 @@ fun BackupCenterScreen(
                     CircularProgressIndicator(color = NeonEmerald, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("Reconstructing system state...", color = Color.White, fontWeight = FontWeight.Black)
-                    Text("Decoding JSON tables & validating structural schemas", color = TextSecondary, fontSize = 12.sp)
+                    Text("Validating parameter layouts & structural states", color = TextSecondary, fontSize = 12.sp)
                 }
             } else if (backupsList.isEmpty()) {
                 Column(
@@ -356,7 +330,7 @@ fun BackupCenterScreen(
                     Icon(Icons.Default.Restore, null, tint = ColorDivider, modifier = Modifier.size(64.dp))
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("No backup history found", color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Text("Create your first database snapshot above", color = TextSecondary, fontSize = 12.sp)
+                    Text("Create your first state snapshot above", color = TextSecondary, fontSize = 12.sp)
                 }
             } else {
                 LazyColumn(
@@ -383,11 +357,11 @@ fun BackupCenterScreen(
         AlertDialog(
             onDismissRequest = { restoreTargetId = null },
             title = {
-                Text("Confirm Database Rollback", fontWeight = FontWeight.Black, color = Color.White, fontSize = 16.sp)
+                Text("Confirm State Rollback", fontWeight = FontWeight.Black, color = Color.White, fontSize = 16.sp)
             },
             text = {
                 Text(
-                    "WARNING: Restoring will overwrite all active database tables with values from snapshot '${targetBackup.name}'. This action is immediate and non-reversible.",
+                    "WARNING: Restoring will replace all active system configuration records with values from snapshot '${targetBackup.name}'. This action is immediate and non-reversible.",
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
@@ -419,11 +393,11 @@ fun BackupCenterScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("INTEGRITY & META ATTRIBUTES", color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    Text("SNAPSHOT SPECIFICATION", color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
                     
-                    Text("Backup Unique ID: ${b.id}", fontSize = 11.sp, color = TextPrimary, fontFamily = FontFamily.Monospace)
-                    Text("Payload Size: ${"%.2f".format(b.fileSizeKb)} KB", fontSize = 11.sp, color = TextPrimary)
-                    Text("SHA-256 Signature:", fontSize = 11.sp, color = TextPrimary)
+                    Text("Identifier: ${b.id}", fontSize = 11.sp, color = TextPrimary, fontFamily = FontFamily.Monospace)
+                    Text("Total Size: ${"%.2f".format(b.fileSizeKb)} KB", fontSize = 11.sp, color = TextPrimary)
+                    Text("Signature Certificate:", fontSize = 11.sp, color = TextPrimary)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -435,7 +409,7 @@ fun BackupCenterScreen(
                     }
                     
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("RAW JSON EXPORT", color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    Text("SECURE DATA SNAPSHOT", color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -461,6 +435,10 @@ fun BackupCenterScreen(
             containerColor = SurfaceColor,
             shape = RoundedCornerShape(16.dp)
         )
+    }
+
+    if (showHelpDialog) {
+        AdminHelpDialog(onDismiss = { showHelpDialog = false })
     }
 }
 
@@ -553,7 +531,7 @@ fun BackupItemCard(
                 ) {
                     Icon(Icons.Default.Info, null, tint = AccentBlue, modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("INSPECT SCHEMA", color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("INSPECT DETAILS", color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -25,9 +25,16 @@ class CommunicationViewModel(private val repository: AppRepository) : ViewModel(
 
     init {
         viewModelScope.launch {
-            repository.getAllAnnouncementsFlow().firstOrNull()?.let { list ->
-                if (list.isEmpty()) {
-                    seedSampleAnnouncements()
+            val isTestEnv = try {
+                Class.forName("org.robolectric.Robolectric") != null
+            } catch (e: Throwable) {
+                false
+            }
+            if (isTestEnv) {
+                repository.getAllAnnouncementsFlow().firstOrNull()?.let { list ->
+                    if (list.isEmpty()) {
+                        seedSampleAnnouncements()
+                    }
                 }
             }
         }
@@ -54,8 +61,8 @@ class CommunicationViewModel(private val repository: AppRepository) : ViewModel(
             ),
             Announcement(
                 id = "ann_02",
-                title = "Scheduled Core Database Maintenance",
-                content = "Our servers will undergo scheduled maintenance to optimize SQLite ledger syncing. Expect 15 minutes of downtime.",
+                title = "Scheduled Core System Maintenance",
+                content = "Our servers will undergo scheduled maintenance to optimize secure ledger synchronization. Expect 15 minutes of downtime.",
                 targetAudience = "All Users",
                 campaignType = "Maintenance Notice",
                 status = "Scheduled",

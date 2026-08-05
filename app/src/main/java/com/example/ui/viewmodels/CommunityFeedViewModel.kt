@@ -82,4 +82,20 @@ class CommunityFeedViewModel constructor(
             _toastMessage.value = "Comment added."
         }
     }
+
+    fun reportPost(postId: String, reason: String, reporterUserId: String) {
+        viewModelScope.launch {
+            val report = com.example.data.model.Report(
+                id = UUID.randomUUID().toString(),
+                reporterId = reporterUserId,
+                targetType = "POST",
+                targetId = postId,
+                reason = reason,
+                status = "PENDING",
+                createdAt = System.currentTimeMillis()
+            )
+            repository.submitReport(report)
+            _toastMessage.value = "Report submitted for moderation review."
+        }
+    }
 }

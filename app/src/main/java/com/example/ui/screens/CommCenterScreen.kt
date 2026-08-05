@@ -42,6 +42,7 @@ fun CommCenterScreen(
 
     var selectedTab by remember { mutableStateOf(0) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
@@ -51,33 +52,6 @@ fun CommCenterScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Communication Center",
-                        fontWeight = FontWeight.Black,
-                        fontSize = 20.sp,
-                        color = Color.White
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("comm_center_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SurfaceColor
-                )
-            )
-        },
         floatingActionButton = {
             if (selectedTab == 0) {
                 FloatingActionButton(
@@ -147,6 +121,10 @@ fun CommCenterScreen(
                     showCreateDialog = false
                 }
             )
+        }
+
+        if (showHelpDialog) {
+            AdminHelpDialog(onDismiss = { showHelpDialog = false })
         }
     }
 }

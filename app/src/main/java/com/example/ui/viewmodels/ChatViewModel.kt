@@ -18,7 +18,11 @@ class ChatViewModel constructor(
 ) : ViewModel() {
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getActiveMessages(workspaceId: Flow<String?>): StateFlow<List<Message>> {
+    fun getActiveMessages(workspaceId: String): Flow<List<Message>> {
+        return repository.getMessagesForWorkspace(workspaceId)
+    }
+
+    fun getActiveMessagesFromFlow(workspaceId: Flow<String?>): StateFlow<List<Message>> {
         return workspaceId.flatMapLatest { id ->
             if (id == null) flowOf(emptyList()) else repository.getMessagesForWorkspace(id)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -32,10 +36,38 @@ class ChatViewModel constructor(
                 workspaceId = workspaceId,
                 senderId = userId,
                 senderName = user?.displayName ?: "Creator",
+                senderRole = user?.systemRole ?: "APP_USER",
                 messageBody = text,
                 timestamp = System.currentTimeMillis()
             )
             repository.insertMessage(msg)
+        }
+    }
+
+    fun getDMsForWorkspace(workspaceId: String, userId: String): Flow<List<Message>> {
+        return repository.getDMsForWorkspace(workspaceId, userId)
+    }
+
+    fun sendDirectMessage(workspaceId: String, recipientId: String, text: String, senderId: String, user: UserProfile?) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            val msg = Message(
+                id = UUID.randomUUID().toString(),
+                workspaceId = workspaceId,
+                senderId = senderId,
+                recipientId = recipientId,
+                senderName = user?.displayName ?: "You",
+                senderRole = user?.systemRole ?: "APP_USER",
+                messageBody = text,
+                timestamp = System.currentTimeMillis()
+            )
+            repository.insertMessage(msg)
+        }
+    }
+
+    fun insertSystemMessage(message: Message) {
+        viewModelScope.launch {
+            repository.insertMessage(message)
         }
     }
 
@@ -51,6 +83,25 @@ class ChatViewModel constructor(
                 timestamp = System.currentTimeMillis()
             )
             repository.insertMessage(msg)
+        }
+    }
+
+    // Direct Messages (Clean MVVM separation additions)
+    val creatorsFlow: Flow<List<UserProfile>> = repository.getAllUsersFlow()
+
+    fun getDMsForUser(userId: String): Flow<List<Message>> {
+        return repository.getDMsForWorkspace("DM_WORKSPACE", userId)
+    }
+
+    fun deleteMessage(messageId: String) {
+        viewModelScope.launch {
+            repository.deleteMessage(messageId)
+        }
+    }
+
+    fun insertMessage(message: Message) {
+        viewModelScope.launch {
+            repository.insertMessage(message)
         }
     }
 }

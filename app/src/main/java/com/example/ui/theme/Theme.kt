@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
+private val ObsidianColorScheme = darkColorScheme(
     primary = AccentBlue,
     secondary = AccentBlue,
     tertiary = ColorSuccess,
@@ -25,22 +25,51 @@ private val DarkColorScheme = darkColorScheme(
     error = ColorError
 )
 
+private val CyberEmeraldColorScheme = darkColorScheme(
+    primary = NeonEmerald,
+    secondary = NeonEmerald,
+    tertiary = AccentBlue,
+    background = Color(0xFF06120E),
+    surface = Color(0xFF0C1A15),
+    onPrimary = Color.Black,
+    onSecondary = TextPrimary,
+    onBackground = TextPrimary,
+    onSurface = TextPrimary,
+    outline = Color(0xFF16382B),
+    error = ColorError
+)
+
+private val AmberSunsetColorScheme = darkColorScheme(
+    primary = CrispAmber,
+    secondary = CrispAmber,
+    tertiary = AccentRed,
+    background = Color(0xFF120E08),
+    surface = Color(0xFF1A140B),
+    onPrimary = Color.Black,
+    onSecondary = TextPrimary,
+    onBackground = TextPrimary,
+    onSurface = TextPrimary,
+    outline = Color(0xFF382A16),
+    error = ColorError
+)
+
 private val LightColorScheme = lightColorScheme(                
-    primary = AccentRed,
+    primary = Color(0xFF0284C7),
     secondary = AccentBlue,
     tertiary = ColorSuccess,
     background = Color(0xFFF8FAFC),
-    surface = Color(0xFFE2E8F0),
+    surface = Color(0xFFFFFFFF),
     onPrimary = Color.White,
     onSecondary = Color.White,
     onBackground = Color(0xFF0F172A),
     onSurface = Color(0xFF0F172A),
-    outline = Color(0xFF94A3B8),
+    outline = Color(0xFFCBD5E1),
     error = ColorError
 )
 
 @Composable
 fun MyApplicationTheme(
+    themeMode: String = "OBSIDIAN",
     darkTheme: Boolean = isSystemInDarkTheme(), 
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
@@ -50,8 +79,10 @@ fun MyApplicationTheme(
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        themeMode.uppercase() == "CYBER_EMERALD" -> CyberEmeraldColorScheme
+        themeMode.uppercase() == "AMBER_SUNSET" -> AmberSunsetColorScheme
+        themeMode.uppercase() == "LIGHT" -> LightColorScheme
+        else -> ObsidianColorScheme
     }
 
     MaterialTheme(
@@ -60,3 +91,4 @@ fun MyApplicationTheme(
         content = content
     )
 }
+

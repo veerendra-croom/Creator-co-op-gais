@@ -26,9 +26,7 @@ class AppViewModelFactory(private val application: CreatorCoopApp) : ViewModelPr
             modelClass.isAssignableFrom(AdminViewModel::class.java) -> {
                 AdminViewModel(container.repository) as T
             }
-            modelClass.isAssignableFrom(AdManagementViewModel::class.java) -> {
-                AdManagementViewModel(container.repository) as T
-            }
+
             modelClass.isAssignableFrom(ChatViewModel::class.java) -> {
                 ChatViewModel(container.repository) as T
             }

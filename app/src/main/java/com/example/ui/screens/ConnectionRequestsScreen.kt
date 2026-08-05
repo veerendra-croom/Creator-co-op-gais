@@ -35,8 +35,8 @@ fun ConnectionRequestsScreen(
 ) {
     if (userProfile == null) return
 
-    val pendingRequests by globalViewModel.getPendingConnectionRequests(userProfile.id).collectAsState(initial = emptyList())
-    val resolvedRequests by globalViewModel.getResolvedConnectionRequests(userProfile.id).collectAsState(initial = emptyList())
+    val pendingRequests by remember(userProfile.id) { globalViewModel.getPendingConnectionRequests(userProfile.id) }.collectAsState(initial = emptyList())
+    val resolvedRequests by remember(userProfile.id) { globalViewModel.getResolvedConnectionRequests(userProfile.id) }.collectAsState(initial = emptyList())
 
     var selectedTab by remember { mutableStateOf("Pending") }
     val tabs = listOf("Pending", "Accepted", "Declined")

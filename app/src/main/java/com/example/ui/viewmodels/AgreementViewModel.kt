@@ -24,24 +24,31 @@ class AgreementViewModel constructor(
     fun resetToast() { _toastMessage.value = null }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getActiveAgreement(workspaceId: Flow<String?>): StateFlow<TeamAgreement?> {
+    fun getActiveAgreement(workspaceId: String): Flow<TeamAgreement?> {
+        return repository.getLatestAgreement(workspaceId)
+    }
+
+    fun getActiveAgreementFromFlow(workspaceId: Flow<String?>): StateFlow<TeamAgreement?> {
         return workspaceId.flatMapLatest { id ->
             if (id == null) flowOf(null) else repository.getLatestAgreement(id)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getAcknowledgments(agreement: StateFlow<TeamAgreement?>): StateFlow<List<AgreementAcknowledgment>> {
+    fun getAcknowledgments(agreementId: String?): Flow<List<AgreementAcknowledgment>> {
+        if (agreementId == null) return flowOf(emptyList())
+        return repository.getAcknowledgmentsFlow(agreementId)
+    }
+
+    fun getAcknowledgmentsFromFlow(agreement: StateFlow<TeamAgreement?>): StateFlow<List<AgreementAcknowledgment>> {
         return agreement.flatMapLatest { a ->
             if (a == null) flowOf(emptyList()) else repository.getAcknowledgmentsFlow(a.id)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getAgreementHistory(workspaceId: Flow<String?>): StateFlow<List<TeamAgreement>> {
-        return workspaceId.flatMapLatest { id ->
-            if (id == null) flowOf(emptyList()) else repository.getAllAgreementsForWorkspace(id)
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    fun getAgreementHistory(workspaceId: String): Flow<List<TeamAgreement>> {
+        return repository.getAllAgreementsForWorkspace(workspaceId)
     }
 
     fun createTeamAgreement(workspaceId: String, content: String) {
@@ -110,8 +117,31 @@ class AgreementViewModel constructor(
         return repository.getAcknowledgmentsForUser(userId)
     }
 
+    fun getAllAgreementsFlow(): Flow<List<TeamAgreement>> {
+        return repository.getAllAgreementsFlow()
+    }
+
     fun getLatestAgreementFlow(workspaceId: String): Flow<TeamAgreement?> {
         return repository.getLatestAgreement(workspaceId)
+    }
+
+    fun notifyLeadCreator(workspaceId: String, userId: String) {
+        viewModelScope.launch {
+            val workspace = repository.getWorkspaceById(workspaceId).firstOrNull()
+            if (workspace != null) {
+                repository.insertNotification(com.example.data.model.Notification(
+                    id = UUID.randomUUID().toString(),
+                    userId = workspace.createdBy,
+                    title = "Agreement Required",
+                    body = "Contributor '$userId' requested that the Team Agreement draft be initialized.",
+                    type = "AGREEMENT_REQUIRED",
+                    createdAt = System.currentTimeMillis()
+                ))
+                _toastMessage.value = "Lead creator notified successfully!"
+            } else {
+                _toastMessage.value = "Workspace not found."
+            }
+        }
     }
 
     fun exportAgreementAsPDF() {

@@ -24,42 +24,62 @@ object SupabaseSynchronizer {
 
         // User Profiles
         try {
-            val response = client.postgrest.from("user_profiles").select().data
-            val data = json.decodeFromString<List<UserProfile>>(response)
-            data.forEach { repository.userDao.insertUser(it) }
+            val response = com.example.util.RetryWithBackoff.execute(maxAttempts = 3) {
+                client.postgrest.from("user_profiles").select().data
+            }
+            if (response != null) {
+                val data = json.decodeFromString<List<UserProfile>>(response)
+                data.forEach { repository.userDao.insertUser(it) }
+            }
         } catch (e: Exception) { Log.e(TAG, "Sync user_profiles fail", e) }
 
         // Workspaces
         try {
-            val response = client.postgrest.from("workspaces").select().data
-            val data = json.decodeFromString<List<Workspace>>(response)
-            data.forEach { repository.workspaceDao.insertWorkspace(it) }
+            val response = com.example.util.RetryWithBackoff.execute(maxAttempts = 3) {
+                client.postgrest.from("workspaces").select().data
+            }
+            if (response != null) {
+                val data = json.decodeFromString<List<Workspace>>(response)
+                data.forEach { repository.workspaceDao.insertWorkspace(it) }
+            }
         } catch (e: Exception) { Log.e(TAG, "Sync workspaces fail", e) }
 
         // Members
         try {
-            val response = client.postgrest.from("workspace_members").select().data
-            val data = json.decodeFromString<List<WorkspaceMember>>(response)
-            data.forEach { repository.workspaceMemberDao.insertMember(it) }
+            val response = com.example.util.RetryWithBackoff.execute(maxAttempts = 3) {
+                client.postgrest.from("workspace_members").select().data
+            }
+            if (response != null) {
+                val data = json.decodeFromString<List<WorkspaceMember>>(response)
+                data.forEach { repository.workspaceMemberDao.insertMember(it) }
+            }
         } catch (e: Exception) { Log.e(TAG, "Sync workspace_members fail", e) }
 
         // Tasks
         try {
-            val response = client.postgrest.from("production_tasks").select().data
-            val data = json.decodeFromString<List<ProductionTask>>(response)
-            data.forEach { repository.productionTaskDao.insertTask(it) }
+            val response = com.example.util.RetryWithBackoff.execute(maxAttempts = 3) {
+                client.postgrest.from("production_tasks").select().data
+            }
+            if (response != null) {
+                val data = json.decodeFromString<List<ProductionTask>>(response)
+                data.forEach { repository.productionTaskDao.insertTask(it) }
+            }
         } catch (e: Exception) { Log.e(TAG, "Sync production_tasks fail", e) }
 
         // Agreements
         try {
-            val response = client.postgrest.from("team_agreements_table").select().data
-            val data = json.decodeFromString<List<TeamAgreement>>(response)
-            data.forEach { repository.agreementDao.insertAgreement(it) }
+            val response = com.example.util.RetryWithBackoff.execute(maxAttempts = 3) {
+                client.postgrest.from("team_agreements").select().data
+            }
+            if (response != null) {
+                val data = json.decodeFromString<List<TeamAgreement>>(response)
+                data.forEach { repository.agreementDao.insertAgreement(it) }
+            }
         } catch (e: Exception) { Log.e(TAG, "Sync team_agreements fail", e) }
 
         // Acknowledgments
         try {
-            val response = client.postgrest.from("agreement_acknowledgments_table").select().data
+            val response = client.postgrest.from("agreement_acknowledgments").select().data
             val data = json.decodeFromString<List<AgreementAcknowledgment>>(response)
             data.forEach { repository.agreementDao.insertAcknowledgment(it) }
         } catch (e: Exception) { Log.e(TAG, "Sync acknowledgments fail", e) }
@@ -87,14 +107,14 @@ object SupabaseSynchronizer {
 
         // Reports (Admin only handled by policies)
         try {
-            val response = client.postgrest.from("reports_table").select().data
+            val response = client.postgrest.from("reports").select().data
             val data = json.decodeFromString<List<Report>>(response)
             data.forEach { repository.reportDao.insertReport(it) }
         } catch (e: Exception) { Log.e(TAG, "Sync reports fail", e) }
 
         // Audit Logs
         try {
-            val response = client.postgrest.from("admin_audit_logs_table").select().data
+            val response = client.postgrest.from("admin_audit_logs").select().data
             val data = json.decodeFromString<List<AuditLog>>(response)
             data.forEach { repository.auditLogDao.insertLog(it) }
         } catch (e: Exception) { Log.e(TAG, "Sync logs fail", e) }
@@ -102,12 +122,12 @@ object SupabaseSynchronizer {
 
     suspend fun syncUpReport(context: Context, report: Report) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try { SupabaseConfig.client.postgrest.from("reports_table").upsert(report) } catch (e: Exception) { Log.e(TAG, "syncUpReport fail", e) }
+        try { SupabaseConfig.client.postgrest.from("reports").upsert(report) } catch (e: Exception) { Log.e(TAG, "syncUpReport fail", e) }
     }
 
     suspend fun syncUpAuditLog(context: Context, log: AuditLog) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try { SupabaseConfig.client.postgrest.from("admin_audit_logs_table").insert(log) } catch (e: Exception) { Log.e(TAG, "syncUpAuditLog fail", e) }
+        try { SupabaseConfig.client.postgrest.from("admin_audit_logs").insert(log) } catch (e: Exception) { Log.e(TAG, "syncUpAuditLog fail", e) }
     }
 
     suspend fun syncDeletePost(context: Context, id: String) = withContext(Dispatchers.IO) {
@@ -141,6 +161,11 @@ object SupabaseSynchronizer {
         try { SupabaseConfig.client.postgrest.from("production_tasks").upsert(task) } catch (e: Exception) { Log.e(TAG, "syncUpProductionTask fail", e) }
     }
 
+    suspend fun syncDeleteProductionTask(context: Context, id: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("production_tasks").delete { filter { eq("id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteProductionTask fail", e) }
+    }
+
     suspend fun syncUpMessage(context: Context, message: Message) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
         try { SupabaseConfig.client.postgrest.from("messages").insert(message) } catch (e: Exception) { Log.e(TAG, "syncUpMessage fail", e) }
@@ -148,12 +173,12 @@ object SupabaseSynchronizer {
 
     suspend fun syncUpAgreement(context: Context, agreement: TeamAgreement) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try { SupabaseConfig.client.postgrest.from("team_agreements_table").upsert(agreement) } catch (e: Exception) { Log.e(TAG, "syncUpAgreement fail", e) }
+        try { SupabaseConfig.client.postgrest.from("team_agreements").upsert(agreement) } catch (e: Exception) { Log.e(TAG, "syncUpAgreement fail", e) }
     }
 
     suspend fun syncUpAcknowledgment(context: Context, acknowledgment: AgreementAcknowledgment) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
-        try { SupabaseConfig.client.postgrest.from("agreement_acknowledgments_table").upsert(acknowledgment) } catch (e: Exception) { Log.e(TAG, "syncUpAcknowledgment fail", e) }
+        try { SupabaseConfig.client.postgrest.from("agreement_acknowledgments").upsert(acknowledgment) } catch (e: Exception) { Log.e(TAG, "syncUpAcknowledgment fail", e) }
     }
 
     suspend fun syncUpPost(context: Context, post: Post) = withContext(Dispatchers.IO) {
@@ -164,5 +189,90 @@ object SupabaseSynchronizer {
     suspend fun syncUpComment(context: Context, comment: Comment) = withContext(Dispatchers.IO) {
         if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
         try { SupabaseConfig.client.postgrest.from("comments").insert(comment) } catch (e: Exception) { Log.e(TAG, "syncUpComment fail", e) }
+    }
+
+    suspend fun syncUpWorkspaceAsset(context: Context, asset: WorkspaceAsset) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("workspace_assets").upsert(asset) } catch (e: Exception) { Log.e(TAG, "syncUpWorkspaceAsset fail", e) }
+    }
+
+    suspend fun syncDeleteWorkspaceAsset(context: Context, id: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("workspace_assets").delete { filter { eq("id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteWorkspaceAsset fail", e) }
+    }
+
+    suspend fun syncUpDeliverable(context: Context, deliverable: Deliverable) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("deliverables").upsert(deliverable) } catch (e: Exception) { Log.e(TAG, "syncUpDeliverable fail", e) }
+    }
+
+    suspend fun syncDeleteDeliverable(context: Context, id: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("deliverables").delete { filter { eq("id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteDeliverable fail", e) }
+    }
+
+    suspend fun syncUpWorkspaceEvent(context: Context, event: WorkspaceEvent) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("workspace_events").upsert(event) } catch (e: Exception) { Log.e(TAG, "syncUpWorkspaceEvent fail", e) }
+    }
+
+    suspend fun syncUpSavedSearch(context: Context, search: SavedSearch) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("saved_searches").upsert(search) } catch (e: Exception) { Log.e(TAG, "syncUpSavedSearch fail", e) }
+    }
+
+    suspend fun syncDeleteSavedSearch(context: Context, id: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("saved_searches").delete { filter { eq("id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteSavedSearch fail", e) }
+    }
+
+    suspend fun syncUpLookingForWork(context: Context, listing: LookingForWork) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("looking_for_work").upsert(listing) } catch (e: Exception) { Log.e(TAG, "syncUpLookingForWork fail", e) }
+    }
+
+    suspend fun syncDeleteLookingForWork(context: Context, userId: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("looking_for_work").delete { filter { eq("userId", userId) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteLookingForWork fail", e) }
+    }
+
+    suspend fun syncDeleteMessage(context: Context, id: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("messages").delete { filter { eq("id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteMessage fail", e) }
+    }
+
+    suspend fun syncUpSupportTicket(context: Context, ticket: SupportTicket) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("support_tickets").upsert(ticket) } catch (e: Exception) { Log.e(TAG, "syncUpSupportTicket fail", e) }
+    }
+
+    suspend fun syncDeleteSupportTicket(context: Context, id: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("support_tickets").delete { filter { eq("id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteSupportTicket fail", e) }
+    }
+
+    suspend fun syncUpDisputeNote(context: Context, note: DisputeNote) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("dispute_notes").upsert(note) } catch (e: Exception) { Log.e(TAG, "syncUpDisputeNote fail", e) }
+    }
+
+    suspend fun syncUpFounderNote(context: Context, note: FounderNote) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("founder_notes").upsert(note) } catch (e: Exception) { Log.e(TAG, "syncUpFounderNote fail", e) }
+    }
+
+    suspend fun syncDeleteFounderNote(context: Context, id: String) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("founder_notes").delete { filter { eq("id", id) } } } catch (e: Exception) { Log.e(TAG, "syncDeleteFounderNote fail", e) }
+    }
+
+    suspend fun syncUpVerificationRequest(context: Context, request: VerificationRequest) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("verification_requests").upsert(request) } catch (e: Exception) { Log.e(TAG, "syncUpVerificationRequest fail", e) }
+    }
+
+    suspend fun syncUpConnectionRequest(context: Context, request: ConnectionRequest) = withContext(Dispatchers.IO) {
+        if (!SupabaseConfig.isNetworkAvailable(context)) return@withContext
+        try { SupabaseConfig.client.postgrest.from("connection_requests").upsert(request) } catch (e: Exception) { Log.e(TAG, "syncUpConnectionRequest fail", e) }
     }
 }

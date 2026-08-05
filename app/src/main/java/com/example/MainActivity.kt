@@ -31,6 +31,7 @@ import com.example.ui.screens.*
 import com.example.navigation.AppNavHost
 import com.example.data.supabase.SupabaseConfig
 import com.example.ui.theme.*
+import com.example.ui.viewmodels.*
 import io.github.jan.supabase.auth.auth
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -55,9 +56,14 @@ class MainActivity : ComponentActivity() {
         }
 
         enableEdgeToEdge()
+        val application = applicationContext as CreatorCoopApp
+        val factory = AppViewModelFactory(application)
+        val globalViewModel: GlobalViewModel by viewModels { factory }
+
         setContent {
-            MyApplicationTheme {
-                AppNavHost()
+            val themeMode by globalViewModel.themeMode.collectAsState()
+            MyApplicationTheme(themeMode = themeMode) {
+                AppNavHost(globalViewModel = globalViewModel)
             }
         }
     }

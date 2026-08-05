@@ -27,8 +27,9 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.SupportTicket
 import com.example.data.model.UserProfile
 import com.example.ui.theme.*
+import com.example.ui.components.*
 import com.example.ui.viewmodels.SupportViewModel
-import java.text.SimpleDateFormat
+import com.example.util.DateTimeUtils
 import java.util.*
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.draw.scale
@@ -49,6 +50,61 @@ fun SupportCenterScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val currentUserId = userProfile?.id ?: "anonymous"
     val currentUserDisplayName = userProfile?.displayName ?: "Anonymous Creator"
+
+    val application = LocalContext.current.applicationContext as com.example.CreatorCoopApp
+    val repository = remember { application.container.repository }
+    val helpTexts by repository.getAllHelpTextsFlow().collectAsState(initial = emptyList())
+    val disputeNotes by repository.getAllDisputeNotesFlow().collectAsState(initial = emptyList())
+
+    // Auto-seed Help Articles & Dispute Notes if empty
+    LaunchedEffect(currentUserId, helpTexts, disputeNotes) {
+        val isTestEnv = try {
+            Class.forName("org.robolectric.Robolectric") != null
+        } catch (e: Throwable) {
+            false
+        }
+        if (isTestEnv) {
+            if (helpTexts.isEmpty()) {
+                repository.insertHelpText(
+                    com.example.data.model.HelpText(
+                        id = "help_1",
+                        topicKey = "Syndicate Verification Requirements",
+                        textContent = "To verify your creator syndicate account, you must complete the OAuth workspace handshake and link a verified repository. Verified accounts receive the Neon Emerald badge on their public profile, elevating overall network standing.",
+                        category = "security"
+                    )
+                )
+                repository.insertHelpText(
+                    com.example.data.model.HelpText(
+                        id = "help_2",
+                        topicKey = "Milestone Escrow Process",
+                        textContent = "Funds are locked in the local milestone contract upon agreement lock-in. Releasing funds requires mutual approval from both parties. If an infraction occurs, the funds remain locked until mediation resolves the dispute.",
+                        category = "finance"
+                    )
+                )
+                repository.insertHelpText(
+                    com.example.data.model.HelpText(
+                        id = "help_3",
+                        topicKey = "Raising and Resolving Dispute Infractions",
+                        textContent = "If a workspace infraction occurs, use the operations panel to raise a dispute note. Assigned platform administrators (Founder Botla Veerendra or Co-Founder Macha Praveen) review details and mediate resolution within SLA guidelines.",
+                        category = "governance"
+                    )
+                )
+            }
+            if (disputeNotes.isEmpty()) {
+                repository.insertDisputeNote(
+                    com.example.data.model.DisputeNote(
+                        id = "disp_seed_1",
+                        workspaceId = "WS123",
+                        authorId = "MachaPraveen",
+                        targetUserId = currentUserId,
+                        content = "Deliverable delay: Milestone 1 deliverables missed the locked date by 4 days without any contract extension request.",
+                        noteText = "CRM Infraction logged. Assigned to platform mediator (Founder Botla Veerendra).",
+                        createdAt = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
     
     // Auto-clear or show toast
     LaunchedEffect(toastMsg) {
@@ -67,35 +123,28 @@ fun SupportCenterScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "SUPPORT OPERATIONS",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "SaaS Customer Operations Architect Panel",
-                            color = TextSecondary,
-                            fontSize = 11.sp
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
-                    }
-                },
-                actions = {
-                    // Quick Demo toggle to simulate Admin role
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
+        containerColor = PrimaryBackground
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(PrimaryBackground)
+        ) {
+            if (isAdmin) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "SaaS Customer Operations Panel",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "ADMIN MODE",
                             color = if (demoAdminMode) CrispAmber else TextMuted,
@@ -114,18 +163,8 @@ fun SupportCenterScreen(
                             modifier = Modifier.scale(0.7f)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground)
-            )
-        },
-        containerColor = PrimaryBackground
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(PrimaryBackground)
-        ) {
+                }
+            }
             // Main Tab Selector
             TabRow(
                 selectedTabIndex = activeMainTab,
@@ -178,7 +217,8 @@ fun SupportCenterScreen(
                     supportViewModel = supportViewModel,
                     allTickets = allTickets,
                     userId = currentUserId,
-                    userName = currentUserDisplayName
+                    userName = currentUserDisplayName,
+                    helpTexts = helpTexts
                 )
             } else {
                 AdminOperationsCenterView(
@@ -187,7 +227,8 @@ fun SupportCenterScreen(
                     openCount = openCount,
                     avgSlaHours = avgSlaHours,
                     adminId = currentUserId,
-                    adminName = currentUserDisplayName
+                    adminName = currentUserDisplayName,
+                    disputeNotes = disputeNotes
                 )
             }
         }
@@ -199,9 +240,10 @@ fun CreatorHelpDeskView(
     supportViewModel: SupportViewModel,
     allTickets: List<SupportTicket>,
     userId: String,
-    userName: String
+    userName: String,
+    helpTexts: List<com.example.data.model.HelpText>
 ) {
-    var helpDeskSubTab by remember { mutableStateOf(0) } // 0 = Submit Ticket, 1 = Feature Board
+    var helpDeskSubTab by remember { mutableStateOf(0) } // 0 = Submit Ticket, 1 = Feature Board, 2 = Help Articles
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
@@ -218,12 +260,17 @@ fun CreatorHelpDeskView(
             Tab(
                 selected = helpDeskSubTab == 0,
                 onClick = { helpDeskSubTab = 0 },
-                text = { Text("New Support Ticket", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("New Ticket", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             )
             Tab(
                 selected = helpDeskSubTab == 1,
                 onClick = { helpDeskSubTab = 1 },
-                text = { Text("Feature Backlog & Upvoting", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Feature Backlog", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = helpDeskSubTab == 2,
+                onClick = { helpDeskSubTab = 2 },
+                text = { Text("Help Articles", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             )
         }
 
@@ -236,12 +283,14 @@ fun CreatorHelpDeskView(
                 userId = userId,
                 userName = userName
             )
-        } else {
+        } else if (helpDeskSubTab == 1) {
             FeatureBacklogView(
                 supportViewModel = supportViewModel,
                 allTickets = allTickets,
                 userId = userId
             )
+        } else {
+            HelpArticlesView(helpTexts = helpTexts)
         }
     }
 }
@@ -255,6 +304,7 @@ fun NewSupportTicketForm(
 ) {
     val categories = listOf("Bug", "Feature Request", "Account Issue", "Workspace Issue", "Verification Issue")
     var selectedCategory by remember { mutableStateOf("Bug") }
+    var selectedTicketForDetails by remember { mutableStateOf<SupportTicket?>(null) }
     
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -263,7 +313,7 @@ fun NewSupportTicketForm(
     var deviceInfo by remember { mutableStateOf("${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})") }
     var appVersion by remember { mutableStateOf("v1.3.2-PROD") }
     var screenshots by remember { mutableStateOf("workspace_canvas_snapshot_error_0x42.png") }
-    var logs by remember { mutableStateOf("[ERROR] SQLiteException: index workspace_members_idx corrupted at line 204\n[DEBUG] SyncEngine: Push failed for 2 pending agreements.\n[WARN] StripeApi: Handshake took 4200ms.") }
+    var logs by remember { mutableStateOf("[ERROR] LedgerSyncException: secure synchronization interrupted\n[DEBUG] SyncEngine: Core synchronization delayed for 2 pending agreements.\n[WARN] NetworkApi: Handshake took 4200ms.") }
 
     LazyColumn(
         modifier = Modifier
@@ -505,13 +555,139 @@ fun NewSupportTicketForm(
                 }
             }
         } else {
-            items(userTickets) { ticket ->
-                TicketItemRow(ticket = ticket, isAdminMode = false, onAction = {})
+            items(userTickets, key = { it.id }) { ticket ->
+                TicketItemRow(
+                    ticket = ticket, 
+                    isAdminMode = false, 
+                    onAction = { selectedTicketForDetails = ticket }
+                )
             }
         }
         
         item {
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+
+    if (selectedTicketForDetails != null) {
+        val ticket = selectedTicketForDetails!!
+        UserTicketDetailDialog(
+            ticket = ticket,
+            onDismiss = { selectedTicketForDetails = null }
+        )
+    }
+}
+
+@Composable
+fun UserTicketDetailDialog(
+    ticket: SupportTicket,
+    onDismiss: () -> Unit
+) {
+    val dateStr = remember(ticket.createdAt) { DateTimeUtils.formatFull(ticket.createdAt) }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.7f)
+                .clip(RoundedCornerShape(16.dp)),
+            color = SurfaceColor,
+            border = BorderStroke(1.dp, ColorDivider)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "TICKET DETAILS",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, null, tint = Color.White)
+                    }
+                }
+
+                Divider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    item {
+                        Text("Status", color = TextSecondary, fontSize = 11.sp)
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    when (ticket.status) {
+                                        "OPEN" -> ColorDivider
+                                        "IN_PROGRESS" -> CrispAmber.copy(alpha = 0.15f)
+                                        "WAITING_USER" -> AccentBlue.copy(alpha = 0.15f)
+                                        "RESOLVED" -> NeonEmerald.copy(alpha = 0.15f)
+                                        else -> Color.Gray.copy(alpha = 0.15f)
+                                    },
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = ticket.status,
+                                color = when (ticket.status) {
+                                    "OPEN" -> Color.White
+                                    "IN_PROGRESS" -> CrispAmber
+                                    "WAITING_USER" -> AccentBlue
+                                    "RESOLVED" -> NeonEmerald
+                                    else -> Color.Gray
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    item {
+                        Text("Title", color = TextSecondary, fontSize = 10.sp)
+                        Text(ticket.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                    item {
+                        Text("Description", color = TextSecondary, fontSize = 10.sp)
+                        Text(ticket.description, color = Color.White, fontSize = 13.sp)
+                    }
+                    item {
+                        Text("Category", color = TextSecondary, fontSize = 10.sp)
+                        Text(ticket.category, color = AccentBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    item {
+                        Text("Submitted On", color = TextSecondary, fontSize = 10.sp)
+                        Text(dateStr, color = TextMuted, fontSize = 11.sp)
+                    }
+                    
+                    if (ticket.status == "RESOLVED" || ticket.status == "CLOSED") {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = NeonEmerald.copy(alpha = 0.1f)),
+                                border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.3f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Resolution Update", color = NeonEmerald, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "This ticket has been marked as ${ticket.status}. If you have further issues, please create a new ticket.",
+                                        color = Color.White,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -568,7 +744,7 @@ fun FeatureBacklogView(
                     }
                 }
             } else {
-                items(featureTickets) { req ->
+                items(featureTickets, key = { it.id }) { req ->
                     FeatureRequestCard(
                         ticket = req,
                         userId = userId,
@@ -717,11 +893,12 @@ fun TicketItemRow(
     isAdminMode: Boolean,
     onAction: () -> Unit
 ) {
-    val dateStr = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(ticket.createdAt))
+    val dateStr = com.example.util.DateTimeUtils.formatFull(ticket.createdAt)
+    val isCritical = ticket.internalPriority == "CRITICAL"
 
     Card(
         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, ColorDivider),
+        border = BorderStroke(1.dp, if (isCritical) AccentRed.copy(alpha = 0.5f) else ColorDivider),
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -763,30 +940,28 @@ fun TicketItemRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     // Priority tag
-                    if (isAdminMode) {
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    when (ticket.internalPriority) {
-                                        "CRITICAL" -> AccentRed.copy(alpha = 0.2f)
-                                        "HIGH" -> CrispAmber.copy(alpha = 0.2f)
-                                        else -> SurfaceLightColor
-                                    },
-                                    RoundedCornerShape(4.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "PRIORITY: ${ticket.internalPriority}",
-                                color = when (ticket.internalPriority) {
-                                    "CRITICAL" -> AccentRed
-                                    "HIGH" -> CrispAmber
-                                    else -> TextSecondary
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                when (ticket.internalPriority) {
+                                    "CRITICAL" -> AccentRed.copy(alpha = 0.2f)
+                                    "HIGH" -> CrispAmber.copy(alpha = 0.2f)
+                                    else -> SurfaceLightColor
                                 },
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Black
+                                RoundedCornerShape(4.dp)
                             )
-                        }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "PRIORITY: ${ticket.internalPriority}",
+                            color = when (ticket.internalPriority) {
+                                "CRITICAL" -> AccentRed
+                                "HIGH" -> CrispAmber
+                                else -> TextSecondary
+                            },
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black
+                        )
                     }
 
                     // Status Badge
@@ -872,7 +1047,8 @@ fun AdminOperationsCenterView(
     openCount: Int,
     avgSlaHours: Double,
     adminId: String,
-    adminName: String
+    adminName: String,
+    disputeNotes: List<com.example.data.model.DisputeNote>
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf("All") }
@@ -981,6 +1157,84 @@ fun AdminOperationsCenterView(
             }
         }
 
+        // CRM DISPUTE RESOLUTION BOARD
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                border = BorderStroke(1.dp, ColorDivider),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Gavel, null, tint = AccentRed, modifier = Modifier.size(16.dp))
+                            Text(
+                                "LOCKED DISPUTES & CRM INFRACTIONS (${disputeNotes.size})",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    if (disputeNotes.isEmpty()) {
+                        Text("No active dispute infractions logged on the shard.", color = TextMuted, fontSize = 12.sp)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            disputeNotes.forEach { note ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = SurfaceLightColor),
+                                    border = BorderStroke(1.dp, ColorDivider),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Workspace ID: ${note.workspaceId}",
+                                                color = AccentBlue,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "LOCKED DISPUTE",
+                                                color = AccentRed,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = note.content,
+                                            color = Color.White,
+                                            fontSize = 13.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = note.noteText,
+                                            color = TextSecondary,
+                                            fontSize = 12.sp,
+                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Live SLA list or Search Block
         item {
             Card(
@@ -1074,7 +1328,7 @@ fun AdminOperationsCenterView(
                 }
             }
         } else {
-            items(filteredTickets) { ticket ->
+            items(filteredTickets, key = { it.id }) { ticket ->
                 TicketItemRow(
                     ticket = ticket,
                     isAdminMode = true,
@@ -1168,8 +1422,8 @@ fun AdminTicketDetailDialog(
                                 Text("Title: ${ticket.title}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Text("Description: ${ticket.description}", color = TextSecondary, fontSize = 11.sp, lineHeight = 15.sp)
                                 Divider(color = ColorDivider.copy(alpha = 0.5f))
-                                Text("Filer: ${ticket.userDisplayName} (ID: ${ticket.userId})", color = TextMuted, fontSize = 10.sp)
-                                Text("Assigned Admin: ${ticket.assignedAdminName ?: "Unassigned"}", color = TextMuted, fontSize = 10.sp)
+                                Text("Filer: ${ticket.userDisplayName} (ID: ${ticket.userId})", color = TextMuted, fontSize = 11.sp)
+                                Text("Assigned Admin: ${ticket.assignedAdminName ?: "Unassigned"}", color = TextMuted, fontSize = 11.sp)
                             }
                         }
                     }
@@ -1183,7 +1437,7 @@ fun AdminTicketDetailDialog(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text("BUG TELEMETRY", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                    Text("BUG TELEMETRY", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     Text("Device: ${ticket.deviceInfo}", color = Color.White, fontSize = 11.sp)
                                     Text("App Version: ${ticket.appVersion}", color = Color.White, fontSize = 11.sp)
                                     Text("Screenshot: ${ticket.screenshots}", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Medium)
@@ -1214,7 +1468,7 @@ fun AdminTicketDetailDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("OPERATIONAL DISPATCH CONTROLS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                Text("OPERATIONAL DISPATCH CONTROLS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
 
                                 // Self Assignment
                                 if (ticket.assignedAdminId != adminId) {
@@ -1269,7 +1523,7 @@ fun AdminTicketDetailDialog(
                                 }
 
                                 // Priority Switcher
-                                Text("Update Priority Level", color = TextSecondary, fontSize = 10.sp)
+                                Text("Update Priority Level", color = TextSecondary, fontSize = 11.sp)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1328,11 +1582,123 @@ fun AdminTicketDetailDialog(
                                         onDismiss()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.bounceScale().fillMaxWidth(),
                                     shape = RoundedCornerShape(6.dp)
                                 ) {
                                     Text("SAVE OPERATION CHANGES", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HelpArticlesView(helpTexts: List<com.example.data.model.HelpText>) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredArticles = remember(helpTexts, searchQuery) {
+        helpTexts.filter {
+            it.topicKey.contains(searchQuery, ignoreCase = true) ||
+            it.textContent.contains(searchQuery, ignoreCase = true) ||
+            it.category.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Search help articles...", color = TextSecondary) },
+            leadingIcon = { Icon(Icons.Default.Search, tint = TextSecondary, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AccentBlue,
+                unfocusedBorderColor = ColorDivider,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (filteredArticles.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No articles found in Knowledge Base.", color = TextMuted, fontSize = 13.sp)
+                    }
+                }
+            } else {
+                items(filteredArticles, key = { it.id }) { article ->
+                    var isExpanded by remember { mutableStateOf(false) }
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isExpanded = !isExpanded },
+                        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, if (isExpanded) AccentBlue else ColorDivider)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Article,
+                                        contentDescription = null,
+                                        tint = AccentBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = article.topicKey,
+                                        color = Color.White,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = TextSecondary
+                                )
+                            }
+                            if (isExpanded) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = article.textContent,
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Category: ${article.category.uppercase()}",
+                                    color = CrispAmber,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }

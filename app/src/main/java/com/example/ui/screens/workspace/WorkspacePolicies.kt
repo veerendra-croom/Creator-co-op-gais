@@ -124,6 +124,10 @@ fun WorkspacePolicies(viewModel: WorkspaceViewModel, workspaceId: String) {
             }
         }
 
+        val context = LocalContext.current
+        val application = remember { context.applicationContext as com.example.CreatorCoopApp }
+        val repository = remember { application.container.repository }
+
         Button(
             onClick = {
                 coroutineScope.launch {
@@ -131,6 +135,20 @@ fun WorkspacePolicies(viewModel: WorkspaceViewModel, workspaceId: String) {
                     handshakeStatus = "Initiating handshake..."
                     delay(1000)
                     handshakeStatus = "API Credentials Verified."
+                    
+                    // Insert dynamic persistent audit log into SQLite database!
+                    val log = com.example.data.model.AuditLog(
+                        id = java.util.UUID.randomUUID().toString(),
+                        adminId = "workspace_coordinator",
+                        adminName = "Workspace Coordinator",
+                        actionTaken = "API_CONNECTION_VERIFIED",
+                        targetType = "WORKSPACE_POLICY",
+                        targetId = workspaceId,
+                        reason = "Verified Discord Webhook, YouTube content publishing API, and screening triggers for workspace $workspaceId",
+                        createdAt = System.currentTimeMillis()
+                    )
+                    repository.insertAuditLog(log)
+                    
                     delay(1000)
                     isSimulatingHandshake = false
                 }

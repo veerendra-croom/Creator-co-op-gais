@@ -3,6 +3,7 @@ package com.example.data.repository
 import com.example.data.local.*
 import com.example.data.model.*
 import com.example.data.supabase.*
+import com.example.analytics.AnalyticsManager
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.room.withTransaction
 import kotlinx.coroutines.launch
 import android.util.Log
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -131,9 +133,9 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                 // Pre-populate Onboarding Slides
                 platformControlDao.getAllOnboardingSlidesFlow().firstOrNull()?.let { slides ->
                     if (slides.isEmpty()) {
-                        platformControlDao.insertOnboardingSlide(OnboardingSlide("slide_01", "Welcome to Creator Co-Op", "The premier decentralized platform for joint media productions and creator milestone syndicates.", 0, "Hub"))
-                        platformControlDao.insertOnboardingSlide(OnboardingSlide("slide_02", "Automated Milestone Splits", "Draft standard peer-to-peer agreement templates and let secure ledgers handle auto-payout allocations.", 1, "Handshake"))
-                        platformControlDao.insertOnboardingSlide(OnboardingSlide("slide_03", "Real-Time Collaboration", "Connect via live video huddles, review work-in-progress materials, and sync pipelines instantly.", 2, "Groups"))
+                        platformControlDao.insertOnboardingSlide(OnboardingSlide("slide_01", "Welcome to Creator Co-Op", "The premier decentralized platform for joint media productions and creator milestone syndicates.", "Hub", 0))
+                        platformControlDao.insertOnboardingSlide(OnboardingSlide("slide_02", "Automated Milestone Splits", "Draft standard peer-to-peer agreement templates and let secure ledgers handle auto-payout allocations.", "Handshake", 1))
+                        platformControlDao.insertOnboardingSlide(OnboardingSlide("slide_03", "Real-Time Collaboration", "Connect via live video huddles, review work-in-progress materials, and sync pipelines instantly.", "Groups", 2))
                     }
                 }
 
@@ -147,7 +149,7 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                 // Pre-populate Empty States
                 platformControlDao.getAllEmptyStatesFlow().firstOrNull()?.let { states ->
                     if (states.isEmpty()) {
-                        platformControlDao.insertEmptyState(EmptyStateConfig("empty_commons", "Commons", "empty_commons", "No Feed Discussions Yet", "Be the first to share an update, start a video huddle, or publish a milestone achievement."))
+                        platformControlDao.insertEmptyState(EmptyStateConfig("empty_commons", "Commons", "Commons", "empty_commons", "No Feed Discussions Yet", "Be the first to share an update, start a video huddle, or publish a milestone achievement."))
                         platformControlDao.insertEmptyState(EmptyStateConfig("empty_crm", "CRM", "empty_crm", "Cohort List is Currently Clear", "Add active founders or prospective candidates to track interactive health metrics and logs."))
                     }
                 }
@@ -186,8 +188,14 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     fun getDisputeNotesAboutUsers(targetUserIds: List<String>, requestingUserId: String): Flow<List<DisputeNote>> = 
         disputeNoteDao.getDisputeNotesAboutUsers(targetUserIds, requestingUserId)
 
-    suspend fun insertDisputeNote(note: DisputeNote) = 
+    fun getAllDisputeNotesFlow(): Flow<List<DisputeNote>> = 
+        disputeNoteDao.getAllDisputeNotes()
+
+    suspend fun insertDisputeNote(note: DisputeNote) {
         disputeNoteDao.insertDisputeNote(note)
+        queueSync("DISPUTE_NOTE", note, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpDisputeNote(it, note) }
+    }
 
     fun getCalendarItemsForWorkspace(workspaceId: String): Flow<List<ContentCalendarItem>> = 
         contentCalendarItemDao.getCalendarItemsForWorkspace(workspaceId)
@@ -220,6 +228,28 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     // User Settings
     suspend fun getThemePreference(userId: String): String? = userSettingsDao.getSetting(userId, "theme")
     suspend fun setThemePreference(userId: String, preference: String) = userSettingsDao.setSetting(UserSetting(id = "${userId}_theme", userId = userId, key = "theme", value = preference))
+
+    suspend fun getUiTextSizeSetting(userId: String): String? = userSettingsDao.getSetting(userId, "ui_text_size")
+    suspend fun setUiTextSizeSetting(userId: String, size: String) = userSettingsDao.setSetting(UserSetting(id = "${userId}_ui_text_size", userId = userId, key = "ui_text_size", value = size))
+
+    suspend fun getSyncFrequencySetting(userId: String): String? = userSettingsDao.getSetting(userId, "sync_frequency")
+    suspend fun setSyncFrequencySetting(userId: String, frequency: String) = userSettingsDao.setSetting(UserSetting(id = "${userId}_sync_frequency", userId = userId, key = "sync_frequency", value = frequency))
+
+    suspend fun getHapticFeedbackSetting(userId: String): Boolean {
+        val value = userSettingsDao.getSetting(userId, "haptic_feedback_enabled")
+        return value == null || value == "true" // defaults to true (enabled)
+    }
+
+    suspend fun setHapticFeedbackSetting(userId: String, enabled: Boolean) {
+        userSettingsDao.setSetting(
+            UserSetting(
+                id = "${userId}_haptic_feedback_enabled",
+                userId = userId,
+                key = "haptic_feedback_enabled",
+                value = enabled.toString()
+            )
+        )
+    }
 
     suspend fun updateAdPlacement(placement: AdPlacement) {
         adDao.updatePlacement(placement)
@@ -264,6 +294,14 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
             is Endorsement -> json.encodeToString(Endorsement.serializer(), entity)
             is SavedSearch -> json.encodeToString(SavedSearch.serializer(), entity)
             is LookingForWork -> json.encodeToString(LookingForWork.serializer(), entity)
+            is WorkspaceAsset -> json.encodeToString(WorkspaceAsset.serializer(), entity)
+            is Deliverable -> json.encodeToString(Deliverable.serializer(), entity)
+            is WorkspaceEvent -> json.encodeToString(WorkspaceEvent.serializer(), entity)
+            is SupportTicket -> json.encodeToString(SupportTicket.serializer(), entity)
+            is DisputeNote -> json.encodeToString(DisputeNote.serializer(), entity)
+            is FounderNote -> json.encodeToString(FounderNote.serializer(), entity)
+            is VerificationRequest -> json.encodeToString(VerificationRequest.serializer(), entity)
+            is ConnectionRequest -> json.encodeToString(ConnectionRequest.serializer(), entity)
             else -> ""
         }
         val id = when (entity) {
@@ -281,6 +319,14 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
             is Endorsement -> "${entity.giverId}_${entity.receiverId}_${entity.workspaceId}"
             is SavedSearch -> entity.id
             is LookingForWork -> entity.userId
+            is WorkspaceAsset -> entity.id
+            is Deliverable -> entity.id
+            is WorkspaceEvent -> entity.id
+            is SupportTicket -> entity.id
+            is DisputeNote -> entity.id
+            is FounderNote -> entity.id
+            is VerificationRequest -> entity.id
+            is ConnectionRequest -> entity.id
             else -> UUID.randomUUID().toString()
         }
 
@@ -322,11 +368,52 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         context?.let { SupabaseSynchronizer.syncUpAuditLog(it, log) }
     }
 
-    suspend fun updateReportStatus(reportId: String, status: String) {
+    suspend fun updateReportStatus(reportId: String, status: String, adminId: String = "SYSTEM") {
         reportDao.updateReportStatus(reportId, status)
         val report = reportDao.getReportById(reportId)
         if (report != null) {
+            queueSync("REPORT", report)
             context?.let { SupabaseSynchronizer.syncUpReport(it, report) }
+            
+            AnalyticsManager.trackEvent("report_resolved", mapOf("report_id" to reportId, "status" to status))
+            
+            insertAuditLog(AuditLog(
+                id = "audit_" + System.currentTimeMillis(),
+                adminId = adminId,
+                actionTaken = "Updated Report Status to $status",
+                targetType = "REPORT",
+                targetId = reportId,
+                reason = "Routine moderation review"
+            ))
+            
+            insertNotification(Notification(
+                id = "notif_rep_" + System.currentTimeMillis(),
+                userId = report.reporterId,
+                title = "Report Update",
+                body = "Your report regarding ${report.targetType} has been reviewed and marked as $status.",
+                type = "REPORT_RESOLVED",
+                createdAt = System.currentTimeMillis()
+            ))
+            
+            if (status == "RESOLVED" && report.targetType == "USER") {
+                userDao.getUserByIdSuspend(report.targetId)?.let { targetUser ->
+                    val updatedTrust = (targetUser.reputationScore - 10).coerceAtLeast(0)
+                    val updatedUser = targetUser.copy(
+                        reputationScore = updatedTrust,
+                        reliabilityBadge = "Warning"
+                    )
+                    userDao.insertUser(updatedUser)
+                    queueSync("USER_PROFILE", updatedUser)
+                    context?.let { SupabaseSynchronizer.syncUpUser(it, updatedUser) }
+                }
+            } else if (status == "DISMISSED" && report.targetType == "USER") {
+                userDao.getUserByIdSuspend(report.targetId)?.let { targetUser ->
+                    val updatedUser = targetUser.copy(reliabilityBadge = "Silver")
+                    userDao.insertUser(updatedUser)
+                    queueSync("USER_PROFILE", updatedUser)
+                    context?.let { SupabaseSynchronizer.syncUpUser(it, updatedUser) }
+                }
+            }
         }
     }
 
@@ -390,6 +477,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun deleteMessage(id: String) {
         messageDao.deleteMessage(id)
+        queueSync("MESSAGE", id, "DELETE")
+        context?.let { SupabaseSynchronizer.syncDeleteMessage(it, id) }
     }
 
     fun getPitchesForProject(projectId: String): Flow<List<TalentPitch>> = talentPitchDao.getPitchesForProject(projectId)
@@ -455,6 +544,46 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     fun getWorkspaceById(id: String) = workspaceDao.getWorkspaceById(id)
     fun getMembersForWorkspace(workspaceId: String) = workspaceMemberDao.getMembersForWorkspace(workspaceId)
     fun getMemberInfo(workspaceId: String, userId: String) = workspaceMemberDao.getMemberInfo(workspaceId, userId)
+    
+    suspend fun updateMemberPresence(workspaceId: String, userId: String, isOnline: Boolean) {
+        workspaceMemberDao.updateMemberPresence(workspaceId, userId, isOnline, System.currentTimeMillis())
+        workspaceMemberDao.getMemberInfoSuspend(workspaceId, userId)?.let { member ->
+            queueSync("WORKSPACE_MEMBER", member, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpWorkspaceMember(it, member) }
+        }
+    }
+    
+    suspend fun updateMemberTyping(workspaceId: String, userId: String, isTyping: Boolean, typingText: String = "") {
+        workspaceMemberDao.updateMemberTyping(workspaceId, userId, isTyping, typingText)
+        workspaceMemberDao.getMemberInfoSuspend(workspaceId, userId)?.let { member ->
+            queueSync("WORKSPACE_MEMBER", member, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpWorkspaceMember(it, member) }
+        }
+    }
+    
+    suspend fun updateMemberViewingTask(workspaceId: String, userId: String, taskId: String?) {
+        workspaceMemberDao.updateMemberViewingTask(workspaceId, userId, taskId)
+        workspaceMemberDao.getMemberInfoSuspend(workspaceId, userId)?.let { member ->
+            queueSync("WORKSPACE_MEMBER", member, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpWorkspaceMember(it, member) }
+        }
+    }
+    
+    suspend fun updateMemberEditingAsset(workspaceId: String, userId: String, assetId: String?) {
+        workspaceMemberDao.updateMemberEditingAsset(workspaceId, userId, assetId)
+        workspaceMemberDao.getMemberInfoSuspend(workspaceId, userId)?.let { member ->
+            queueSync("WORKSPACE_MEMBER", member, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpWorkspaceMember(it, member) }
+        }
+    }
+    
+    suspend fun updateMemberLiveStatus(workspaceId: String, userId: String, statusUpdate: String) {
+        workspaceMemberDao.updateMemberLiveStatus(workspaceId, userId, statusUpdate, System.currentTimeMillis())
+        workspaceMemberDao.getMemberInfoSuspend(workspaceId, userId)?.let { member ->
+            queueSync("WORKSPACE_MEMBER", member, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpWorkspaceMember(it, member) }
+        }
+    }
     fun getProductionTasks(workspaceId: String) = productionTaskDao.getProductionReadyTasks(workspaceId)
     fun getAllTasksForUser(userId: String) = productionTaskDao.getAllTasksForUser(userId)
     fun getAllProductionTasksFlow() = productionTaskDao.getAllProductionTasks()
@@ -490,6 +619,11 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         context?.let { SupabaseSynchronizer.syncUpAcknowledgment(it, acknowledgment) }
     }
 
+    val allSyncEvents: kotlinx.coroutines.flow.Flow<List<SyncEntity>> = syncDao.getAllSyncEventsFlow()
+    suspend fun clearSyncedHistory() = syncDao.clearSyncedEvents()
+    suspend fun deleteSyncEvent(id: String) = syncDao.deleteSyncEvent(id)
+    suspend fun updateSyncEvent(event: SyncEntity) = syncDao.updateSyncEvent(event)
+
     suspend fun syncUpPendingEvents() {
         val pendingEvents = syncDao.getPendingSyncEventsSuspend()
         context ?: return
@@ -503,13 +637,25 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                         true
                     }
                     "MESSAGE" -> {
-                        val message = json.decodeFromString(Message.serializer(), event.entityJson)
-                        SupabaseSynchronizer.syncUpMessage(context, message)
+                        if (event.actionType == "UPSERT") {
+                            val message = json.decodeFromString(Message.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpMessage(context, message)
+                        } else {
+                            val parts = event.id.split("_")
+                            val id = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteMessage(context, id)
+                        }
                         true
                     }
                     "TASK" -> {
-                        val task = json.decodeFromString(ProductionTask.serializer(), event.entityJson)
-                        SupabaseSynchronizer.syncUpProductionTask(context, task)
+                        if (event.actionType == "UPSERT") {
+                            val task = json.decodeFromString(ProductionTask.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpProductionTask(context, task)
+                        } else {
+                            val parts = event.id.split("_")
+                            val id = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteProductionTask(context, id)
+                        }
                         true
                     }
                     "AGREEMENT_ACK" -> {
@@ -527,9 +673,128 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                         SupabaseConfig.client.postgrest.from("endorsements").upsert(endorsement)
                         true
                     }
+                    "COMMENT" -> {
+                        val comment = json.decodeFromString(Comment.serializer(), event.entityJson)
+                        if (event.actionType == "UPSERT") SupabaseSynchronizer.syncUpComment(context, comment)
+                        else SupabaseSynchronizer.syncDeleteComment(context, comment.id)
+                        true
+                    }
+                    "WORKSPACE" -> {
+                        val workspace = json.decodeFromString(Workspace.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpWorkspace(context, workspace)
+                        true
+                    }
+                    "WORKSPACE_MEMBER" -> {
+                        val member = json.decodeFromString(WorkspaceMember.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpWorkspaceMember(context, member)
+                        true
+                    }
+                    "AGREEMENT" -> {
+                        val agreement = json.decodeFromString(TeamAgreement.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpAgreement(context, agreement)
+                        true
+                    }
+                    "REPORT" -> {
+                        val report = json.decodeFromString(Report.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpReport(context, report)
+                        true
+                    }
+                    "AUDIT_LOG" -> {
+                        val log = json.decodeFromString(AuditLog.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpAuditLog(context, log)
+                        true
+                    }
+                    "SAVED_SEARCH" -> {
+                        if (event.actionType == "UPSERT") {
+                            val search = json.decodeFromString(SavedSearch.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpSavedSearch(context, search)
+                        } else {
+                            val parts = event.id.split("_")
+                            val id = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteSavedSearch(context, id)
+                        }
+                        true
+                    }
+                    "LOOKING_FOR_WORK" -> {
+                        if (event.actionType == "UPSERT") {
+                            val listing = json.decodeFromString(LookingForWork.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpLookingForWork(context, listing)
+                        } else {
+                            val parts = event.id.split("_")
+                            val userId = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteLookingForWork(context, userId)
+                        }
+                        true
+                    }
+                    "WORKSPACE_ASSET" -> {
+                        if (event.actionType == "UPSERT") {
+                            val asset = json.decodeFromString(WorkspaceAsset.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpWorkspaceAsset(context, asset)
+                        } else {
+                            val parts = event.id.split("_")
+                            val id = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteWorkspaceAsset(context, id)
+                        }
+                        true
+                    }
+                    "DELIVERABLE" -> {
+                        if (event.actionType == "UPSERT") {
+                            val deliverable = json.decodeFromString(Deliverable.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpDeliverable(context, deliverable)
+                        } else {
+                            val parts = event.id.split("_")
+                            val id = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteDeliverable(context, id)
+                        }
+                        true
+                    }
+                    "WORKSPACE_EVENT" -> {
+                        val wsEvent = json.decodeFromString(WorkspaceEvent.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpWorkspaceEvent(context, wsEvent)
+                        true
+                    }
+                    "SUPPORT_TICKET" -> {
+                        if (event.actionType == "UPSERT") {
+                            val ticket = json.decodeFromString(SupportTicket.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpSupportTicket(context, ticket)
+                        } else {
+                            val parts = event.id.split("_")
+                            val id = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteSupportTicket(context, id)
+                        }
+                        true
+                    }
+                    "DISPUTE_NOTE" -> {
+                        val note = json.decodeFromString(DisputeNote.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpDisputeNote(context, note)
+                        true
+                    }
+                    "FOUNDER_NOTE" -> {
+                        if (event.actionType == "UPSERT") {
+                            val note = json.decodeFromString(FounderNote.serializer(), event.entityJson)
+                            SupabaseSynchronizer.syncUpFounderNote(context, note)
+                        } else {
+                            val parts = event.id.split("_")
+                            val id = parts.getOrNull(1) ?: event.id
+                            SupabaseSynchronizer.syncDeleteFounderNote(context, id)
+                        }
+                        true
+                    }
+                    "VERIFICATION_REQUEST" -> {
+                        val request = json.decodeFromString(VerificationRequest.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpVerificationRequest(context, request)
+                        true
+                    }
+                    "CONNECTION_REQUEST" -> {
+                        val request = json.decodeFromString(ConnectionRequest.serializer(), event.entityJson)
+                        SupabaseSynchronizer.syncUpConnectionRequest(context, request)
+                        true
+                    }
                     else -> false
                 }
-                if (success) syncDao.deleteSyncEvent(event.id)
+                if (success) {
+                    syncDao.updateSyncStatus(event.id, "SYNCED")
+                }
             } catch (e: Exception) {
                 val retries = event.retryCount + 1
                 val status = if (retries >= 5) "FAILED" else "PENDING"
@@ -593,6 +858,9 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         context?.let { SupabaseSynchronizer.syncUpComment(it, comment) }
     }
 
+    fun getCommentsForEntity(entityId: String): Flow<List<Comment>> =
+        commentDao.getCommentsForPost(entityId)
+
     suspend fun insertWorkspace(workspace: Workspace) {
         workspaceDao.insertWorkspace(workspace)
         queueSync("WORKSPACE", workspace)
@@ -609,6 +877,56 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         productionTaskDao.insertTask(task)
         queueSync("TASK", task)
         context?.let { SupabaseSynchronizer.syncUpProductionTask(it, task) }
+    }
+
+    suspend fun updateTaskStatus(taskId: String, status: String) {
+        val task = productionTaskDao.getTaskByIdSuspend(taskId)
+        if (task != null) {
+            val updatedTask = task.copy(kanbanLane = status)
+            productionTaskDao.insertTask(updatedTask)
+            queueSync("TASK", updatedTask)
+            context?.let { SupabaseSynchronizer.syncUpProductionTask(it, updatedTask) }
+            
+            // Generate notification for task completion
+            if (status == "COMPLETED") {
+                val notificationId = "notif_" + System.currentTimeMillis()
+                insertNotification(Notification(
+                    id = notificationId,
+                    userId = task.creatorId,
+                    title = "Task Completed",
+                    body = "Task '${task.title}' in workspace has been marked as completed.",
+                    type = "TASK_COMPLETED",
+                    deepLinkTarget = "creatorcoop://task/$taskId",
+                    createdAt = System.currentTimeMillis()
+                ))
+                
+                AnalyticsManager.trackTaskCompleted(taskId, System.currentTimeMillis() - task.createdAt)
+                
+                // Boost Reputation for Task Completion
+                val user = userDao.getUserByIdSuspend(task.creatorId)
+                if (user != null) {
+                    val updatedTrustScore = user.reputationScore + 2
+                    val updatedUser = user.copy(reputationScore = updatedTrustScore)
+                    userDao.insertUser(updatedUser)
+                    queueSync("USER_PROFILE", updatedUser)
+                    context?.let { SupabaseSynchronizer.syncUpUser(it, updatedUser) }
+                    AnalyticsManager.trackReputationGain(updatedTrustScore)
+                }
+                
+                insertWorkspaceEvent(WorkspaceEvent(
+                    id = "evt_" + System.currentTimeMillis(),
+                    workspaceId = task.workspaceId,
+                    actorId = task.creatorId,
+                    eventType = "TASK_COMPLETED",
+                    entityId = taskId,
+                    title = "Task Completed",
+                    description = "Task '${task.title}' was completed.",
+                    startTime = System.currentTimeMillis(),
+                    endTime = System.currentTimeMillis(),
+                    createdAt = System.currentTimeMillis()
+                ))
+            }
+        }
     }
 
     suspend fun deleteWorkspace(id: String) {
@@ -632,12 +950,19 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun deleteTask(id: String) {
         productionTaskDao.deleteTaskById(id)
+        queueSync("TASK", id, "DELETE")
+        context?.let { SupabaseSynchronizer.syncDeleteProductionTask(it, id) }
     }
 
     suspend fun insertMessage(message: Message) {
         messageDao.insertMessage(message)
         queueSync("MESSAGE", message)
         context?.let { SupabaseSynchronizer.syncUpMessage(it, message) }
+        
+        AnalyticsManager.trackEvent("message_sent", mapOf(
+            "workspace_id" to message.workspaceId,
+            "sender_id" to message.senderId
+        ))
     }
 
     fun getEndorsementsForUser(userId: String): Flow<List<Endorsement>> {
@@ -668,7 +993,11 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     }
 
     suspend fun prepopulateIfEmpty() {
-        val isTest = System.getProperty("robolectric.active") != null
+        val isTest = try {
+            Class.forName("org.robolectric.Robolectric") != null
+        } catch (e: Throwable) {
+            false
+        }
         if (isTest && userDao.getAllUsers().firstOrNull()?.isEmpty() == true) {
             val myId = "admin_seed"
             val me = UserProfile(
@@ -873,6 +1202,9 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     suspend fun getReferralForUser(userId: String) =
         referralDao.getReferralForUser(userId)
 
+    suspend fun getUserByReferralCode(code: String) =
+        referralDao.getUserByReferralCode(code.trim().uppercase())
+
     suspend fun applyReferralCode(referredUserId: String, enteredCode: String): Pair<Boolean, String> {
         val referredUser = userDao.getUserById(referredUserId).firstOrNull() ?: return Pair(false, "User not found")
         
@@ -998,7 +1330,7 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         val limitStr = getGlobalConfig("spam_threshold_connection_requests", "10")
         val limit = limitStr.toIntOrNull() ?: 10
         val sinceTime = System.currentTimeMillis() - 60 * 60 * 1000L // 1 hour
-        val count = talentPitchDao.getPitchCountSince(senderId, sinceTime)
+        val count = connectionRequestDao.getRequestCountSince(senderId, sinceTime)
         if (count > limit) {
             val autoReport = Report(
                 id = UUID.randomUUID().toString(),
@@ -1086,6 +1418,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     
     suspend fun insertConnectionRequest(request: ConnectionRequest) {
         connectionRequestDao.insertRequest(request)
+        queueSync("CONNECTION_REQUEST", request, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpConnectionRequest(it, request) }
         // Also fire off a notification to the receiver
         val notif = Notification(
             id = UUID.randomUUID().toString(),
@@ -1097,17 +1431,27 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
             createdAt = System.currentTimeMillis()
         )
         notificationDao.insertNotification(notif)
+        checkConnectionRequestRateLimit(request.senderId)
     }
 
     suspend fun resolveConnectionRequest(requestId: String, accept: Boolean) {
         connectionRequestDao.updateRequestStatus(requestId, if (accept) "ACCEPTED" else "DECLINED")
+        val req = connectionRequestDao.getRequestById(requestId)
+        if (req != null) {
+            queueSync("CONNECTION_REQUEST", req, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpConnectionRequest(it, req) }
+        }
     }
 
     // --- NOTIFICATIONS ---
+    fun getAllNotificationsFlow() = notificationDao.getAllNotificationsFlow()
     fun getNotificationsForUser(userId: String) = notificationDao.getNotificationsForUser(userId)
 
     suspend fun markNotificationAsRead(id: String) = notificationDao.markAsRead(id)
+    suspend fun updateNotificationReadState(id: String, isRead: Boolean) = notificationDao.updateReadState(id, if (isRead) 1 else 0)
     suspend fun markAllNotificationsAsRead(userId: String) = notificationDao.markAllAsRead(userId)
+    suspend fun pinNotification(id: String, isPinned: Boolean) = notificationDao.updatePinnedState(id, if (isPinned) 1 else 0)
+    suspend fun archiveNotification(id: String, isArchived: Boolean) = notificationDao.updateArchivedState(id, if (isArchived) 1 else 0)
     suspend fun deleteNotification(id: String) = notificationDao.deleteNotification(id)
     fun getProjectProposalById(id: String): Flow<ProjectProposal?> = projectProposalDao.getProjectProposalById(id)
     
@@ -1131,6 +1475,7 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     // --- USER MANAGEMENT & CREATOR VERIFICATION ---
     fun getAllUsersFlow(): kotlinx.coroutines.flow.Flow<List<UserProfile>> = userDao.getAllUsers()
+    fun getUserByIdFlow(userId: String): kotlinx.coroutines.flow.Flow<UserProfile?> = userDao.getUserById(userId)
 
     suspend fun getVerificationRequestById(id: String): VerificationRequest? = 
         verificationRequestDao.getVerificationRequestById(id)
@@ -1140,6 +1485,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun submitVerificationRequest(request: VerificationRequest) {
         verificationRequestDao.insertVerificationRequest(request)
+        queueSync("VERIFICATION_REQUEST", request, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpVerificationRequest(it, request) }
     }
 
     suspend fun updateVerificationRequest(
@@ -1150,15 +1497,45 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     ) {
         verificationRequestDao.updateVerificationRequestStatus(id, status, notes, reviewedBy, System.currentTimeMillis())
         
+        val updatedReq = verificationRequestDao.getVerificationRequestById(id)
+        if (updatedReq != null) {
+            queueSync("VERIFICATION_REQUEST", updatedReq, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpVerificationRequest(it, updatedReq) }
+        }
+        
         // Also update the actual UserProfile
         val request = verificationRequestDao.getVerificationRequestById(id)
         if (request != null && status == "APPROVED") {
-            userDao.getUserById(request.userId).firstOrNull()?.let { user ->
-                userDao.insertUser(user.copy(
+            userDao.getUserByIdSuspend(request.userId)?.let { user ->
+                val updatedUser = user.copy(
                     isVerifiedPro = true,
                     verificationLevel = "L2 Pro Verified"
+                )
+                userDao.insertUser(updatedUser)
+                queueSync("USER_PROFILE", updatedUser)
+                context?.let { SupabaseSynchronizer.syncUpUser(it, updatedUser) }
+                
+                AnalyticsManager.trackEvent("user_verified", mapOf("user_id" to user.id, "reviewer" to reviewedBy))
+                
+                insertNotification(Notification(
+                    id = "notif_" + System.currentTimeMillis(),
+                    userId = request.userId,
+                    title = "Verification Approved \uD83D\uDCA5",
+                    body = "You are now officially a verified creator! Your profile has been upgraded.",
+                    type = "VERIFICATION_APPROVED",
+                    deepLinkTarget = "creatorcoop://profile/${user.id}",
+                    createdAt = System.currentTimeMillis()
                 ))
             }
+        } else if (request != null && status == "REJECTED") {
+            insertNotification(Notification(
+                id = "notif_" + System.currentTimeMillis(),
+                userId = request.userId,
+                title = "Verification Update",
+                body = "Your verification request was reviewed. Notes: $notes",
+                type = "VERIFICATION_REJECTED",
+                createdAt = System.currentTimeMillis()
+            ))
         }
     }
 
@@ -1177,6 +1554,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun insertSupportTicket(ticket: SupportTicket) {
         supportTicketDao.insertSupportTicket(ticket)
+        queueSync("SUPPORT_TICKET", ticket, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpSupportTicket(it, ticket) }
     }
 
     suspend fun getSupportTicketById(id: String): SupportTicket? =
@@ -1184,6 +1563,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun deleteSupportTicket(id: String) {
         supportTicketDao.deleteSupportTicket(id)
+        queueSync("SUPPORT_TICKET", id, "DELETE")
+        context?.let { SupabaseSynchronizer.syncDeleteSupportTicket(it, id) }
     }
 
     fun getAllCrmRecordsFlow(): Flow<List<CrmRecord>> =
@@ -1292,21 +1673,40 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun insertFounderNote(note: FounderNote) {
         founderNoteDao.insertNote(note)
+        queueSync("FOUNDER_NOTE", note, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpFounderNote(it, note) }
     }
 
     suspend fun deleteFounderNote(id: String) {
         founderNoteDao.deleteNote(id)
+        queueSync("FOUNDER_NOTE", id, "DELETE")
+        context?.let { SupabaseSynchronizer.syncDeleteFounderNote(it, id) }
     }
 
     // Workspace Assets
     fun getAssetsForWorkspace(workspaceId: String): Flow<List<WorkspaceAsset>> =
         workspaceAssetDao.getAssetsForWorkspace(workspaceId)
     
-    suspend fun insertAsset(asset: WorkspaceAsset) = workspaceAssetDao.insertAsset(asset)
+    suspend fun insertAsset(asset: WorkspaceAsset) {
+        workspaceAssetDao.insertAsset(asset)
+        queueSync("WORKSPACE_ASSET", asset, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpWorkspaceAsset(it, asset) }
+    }
     
-    suspend fun updateAssetStatus(assetId: String, status: String) = workspaceAssetDao.updateAssetStatus(assetId, status)
+    suspend fun updateAssetStatus(assetId: String, status: String) {
+        workspaceAssetDao.updateAssetStatus(assetId, status)
+        val asset = workspaceAssetDao.getAssetById(assetId)
+        if (asset != null) {
+            queueSync("WORKSPACE_ASSET", asset, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpWorkspaceAsset(it, asset) }
+        }
+    }
     
-    suspend fun deleteAsset(assetId: String) = workspaceAssetDao.deleteAsset(assetId)
+    suspend fun deleteAsset(assetId: String) {
+        workspaceAssetDao.deleteAsset(assetId)
+        queueSync("WORKSPACE_ASSET", assetId, "DELETE")
+        context?.let { SupabaseSynchronizer.syncDeleteWorkspaceAsset(it, assetId) }
+    }
 
     // Deliverables
     fun getDeliverablesForWorkspace(workspaceId: String): Flow<List<Deliverable>> =
@@ -1315,17 +1715,41 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     fun getDeliverablesForTask(taskId: String): Flow<List<Deliverable>> =
         deliverableDao.getDeliverablesForTask(taskId)
         
-    suspend fun insertDeliverable(deliverable: Deliverable) = deliverableDao.insertDeliverable(deliverable)
+    suspend fun insertDeliverable(deliverable: Deliverable) {
+        deliverableDao.insertDeliverable(deliverable)
+        queueSync("DELIVERABLE", deliverable, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpDeliverable(it, deliverable) }
+    }
     
-    suspend fun updateDeliverableStatus(deliverableId: String, status: String, feedback: String? = null) = 
+    suspend fun updateDeliverableStatus(deliverableId: String, status: String, feedback: String? = null) {
         deliverableDao.updateDeliverableStatus(deliverableId, status, feedback)
+        val deliverable = deliverableDao.getDeliverableById(deliverableId)
+        if (deliverable != null) {
+            queueSync("DELIVERABLE", deliverable, "UPSERT")
+            context?.let { SupabaseSynchronizer.syncUpDeliverable(it, deliverable) }
+        }
+    }
         
-    suspend fun deleteDeliverable(deliverableId: String) = deliverableDao.deleteDeliverable(deliverableId)
+    suspend fun deleteDeliverable(deliverableId: String) {
+        deliverableDao.deleteDeliverable(deliverableId)
+        queueSync("DELIVERABLE", deliverableId, "DELETE")
+        context?.let { SupabaseSynchronizer.syncDeleteDeliverable(it, deliverableId) }
+    }
 
     // Workspace Events
     fun getEventsForWorkspace(workspaceId: String): Flow<List<WorkspaceEvent>> =
         workspaceEventDao.getEventsForWorkspace(workspaceId)
         
-    suspend fun insertWorkspaceEvent(event: WorkspaceEvent) = workspaceEventDao.insertEvent(event)
+    suspend fun insertWorkspaceEvent(event: WorkspaceEvent) {
+        workspaceEventDao.insertEvent(event)
+        queueSync("WORKSPACE_EVENT", event, "UPSERT")
+        context?.let { SupabaseSynchronizer.syncUpWorkspaceEvent(it, event) }
+    }
+
+    fun getAllAssetsFlow(): Flow<List<WorkspaceAsset>> = workspaceAssetDao.getAllAssetsFlow()
+    fun getAllDeliverablesFlow(): Flow<List<Deliverable>> = deliverableDao.getAllDeliverablesFlow()
+    fun getAllAgreementsFlow(): Flow<List<TeamAgreement>> = agreementDao.getAllAgreementsFlow()
+    fun getAllCommentsFlow(): Flow<List<Comment>> = commentDao.getAllCommentsFlow()
+    fun getAllWorkspaceMembersFlow(): Flow<List<WorkspaceMember>> = workspaceMemberDao.getAllMembersFlow()
 }
 

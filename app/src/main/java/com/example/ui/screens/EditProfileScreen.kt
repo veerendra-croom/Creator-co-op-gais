@@ -72,7 +72,7 @@ fun EditProfileScreen(
     var newPortfolioTitle by remember { mutableStateOf("") }
 
     val currentUserId = userProfile.id
-    val existingListingState by globalViewModel.getListingForUser(currentUserId).collectAsState(initial = null)
+    val existingListingState by remember(currentUserId) { globalViewModel.getListingForUser(currentUserId) }.collectAsState(initial = null)
     
     var isSeekingWork by remember { mutableStateOf(false) }
     var lfwSkills by remember { mutableStateOf("") }

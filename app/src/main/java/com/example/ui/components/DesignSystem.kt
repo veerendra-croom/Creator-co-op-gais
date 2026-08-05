@@ -15,11 +15,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.composed
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +60,7 @@ fun PageHeader(
     title: String,
     subtitle: String? = null,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     action: @Composable (RowScope.() -> Unit)? = null
 ) {
     Row(
@@ -64,20 +70,44 @@ fun PageHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Black,
-                color = Color.White
-            )
-            if (subtitle != null) {
-                Spacer(modifier = Modifier.height(DS.Space4))
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DS.Space12)
+        ) {
+            if (onBack != null) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(SurfaceColor, CircleShape)
+                        .border(1.dp, ColorDivider, CircleShape)
+                        .testTag("page_header_back_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Navigate Back",
+                        tint = AccentBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
                 )
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(DS.Space4))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
             }
         }
         if (action != null) {
@@ -162,15 +192,15 @@ fun EmptyStateCard(
                     shape = DS.RadiusMedium
                 ) {
                     val textColor = if (accentColor == CrispAmber) Color.Black else Color.White
-                    Text(primaryCtaLabel.uppercase(), fontWeight = FontWeight.Black, color = textColor, fontSize = 13.sp, letterSpacing = 1.sp)
+                    Text(primaryCtaLabel.uppercase(), fontWeight = FontWeight.Black, color = textColor, fontSize = 14.sp, letterSpacing = 1.sp)
                 }
                 
                 if (secondaryCtaLabel != null) {
                     TextButton(
                         onClick = onSecondaryCta,
-                        modifier = Modifier.fillMaxWidth().height(44.dp)
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
-                        Text(secondaryCtaLabel.uppercase(), color = accentColor, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 0.5.sp)
+                        Text(secondaryCtaLabel.uppercase(), color = accentColor, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 0.5.sp)
                     }
                 }
             }
@@ -232,9 +262,9 @@ fun Modifier.shimmer(): Modifier = composed {
 }
 
 @Composable
-fun MetricSkeleton() {
+fun MetricSkeleton(modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth().height(80.dp),
+        modifier = modifier.fillMaxWidth().height(80.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
         shape = DS.RadiusMedium,
         border = BorderStroke(DS.BorderWidth, ColorDivider)
@@ -315,8 +345,13 @@ fun KPICard(
     icon: ImageVector,
     tint: Color = AccentBlue,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
+    if (isLoading) {
+        MetricSkeleton(modifier = modifier)
+        return
+    }
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -859,6 +894,7 @@ fun EmptyState(
             color = Color.White,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Black,
+            fontSize = 14.sp,
             letterSpacing = 1.sp,
             textAlign = TextAlign.Center
         )
@@ -903,11 +939,11 @@ fun ErrorMessage(
             Icon(Icons.Default.Error, null, tint = AccentRed, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.width(DS.Space12))
             Column(modifier = Modifier.weight(1f)) {
-                Text("OPERATIONAL FAULT", color = AccentRed, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
-                Text(message, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall)
+                Text("OPERATIONAL FAULT", color = AccentRed, style = MaterialTheme.typography.labelSmall, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                Text(message, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
             }
-            TextButton(onClick = onRetry) {
-                Text("RETRY", color = AccentRed, fontWeight = FontWeight.Black)
+            TextButton(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("RETRY", color = AccentRed, fontSize = 12.sp, fontWeight = FontWeight.Black)
             }
         }
     }
@@ -938,7 +974,7 @@ fun TrustBadge(
             Text(
                 text = score.toString(),
                 color = NeonEmerald,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Black
             )
         }
@@ -968,10 +1004,396 @@ fun SecureShardBadge(modifier: Modifier = Modifier) {
                 text = "SECURE SHARD",
                 color = AccentBlue,
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = 8.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 0.5.sp
             )
+        }
+    }
+}
+
+@Composable
+fun UserRoleBadge(
+    role: String,
+    isPro: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val isAdmin = role.equals("ADMIN", ignoreCase = true)
+    val isCreator = role.equals("CREATOR", ignoreCase = true)
+
+    val bgColor = when {
+        isAdmin -> CrispAmber.copy(alpha = 0.15f)
+        isPro -> NeonEmerald.copy(alpha = 0.15f)
+        isCreator -> AccentBlue.copy(alpha = 0.15f)
+        else -> SurfaceLightColor
+    }
+    val contentColor = when {
+        isAdmin -> CrispAmber
+        isPro -> NeonEmerald
+        isCreator -> AccentBlue
+        else -> TextSecondary
+    }
+    val label = when {
+        isAdmin -> "ADMIN"
+        isPro -> "PRO"
+        isCreator -> "CREATOR"
+        else -> "FREE"
+    }
+    val icon = when {
+        isAdmin -> Icons.Default.Security
+        isPro -> Icons.Default.Star
+        isCreator -> Icons.Default.WorkspacePremium
+        else -> Icons.Default.Person
+    }
+
+    Surface(
+        color = bgColor,
+        contentColor = contentColor,
+        shape = DS.RadiusSmall,
+        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(11.dp))
+            Text(text = label, color = contentColor, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+        }
+    }
+}
+
+@Composable
+fun ReliabilityBadge(
+    badge: String,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = when (badge.lowercase()) {
+        "diamond" -> AccentBlue.copy(alpha = 0.18f)
+        "platinum" -> NeonEmerald.copy(alpha = 0.18f)
+        "gold" -> CrispAmber.copy(alpha = 0.18f)
+        "silver" -> Color(0xFFE2E8F0).copy(alpha = 0.15f)
+        else -> SurfaceLightColor
+    }
+    val contentColor = when (badge.lowercase()) {
+        "diamond" -> AccentBlue
+        "platinum" -> NeonEmerald
+        "gold" -> CrispAmber
+        "silver" -> Color(0xFFE2E8F0)
+        else -> TextMuted
+    }
+    val icon = when (badge.lowercase()) {
+        "diamond" -> Icons.Default.Diamond
+        "platinum" -> Icons.Default.WorkspacePremium
+        "gold" -> Icons.Default.Stars
+        "silver" -> Icons.Default.VerifiedUser
+        else -> Icons.Default.Shield
+    }
+
+    Surface(
+        color = bgColor,
+        contentColor = contentColor,
+        shape = DS.RadiusSmall,
+        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(11.dp))
+            Text(text = badge.uppercase(), color = contentColor, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+        }
+    }
+}
+
+@Composable
+fun SubscriptionTierBadge(
+    isPro: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = if (isPro) NeonEmerald.copy(alpha = 0.15f) else ColorDivider.copy(alpha = 0.3f)
+    val contentColor = if (isPro) NeonEmerald else TextMuted
+    val label = if (isPro) "CREATOR PRO" else "STANDARD FREE"
+    val icon = if (isPro) Icons.Default.Star else Icons.Default.Person
+
+    Surface(
+        color = bgColor,
+        contentColor = contentColor,
+        shape = DS.RadiusSmall,
+        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(11.dp))
+            Text(text = label, color = contentColor, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+        }
+    }
+}
+
+@Composable
+fun StatusTagBadge(
+    status: String,
+    modifier: Modifier = Modifier
+) {
+    val (bgColor, contentColor) = when (status.uppercase()) {
+        "ACTIVE", "VERIFIED", "RESOLVED", "SUCCESS", "APPROVED" -> Pair(NeonEmerald.copy(alpha = 0.15f), NeonEmerald)
+        "PENDING", "IN_PROGRESS", "OPEN", "WAITING" -> Pair(CrispAmber.copy(alpha = 0.15f), CrispAmber)
+        "CRITICAL", "FAILED", "SUSPENDED", "BLOCKED", "HIGH" -> Pair(AccentRed.copy(alpha = 0.15f), AccentRed)
+        else -> Pair(AccentBlue.copy(alpha = 0.15f), AccentBlue)
+    }
+
+    Surface(
+        color = bgColor,
+        shape = DS.RadiusSmall,
+        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Text(
+            text = status.replace("_", " ").uppercase(),
+            color = contentColor,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+fun SearchEmptyState(
+    message: String = "We couldn't find any results matching your filters or keywords.",
+    suggestion: String = "Try adjusting your search terms, clearing filters, or typing a different query."
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = DS.Space16),
+        colors = CardDefaults.cardColors(containerColor = SurfaceColor.copy(alpha = 0.5f)),
+        shape = DS.RadiusMedium,
+        border = BorderStroke(DS.BorderWidth, ColorDivider.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(DS.Space24),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DS.Space12)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(AccentBlue.copy(alpha = 0.1f))
+                    .border(1.dp, AccentBlue.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            
+            Text(
+                text = "NO RESULTS FOUND",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                letterSpacing = 1.sp
+            )
+            
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 20.sp
+            )
+            
+            Text(
+                text = suggestion,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 16.sp
+            )
+        }
+    }
+}
+
+fun Modifier.bounceScale(interactionSource: MutableInteractionSource) = composed {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "bounceScale"
+    )
+    this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+fun Modifier.bounceScale() = composed {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "bounceScale"
+    )
+    this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+fun Modifier.bounceClick(
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) = composed {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "bounceClickScale"
+    )
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clickable(
+            interactionSource = interactionSource,
+            indication = LocalIndication.current,
+            enabled = enabled,
+            onClick = onClick
+        )
+}
+
+fun Modifier.shake(trigger: Any?) = composed {
+    var isShaking by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(trigger) {
+        if (trigger != null) {
+            isShaking = true
+            delay(350)
+            isShaking = false
+        }
+    }
+    
+    val translationX by animateFloatAsState(
+        targetValue = 0f,
+        animationSpec = if (isShaking) {
+            keyframes {
+                durationMillis = 350
+                0f at 0
+                -10f at 50
+                10f at 100
+                -10f at 150
+                10f at 200
+                -5f at 250
+                5f at 300
+                0f at 350
+            }
+        } else {
+            snap()
+        },
+        label = "shakeTranslation"
+    )
+    
+    this.graphicsLayer {
+        this.translationX = translationX
+    }
+}
+
+fun Modifier.glowOnFocus(
+    isFocused: Boolean,
+    glowColor: Color = AccentBlue,
+    shape: Shape = RoundedCornerShape(12.dp)
+) = composed {
+    val infiniteTransition = rememberInfiniteTransition(label = "glowPulse")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+    
+    val borderAlpha by animateFloatAsState(
+        targetValue = if (isFocused) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "borderAlpha"
+    )
+    
+    this.then(
+        if (isFocused) {
+            Modifier.border(
+                width = 1.5.dp,
+                color = glowColor.copy(alpha = borderAlpha * glowAlpha),
+                shape = shape
+            )
+        } else {
+            Modifier
+        }
+    )
+}
+
+@Composable
+fun AnimatedCounter(
+    value: Int,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = LocalTextStyle.current,
+    color: Color = Color.Unspecified,
+    prefix: String = ""
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (prefix.isNotEmpty()) {
+            Text(text = prefix, style = style, color = color)
+        }
+        val valueString = value.toString()
+        valueString.forEachIndexed { index, char ->
+            AnimatedContent(
+                targetState = char,
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                (slideOutVertically { height -> -height } + fadeOut())
+                    } else {
+                        (slideInVertically { height -> -height } + fadeIn()) togetherWith
+                                (slideOutVertically { height -> height } + fadeOut())
+                    }.using(
+                        SizeTransform(clip = false)
+                    )
+                },
+                label = "counter_char_$index"
+            ) { targetChar ->
+                Text(
+                    text = targetChar.toString(),
+                    style = style,
+                    color = color,
+                    softWrap = false
+                )
+            }
         }
     }
 }

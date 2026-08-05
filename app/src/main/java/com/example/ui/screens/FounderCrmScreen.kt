@@ -62,43 +62,10 @@ fun FounderCrmScreen(
     // Dialog / Case Details state
     var selectedRecordForDetails by remember { mutableStateOf<CrmRecord?>(null) }
     var showRegistrationDialog by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "FOUNDER CRM & COHORT MANAGER",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "YC Beta Cohort Health Metrics & Pipeline Panel",
-                            color = TextSecondary,
-                            fontSize = 11.sp
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { showRegistrationDialog = true },
-                        modifier = Modifier.testTag("action_register_user_button")
-                    ) {
-                        Icon(Icons.Default.PersonAdd, "Register Creator", tint = NeonEmerald)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground)
-            )
-        },
         containerColor = PrimaryBackground
     ) { paddingValues ->
         Column(
@@ -107,6 +74,33 @@ fun FounderCrmScreen(
                 .padding(paddingValues)
                 .background(PrimaryBackground)
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "YC Beta Cohort Health Metrics & Pipeline Panel",
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { showHelpDialog = true },
+                        modifier = Modifier.testTag("action_help_button")
+                    ) {
+                        Icon(Icons.Default.HelpOutline, "Help Guide", tint = AccentBlue)
+                    }
+                    IconButton(
+                        onClick = { showRegistrationDialog = true },
+                        modifier = Modifier.testTag("action_register_user_button")
+                    ) {
+                        Icon(Icons.Default.PersonAdd, "Register Creator", tint = NeonEmerald)
+                    }
+                }
+            }
             // Material 3 Navigation Tab Bar
             TabRow(
                 selectedTabIndex = selectedTab,
@@ -188,6 +182,10 @@ fun FounderCrmScreen(
             crmViewModel = crmViewModel,
             onDismiss = { showRegistrationDialog = false }
         )
+    }
+
+    if (showHelpDialog) {
+        AdminHelpDialog(onDismiss = { showHelpDialog = false })
     }
 }
 
@@ -272,7 +270,14 @@ fun ExecutiveDashboardView(crmViewModel: FounderCrmViewModel) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Hourly User Engagement Trends", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    SparklineGraph()
+                    val graphPoints = remember(allRecords) {
+                        if (allRecords.isEmpty()) {
+                            listOf(10f, 25f, 18f, 42f, 35f, 58f, 50f, 72f, 65f, 85f, 80f, 98f)
+                        } else {
+                            allRecords.map { it.healthScore.toFloat() }.takeLast(12)
+                        }
+                    }
+                    SparklineGraph(points = graphPoints)
                 }
             }
         }
@@ -479,7 +484,7 @@ fun FoundersView(
                 EmptyDashboardPlaceholder("No champions match. Support users to complete tasks!")
             }
         } else {
-            items(champions) { champ ->
+            items(champions, key = { it.id }) { champ ->
                 CreatorHealthCard(lead = champ, onClick = { onSelectCreator(champ) })
             }
         }
@@ -499,7 +504,7 @@ fun FoundersView(
                 EmptyDashboardPlaceholder("Excellent! No cohort members are in the churn risk zone.")
             }
         } else {
-            items(churnRisks) { risk ->
+            items(churnRisks, key = { it.id }) { risk ->
                 CreatorHealthCard(lead = risk, onClick = { onSelectCreator(risk) })
             }
         }
@@ -519,7 +524,7 @@ fun FoundersView(
                 EmptyDashboardPlaceholder("Perfect! All customer support tickets resolved.")
             }
         } else {
-            items(openTickets) { ticket ->
+            items(openTickets, key = { it.id }) { ticket ->
                 SupportTicketInteractiveCard(ticket, crmViewModel)
             }
         }
@@ -539,7 +544,7 @@ fun FoundersView(
                 EmptyDashboardPlaceholder("Excellent! No open moderation/abuse reports.")
             }
         } else {
-            items(pendingReports) { report ->
+            items(pendingReports, key = { it.id }) { report ->
                 ReportInteractiveCard(report, crmViewModel)
             }
         }
@@ -559,7 +564,7 @@ fun FoundersView(
                 EmptyDashboardPlaceholder("No pending verification requests.")
             }
         } else {
-            items(pendingVerifs) { request ->
+            items(pendingVerifs, key = { it.id }) { request ->
                 VerificationInteractiveCard(request, crmViewModel)
             }
         }
@@ -567,16 +572,16 @@ fun FoundersView(
 }
 
 @Composable
-fun SparklineGraph() {
+fun SparklineGraph(points: List<Float>) {
     androidx.compose.foundation.Canvas(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp)
             .background(PrimaryBackground.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
     ) {
-        val points = listOf(10f, 25f, 18f, 42f, 35f, 58f, 50f, 72f, 65f, 85f, 80f, 98f)
+        if (points.isEmpty()) return@Canvas
         val path = androidx.compose.ui.graphics.Path()
-        val widthBetween = size.width / (points.size - 1)
+        val widthBetween = if (points.size > 1) size.width / (points.size - 1) else size.width
         val maxHeight = size.height - 10.dp.toPx()
         val minHeight = 5.dp.toPx()
         
@@ -1051,10 +1056,13 @@ fun CohortDirectoryView(
 
             if (filteredList.isEmpty()) {
                 item {
-                    EmptyDashboardPlaceholder("No cohort members match the search filters.")
+                    com.example.ui.components.SearchEmptyState(
+                        message = "No cohort members match the search filters.",
+                        suggestion = "Try adjusting your search keywords, segment filters, or follow-up status."
+                    )
                 }
             } else {
-                items(filteredList) { member ->
+                items(filteredList, key = { it.id }) { member ->
                     CreatorHealthCard(lead = member, onClick = { onSelectCreator(member) })
                 }
             }

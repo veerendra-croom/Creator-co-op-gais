@@ -19,11 +19,12 @@ import com.example.CreatorCoopApp
 
 @Composable
 fun AppNavHost(
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    globalViewModel: GlobalViewModel? = null
 ) {
     val application = LocalContext.current.applicationContext as CreatorCoopApp
     val factory = AppViewModelFactory(application)
-    val globalViewModel: GlobalViewModel = viewModel(factory = factory)
+    val globalViewModel: GlobalViewModel = globalViewModel ?: viewModel(factory = factory)
     val authViewModel: AuthViewModel = viewModel(factory = factory)
     val showSplash by globalViewModel.showSplash.collectAsState()
     val currentUserId by authViewModel.currentUserId.collectAsState(initial = null)

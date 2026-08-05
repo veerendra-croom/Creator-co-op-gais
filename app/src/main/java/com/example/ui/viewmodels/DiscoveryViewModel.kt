@@ -55,7 +55,7 @@ class DiscoveryViewModel constructor(
         }
     }
 
-    fun submitProjectProposal(title: String, niche: String, brief: String, user: UserProfile?, userId: String) {
+    fun submitProjectProposal(title: String, niche: String, brief: String, user: UserProfile?, userId: String, isBoosted: Boolean = false) {
         if (user == null || userId != user.id) {
             _toastMessage.value = "Identity verification failed. Please re-login."
             return
@@ -72,10 +72,11 @@ class DiscoveryViewModel constructor(
                 brief = brief,
                 authorId = userId,
                 authorName = user.displayName,
+                boostedUntil = if (isBoosted) System.currentTimeMillis() + (48 * 60 * 60 * 1000) else 0,
                 createdAt = System.currentTimeMillis()
             )
             repository.insertProjectProposal(proposal)
-            _toastMessage.value = "Project proposal posted successfully!"
+            _toastMessage.value = if (isBoosted) "Project proposal posted and boosted successfully!" else "Project proposal posted successfully!"
         }
     }
 

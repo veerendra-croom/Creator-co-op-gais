@@ -29,41 +29,78 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun OnboardingScreen(
+    globalViewModel: com.example.ui.viewmodels.GlobalViewModel,
     onComplete: () -> Unit
 ) {
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    val dbSlides by globalViewModel.onboardingSlides.collectAsState()
     val scope = rememberCoroutineScope()
 
-    val onboardingPages = listOf(
-        OnboardingPage(
-            title = "Welcome to the Co-Op",
-            description = "The first premium B2B SaaS platform designed specifically for the Creator Economy.",
-            icon = Icons.Default.Groups,
-            color = AccentBlue,
-            imageRes = com.example.R.drawable.onboarding_collaboration_1782754946609
-        ),
-        OnboardingPage(
-            title = "Secure Agreements",
-            description = "Lock in your production terms with legal-grade agreements signed directly in-app.",
-            icon = Icons.Default.Gavel,
-            color = CrispAmber,
-            imageRes = com.example.R.drawable.onboarding_security_1782754961964
-        ),
-        OnboardingPage(
-            title = "Proof of Reputation",
-            description = "Build a verifiable trust score based on completed tasks and verified collaborations.",
-            icon = Icons.Default.Verified,
-            color = NeonEmerald,
-            imageRes = com.example.R.drawable.onboarding_reputation_1782754975727
-        ),
-        OnboardingPage(
-            title = "Ready to Build?",
-            description = "Establish your first workspace node and start collaborating with the elite 1% of creators.",
-            icon = Icons.Default.RocketLaunch,
-            color = AccentRed,
-            imageRes = com.example.R.drawable.img_hero_banner
-        )
-    )
+    val onboardingPages = remember(dbSlides) {
+        if (dbSlides.isNotEmpty()) {
+            dbSlides.sortedBy { it.stepIndex }.map { slide ->
+                val icon = when (slide.iconName) {
+                    "Hub" -> Icons.Default.Share
+                    "Handshake" -> Icons.Default.Verified
+                    "Groups" -> Icons.Default.Groups
+                    "Gavel" -> Icons.Default.Gavel
+                    "Verified" -> Icons.Default.Verified
+                    else -> Icons.Default.Star
+                }
+                val color = when (slide.stepIndex) {
+                    0 -> AccentBlue
+                    1 -> CrispAmber
+                    2 -> NeonEmerald
+                    else -> AccentRed
+                }
+                val imageRes = when (slide.stepIndex) {
+                    0 -> com.example.R.drawable.onboarding_collaboration_1782754946609
+                    1 -> com.example.R.drawable.onboarding_security_1782754961964
+                    2 -> com.example.R.drawable.onboarding_reputation_1782754975727
+                    else -> com.example.R.drawable.img_hero_banner
+                }
+                OnboardingPage(
+                    title = slide.title,
+                    description = slide.description,
+                    icon = icon,
+                    color = color,
+                    imageRes = imageRes
+                )
+            }
+        } else {
+            listOf(
+                OnboardingPage(
+                    title = "Welcome to the Co-Op",
+                    description = "The first premium B2B SaaS platform designed specifically for the Creator Economy.",
+                    icon = Icons.Default.Groups,
+                    color = AccentBlue,
+                    imageRes = com.example.R.drawable.onboarding_collaboration_1782754946609
+                ),
+                OnboardingPage(
+                    title = "Secure Agreements",
+                    description = "Lock in your production terms with legal-grade agreements signed directly in-app.",
+                    icon = Icons.Default.Gavel,
+                    color = CrispAmber,
+                    imageRes = com.example.R.drawable.onboarding_security_1782754961964
+                ),
+                OnboardingPage(
+                    title = "Proof of Reputation",
+                    description = "Build a verifiable trust score based on completed tasks and verified collaborations.",
+                    icon = Icons.Default.Verified,
+                    color = NeonEmerald,
+                    imageRes = com.example.R.drawable.onboarding_reputation_1782754975727
+                ),
+                OnboardingPage(
+                    title = "Ready to Build?",
+                    description = "Establish your first workspace node and start collaborating with the elite 1% of creators.\n\nCreated by Founder Botla Veerendra & Co-Founder Macha Praveen.",
+                    icon = Icons.Default.Star,
+                    color = AccentRed,
+                    imageRes = com.example.R.drawable.img_hero_banner
+                )
+            )
+        }
+    }
+
+    val pagerState = rememberPagerState(pageCount = { onboardingPages.size })
 
     Scaffold(
         containerColor = PrimaryBackground,
@@ -116,6 +153,9 @@ fun OnboardingScreen(
                         letterSpacing = 1.sp
                     )
                 }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Created by Founder Botla Veerendra & Co-Founder Macha Praveen", color = TextSecondary, fontSize = 10.sp)
             }
         }
     ) { padding ->

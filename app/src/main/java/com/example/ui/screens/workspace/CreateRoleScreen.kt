@@ -16,12 +16,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.testTag
+import com.example.data.model.UserProfile
+import com.example.ui.feedback.FeedbackManager
 import com.example.ui.theme.*
 
 @Composable
 fun CreateRoleScreen(
     discoveryViewModel: com.example.ui.viewmodels.DiscoveryViewModel,
     authViewModel: com.example.ui.viewmodels.AuthViewModel,
+    userProfile: UserProfile?,
     onBack: () -> Unit
 ) {
     val currentUserId by authViewModel.currentUserId.collectAsState()
@@ -29,6 +33,22 @@ fun CreateRoleScreen(
     var description by remember { mutableStateOf("") }
     var requirements by remember { mutableStateOf("") }
     var workType by remember { mutableStateOf("Full Time") }
+
+    var boostOpportunity by remember { mutableStateOf(false) }
+    var showBillingDialog by remember { mutableStateOf(false) }
+
+    if (showBillingDialog) {
+        com.example.ui.components.BillingSimulatorDialog(
+            skuName = "Open Role 48h Boost",
+            skuPrice = "$4.99",
+            skuDescription = "Feature your listing at the top of discovery feeds instantly.",
+            onDismiss = { showBillingDialog = false },
+            onPurchaseSuccess = {
+                boostOpportunity = true
+                showBillingDialog = false
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -54,9 +74,11 @@ fun CreateRoleScreen(
                         title = roleName,
                         niche = requirements,
                         brief = description,
-                        user = null,
-                        userId = currentUserId ?: "unknown"
+                        user = userProfile,
+                        userId = currentUserId ?: "unknown",
+                        isBoosted = boostOpportunity
                     )
+                    FeedbackManager.showSuccess("Opportunity posted successfully!")
                     onBack()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
@@ -134,6 +156,74 @@ fun CreateRoleScreen(
                             text = opt, 
                             selected = workType == opt,
                             onClick = { workType = opt }
+                        )
+                    }
+                }
+            }
+
+            item {
+                Text("MONETIZATION & PROMOTION", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (!boostOpportunity) {
+                                showBillingDialog = true
+                            } else {
+                                boostOpportunity = false
+                            }
+                        }
+                        .testTag("boost_toggle_card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (boostOpportunity) AccentBlue.copy(alpha = 0.15f) else SurfaceColor
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, if (boostOpportunity) AccentBlue else ColorDivider)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = "Boost",
+                                tint = if (boostOpportunity) AccentBlue else TextSecondary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Boost Opportunity (48 Hours)",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (boostOpportunity) "✓ Play Billing purchase successful! Active upon posting." else "Feature on top of discovery feeds instantly. ($4.99 SKU)",
+                                    color = if (boostOpportunity) NeonEmerald else TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = boostOpportunity,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    showBillingDialog = true
+                                } else {
+                                    boostOpportunity = false
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = PrimaryBackground,
+                                checkedTrackColor = AccentBlue,
+                                uncheckedThumbColor = TextMuted,
+                                uncheckedTrackColor = SurfaceColor
+                            ),
+                            modifier = Modifier.testTag("boost_switch_input")
                         )
                     }
                 }

@@ -25,12 +25,11 @@ fun LegalScreen(onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(PrimaryBackground)
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -51,7 +50,13 @@ fun LegalScreen(onBack: () -> Unit) {
             }
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(modifier = Modifier.height(12.dp))
 
         // Professional Review Disclaimer
         Card(
@@ -82,8 +87,8 @@ fun LegalScreen(onBack: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "This document is an accurate, AI-generated legal text accurately describing " +
-                        "the data collection, storage engines (Supabase/PostgreSQL), deletion flows, " +
+                        "This document is an accurate legal text describing " +
+                        "the data collection, secure cloud storage, deletion flows, " +
                         "and non-binding team alignment features of Creator Co-Op. While it is fully complete and " +
                         "no longer a placeholder, we recommend a secondary quick human/lawyer review before official commercial launch.",
                         color = TextPrimary,
@@ -153,21 +158,21 @@ fun LegalScreen(onBack: () -> Unit) {
 
                 LegalItem(
                     title = "4. Premium & Promotion Features",
-                    description = "Platform features including 'Listing Boost' and 'Workspace Sponsorship' are elective promotion tools. Acknowledgment that boosting a listing does not guarantee specific results or commercial success. Sponsored labels indicate platform-vetted pairings but do not imply platform control over the workspace activities."
+                    description = "Platform features including one-time role boosts, premium workspace sponsorships, and annual/monthly premium subscription terms are elective promotion tools processed securely via Google Play Billing. Acknowledgment that boosting a listing does not guarantee specific results or commercial success. Sponsored labels indicate platform-vetted pairings but do not imply platform control over the workspace activities."
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 LegalItem(
                     title = "5. User Referral Program",
-                    description = "Participants in our Referral Program may receive rewards such as 'Pro Trial Extensions'. These rewards have zero cash value, are non-transferable, and the platform reserves the right to terminate the program or revoke rewards obtained through fraudulent or abusive sharing practices."
+                    description = "Participants in our Referral Program may receive rewards such as referral program trial extensions for premium subscription tiers. These rewards have zero cash value, are non-transferable, and the platform reserves the right to terminate the program or revoke rewards obtained through fraudulent or abusive sharing practices."
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 LegalItem(
                     title = "6. Endorsements & Dispute Documentation",
-                    description = "All 'Endorsements' and 'Dispute Notes' represent the subjective opinions and experiences of individual users. The platform does not verify, fact-check, or guarantee the accuracy of this user-generated feedback. Users interact with endorsed creators at their own professional discretion, and the platform is not liable for outcomes resulting from these interactions."
+                    description = "All user endorsements, private dispute notes, and feedback are purely user-generated records. They are explicitly NOT legally binding platform determinations, enforceable findings, or official certifications. The platform does not verify, fact-check, or guarantee the accuracy of this user-generated feedback. Users interact with endorsed creators or handle dispute outcomes at their own professional discretion."
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -222,8 +227,8 @@ fun LegalScreen(onBack: () -> Unit) {
                 LegalItem(
                     title = "2. Storage & Hosting Architecture",
                     description = "All cloud-synchronized data, active login sessions, and uploaded assets " +
-                        "are stored securely on Supabase cloud-hosted system backends, leveraging secure " +
-                        "PostgreSQL relational databases, Supabase Auth engines, and cloud storage buckets."
+                        "are stored securely on enterprise cloud-hosted system backends, leveraging secure " +
+                        "cloud networks, encrypted authorization systems, and protected cloud storage."
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -264,6 +269,7 @@ fun LegalScreen(onBack: () -> Unit) {
             }
         }
     }
+}
 }
 
 @Composable

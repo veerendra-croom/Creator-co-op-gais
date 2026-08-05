@@ -36,7 +36,8 @@ fun WorkspaceHub(
     chatViewModel: ChatViewModel,
     userId: String,
     userProfile: UserProfile?,
-    onNavigateToCreate: () -> Unit = {}
+    onNavigateToCreate: () -> Unit = {},
+    onNavigateToDiscovery: () -> Unit = {}
 ) {
     val workspaces by workspaceViewModel.workspaces.collectAsStateWithLifecycle()
     val selectedWorkspace by workspaceViewModel.selectedWorkspace.collectAsStateWithLifecycle()
@@ -46,7 +47,8 @@ fun WorkspaceHub(
         WorkspaceList(
             workspaces = workspaces,
             onSelect = { workspaceViewModel.selectWorkspace(it) },
-            onCreateClick = onNavigateToCreate
+            onCreateClick = onNavigateToCreate,
+            onDiscoveryClick = onNavigateToDiscovery
         )
     } else {
         WorkspaceDetailContainer(
@@ -65,7 +67,8 @@ fun WorkspaceHub(
 fun WorkspaceList(
     workspaces: List<Workspace>,
     onSelect: (Workspace) -> Unit,
-    onCreateClick: () -> Unit
+    onCreateClick: () -> Unit,
+    onDiscoveryClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().background(PrimaryBackground)) {
         Box(modifier = Modifier.fillMaxWidth().height(84.dp)) {
@@ -86,7 +89,7 @@ fun WorkspaceList(
                     primaryCtaLabel = "ESTABLISH NEW NODE",
                     onPrimaryCta = onCreateClick,
                     secondaryCtaLabel = "BROWSE PUBLIC PROJECTS",
-                    onSecondaryCta = { /* Navigate to Discovery */ },
+                    onSecondaryCta = onDiscoveryClick,
                     accentColor = AccentBlue,
                     showFabCue = true
                 )
@@ -232,8 +235,8 @@ fun WorkspaceDetailContainer(
     }
 
     val activeModule by workspaceViewModel.workspaceSubTab.collectAsState()
-    val activeAgreement by agreementViewModel.getActiveAgreement(workspaceViewModel.selectedWorkspaceId).collectAsState()
-    val isAgreementLocked = activeAgreement != null && activeAgreement!!.isLocked
+    val activeAgreement by remember(workspace.id) { agreementViewModel.getActiveAgreement(workspace.id) }.collectAsState(initial = null)
+    val isAgreementLocked = activeAgreement?.isLocked == true
     val isLead = members.any { it.userId == userId && it.assignedRoleTitle in listOf("Lead Creator", "Head") } || workspace.createdBy == userId
     
     Scaffold(
@@ -294,6 +297,35 @@ fun WorkspaceDetailContainer(
                     Tab(selected = activeModule == "TEAM", onClick = { workspaceViewModel.workspaceSubTab.value = "TEAM" }, text = { Text("Team", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
                     Tab(selected = activeModule == "AGREEMENT", onClick = { workspaceViewModel.workspaceSubTab.value = "AGREEMENT" }, text = { Text("Vault", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
                 }
+                
+                if (workspace.isSponsored) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Brush.linearGradient(listOf(AccentBlue.copy(alpha = 0.15f), Color.Transparent)))
+                            .padding(vertical = 10.dp, horizontal = 16.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Celebration,
+                                contentDescription = "Sponsor Badge",
+                                tint = AccentBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Presented by ${workspace.sponsorName ?: "Premium Partner"}",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+                }
             }
         },
         containerColor = PrimaryBackground
@@ -305,7 +337,15 @@ fun WorkspaceDetailContainer(
                 label = "module_switch"
             ) { module ->
                 when (module) {
-                    "STATE" -> WorkspaceOverview(workspace, workspaceViewModel, isAgreementLocked, onGoToAgreement = { workspaceViewModel.workspaceSubTab.value = "AGREEMENT" })
+                    "STATE" -> WorkspaceOverview(
+                        workspace = workspace,
+                        viewModel = workspaceViewModel,
+                        isAgreementActive = isAgreementLocked,
+                        onGoToAgreement = { workspaceViewModel.workspaceSubTab.value = "AGREEMENT" },
+                        onGoToTasks = { workspaceViewModel.workspaceSubTab.value = "PRODUCTION" },
+                        onGoToChat = { workspaceViewModel.workspaceSubTab.value = "CHAT" },
+                        onGoToTeam = { workspaceViewModel.workspaceSubTab.value = "TEAM" }
+                    )
                     "SANDBOX" -> PersonalSpaceScreen(workspaceViewModel, workspace.id, userId)
                     "PRODUCTION" -> TeamSpaceScreen(workspaceViewModel, workspace.id, userId, isAgreementLocked, onGoToAgreement = { workspaceViewModel.workspaceSubTab.value = "AGREEMENT" })
                     "CHAT" -> WorkspaceChat(chatViewModel, workspace.id, userId, userProfile, isAgreementLocked)

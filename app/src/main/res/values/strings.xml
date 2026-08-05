@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">Creator Co-Op</string>
+    
+    <!-- Auth Screen -->
+    <string name="auth_sign_in">Sign In</string>
+    <string name="auth_join_coop">Join the Co-Op</string>
+    <string name="auth_email_label">Email Address</string>
+    <string name="auth_email_placeholder">Enter your email</string>
+    <string name="auth_password_label">Password</string>
+    <string name="auth_password_placeholder">Enter your password</string>
+    <string name="auth_confirm_password_label">Confirm Password</string>
+    <string name="auth_confirm_password_placeholder">Verify your password</string>
+    <string name="auth_forgot_password">FORGOT PASSWORD?</string>
+    <string name="auth_no_account">Don\'t have an account? Join Now</string>
+    <string name="auth_have_account">Already a member? Sign In</string>
+    <string name="auth_google_sign_in">Sign in with Google</string>
+    <string name="auth_google_continue">to continue to Creator Co-Op</string>
+    <string name="auth_error_generic">Authentication failed. Please try again.</string>
 </resources>

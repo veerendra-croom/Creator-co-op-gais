@@ -48,6 +48,7 @@ fun PlatformControlCenterScreen(
     val toastMessage by viewModel.toastMessage.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var showAdminHelpDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
@@ -61,40 +62,6 @@ fun PlatformControlCenterScreen(
             .fillMaxSize()
             .testTag("platform_control_center_scaffold"),
         containerColor = PrimaryBackground,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Platform Control",
-                            color = TextPrimary,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Creator Co-Op Infrastructure",
-                            color = AccentBlue,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceColor)
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
@@ -237,7 +204,7 @@ fun PlatformControlCenterScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             if (featureFlags.isEmpty()) {
                                 Text(
-                                    text = "No feature flags loaded in database repository.",
+                                    text = "No feature flags are currently configured.",
                                     color = TextSecondary,
                                     fontSize = 13.sp,
                                     modifier = Modifier.padding(8.dp)
@@ -267,6 +234,10 @@ fun PlatformControlCenterScreen(
                 )
             }
         }
+    }
+
+    if (showAdminHelpDialog) {
+        AdminHelpDialog(onDismiss = { showAdminHelpDialog = false })
     }
 }
 
@@ -350,7 +321,7 @@ fun FeatureFlagRow(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = flag.description,
+                text = flag.description ?: "",
                 color = TextPrimary,
                 fontSize = 12.sp,
                 lineHeight = 16.sp
@@ -472,7 +443,7 @@ fun DynamicContentManagementView(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(onboardingSlides) { slide ->
+                            items(onboardingSlides, key = { it.id }) { slide ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -546,7 +517,7 @@ fun DynamicContentManagementView(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(welcomeMessages) { msg ->
+                            items(welcomeMessages, key = { it.id }) { msg ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -637,7 +608,7 @@ fun DynamicContentManagementView(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(emptyStates) { state ->
+                            items(emptyStates, key = { it.id }) { state ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -712,7 +683,7 @@ fun DynamicContentManagementView(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(helpTexts) { help ->
+                            items(helpTexts, key = { it.id }) { help ->
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(containerColor = SurfaceColor),

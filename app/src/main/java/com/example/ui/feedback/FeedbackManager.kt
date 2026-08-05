@@ -24,6 +24,8 @@ object FeedbackManager {
     private val _messages = MutableSharedFlow<FeedbackMessage>(extraBufferCapacity = 16)
     val messages = _messages.asSharedFlow()
 
+    var isHapticEnabled: Boolean = true
+
     var currentMessage = androidx.compose.runtime.mutableStateOf<FeedbackMessage?>(null)
         private set
 

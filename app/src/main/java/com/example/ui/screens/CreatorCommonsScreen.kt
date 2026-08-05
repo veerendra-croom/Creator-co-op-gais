@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.TextStyle
@@ -283,6 +284,46 @@ fun CreatorCommonsScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            if (posts.itemCount == 0 && posts.loadState.refresh is androidx.paging.LoadState.NotLoading) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = SurfaceColor.copy(alpha = 0.4f)),
+                        border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 32.dp)
+                            .testTag("commons_empty_state_card")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Forum,
+                                contentDescription = null,
+                                tint = TextMuted,
+                                modifier = Modifier.size(40.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "No ideas or announcements in this space yet.",
+                                color = TextMuted,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Be the first to share an idea with the co-op by tapping 'Share Idea' below!",
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+
             // Feed Items
             items(
                 count = posts.itemCount,
@@ -317,7 +358,7 @@ fun CreatorCommonsScreen(
             onDismiss = { reportTarget = null },
             onSubmit = { reason ->
                 val reporterId = authViewModel.currentUserId.value ?: "me"
-                adminViewModel.reportContent(reportTarget!!.first, reportTarget!!.second, reporterId, reason)
+                adminViewModel.reportContent(reportTarget!!.first, reportTarget!!.second, reason, reporterId)
                 reportTarget = null
             }
         )
@@ -394,7 +435,7 @@ fun PostDetailDialog(
     userProfile: com.example.data.model.UserProfile?, 
     onDismiss: () -> Unit
 ) {
-    val comments by feedViewModel.getCommentsForPost(post.id).collectAsState(initial = emptyList())
+    val comments by remember(post.id) { feedViewModel.getCommentsForPost(post.id) }.collectAsState(initial = emptyList())
     var commentText by remember { mutableStateOf("") }
 
     AlertDialog(
@@ -427,7 +468,7 @@ fun PostDetailDialog(
                             onClick = {}, 
                             onReport = { 
                                 val reporterId = authViewModel.currentUserId.value ?: "me"
-                                adminViewModel.reportContent("POST", post.id, reporterId, "Reported from Detail") 
+                                adminViewModel.reportContent("POST", post.id, "Reported from Detail", reporterId) 
                             }
                         )
                     }
@@ -451,7 +492,7 @@ fun PostDetailDialog(
                                 Spacer(modifier = Modifier.weight(1f))
                                 IconButton(onClick = { 
                                     val reporterId = authViewModel.currentUserId.value ?: "me"
-                                    adminViewModel.reportContent("COMMENT", comment.id, reporterId, "Reported from discussion") 
+                                    adminViewModel.reportContent("COMMENT", comment.id, "Reported from discussion", reporterId) 
                                 }, modifier = Modifier.size(24.dp)) {
                                     Icon(Icons.Default.Flag, null, tint = TextSecondary, modifier = Modifier.size(14.dp))
                                 }
@@ -577,6 +618,7 @@ fun CreatePostDialog(onDismiss: () -> Unit, onPost: (String, String) -> Unit) {
 
 @Composable
 fun TrendingSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp),
@@ -609,7 +651,9 @@ fun TrendingSection() {
                             )
                         )
                         .border(1.dp, ColorDivider, RoundedCornerShape(24.dp))
-                        .clickable { }
+                        .clickable { 
+                            android.widget.Toast.makeText(context, "Joining the viral discussion: $title", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                         .padding(20.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
@@ -661,7 +705,7 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(post.authorRole, color = AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Text(" • ", color = TextSecondary)
-                        Text(com.example.utils.TimeUtils.formatRelative(post.timestamp), color = TextSecondary, fontSize = 10.sp)
+                        Text(com.example.util.DateTimeUtils.getRelativeTimeSpanString(post.timestamp), color = TextSecondary, fontSize = 10.sp)
                     }
                 }
                 
@@ -768,9 +812,16 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
                             }
                         }
                     }
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Outlined.Share, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
-                    }
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        TextButton(
+                            onClick = { 
+                                android.widget.Toast.makeText(context, "Syndicate Share: Spreading this idea across the co-op!", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.Share, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+                            }
+                        }
                 }
             }
         }

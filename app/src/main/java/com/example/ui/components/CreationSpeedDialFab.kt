@@ -91,7 +91,9 @@ fun CreationSpeedDialFab(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
                         isExpanded = false
                     }
             )
@@ -182,7 +184,9 @@ fun CreationSpeedDialFab(
                             modifier = Modifier
                                 .padding(end = 10.dp)
                                 .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
                                     item.onClick()
                                 }
                         ) {
@@ -204,7 +208,9 @@ fun CreationSpeedDialFab(
                                 .background(SurfaceColor)
                                 .border(1.5.dp, item.tint.copy(alpha = 0.8f), CircleShape)
                                 .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
                                     item.onClick()
                                 }
                                 .semantics { contentDescription = item.label },
@@ -239,7 +245,9 @@ fun CreationSpeedDialFab(
                 )
                 .border(2.dp, if (isExpanded) AccentRed else AccentBlue, CircleShape)
                 .clickable {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
                     isExpanded = !isExpanded
                 }
                 .semantics { contentDescription = if (isExpanded) "Collapse Creator Actions" else "Expand Creator Actions" },

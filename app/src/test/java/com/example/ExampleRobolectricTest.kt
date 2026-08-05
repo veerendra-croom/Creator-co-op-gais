@@ -426,6 +426,8 @@ class ExampleRobolectricTest {
             id = "note_1",
             workspaceId = workspaceId,
             authorId = "editor_b",
+            targetUserId = "creator_lead",
+            content = "Dispute over edits deliverable",
             noteText = "Dispute over edits deliverable"
         )
         repository.insertDisputeNote(disputeNote)
@@ -435,12 +437,12 @@ class ExampleRobolectricTest {
         assertEquals(1, notesForAuthor.size)
         assertEquals("Dispute over edits deliverable", notesForAuthor.first().noteText)
 
-        // 2. Co-member (creator_lead) queries notes about editor_b - should see it because they share the workspace
-        val notesForLead = repository.getDisputeNotesAboutUser("editor_b", "creator_lead").first()
+        // 2. Co-member (creator_lead) queries notes about creator_lead - should see it because they share the workspace
+        val notesForLead = repository.getDisputeNotesAboutUser("creator_lead", "creator_lead").first()
         assertEquals(1, notesForLead.size)
 
-        // 3. Unauthorized bystander (some other user, e.g., "bystander") queries notes about editor_b - should return EMPTY list (RLS enforcement!)
-        val notesForBystander = repository.getDisputeNotesAboutUser("editor_b", "bystander").first()
+        // 3. Unauthorized bystander (some other user, e.g., "bystander") queries notes about creator_lead - should return EMPTY list (RLS enforcement!)
+        val notesForBystander = repository.getDisputeNotesAboutUser("creator_lead", "bystander").first()
         assertTrue("Bystander must be filtered out securely via SQLite RLS", notesForBystander.isEmpty())
     }
 }

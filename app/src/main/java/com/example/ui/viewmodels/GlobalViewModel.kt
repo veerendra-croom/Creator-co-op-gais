@@ -25,6 +25,31 @@ class GlobalViewModel constructor(
     val currentTab = MutableStateFlow("HOME")
     private val tabBackStack = mutableListOf<String>()
 
+    val selectedTaskId = MutableStateFlow<String?>(null)
+    val selectedUserId = MutableStateFlow<String?>(null)
+    val selectedWorkspaceId = MutableStateFlow<String?>(null)
+    val selectedProjectId = MutableStateFlow<String?>(null)
+
+    fun navigateToTaskDetails(taskId: String) {
+        selectedTaskId.value = taskId
+        navigateToTab("TASK_DETAILS")
+    }
+
+    fun navigateToPublicProfile(userId: String) {
+        selectedUserId.value = userId
+        navigateToTab("PUBLIC_PROFILE")
+    }
+
+    fun navigateToWorkspaceSettings(workspaceId: String) {
+        selectedWorkspaceId.value = workspaceId
+        navigateToTab("WORKSPACE_SETTINGS")
+    }
+
+    fun navigateToPortfolioDetail(projectId: String) {
+        selectedProjectId.value = projectId
+        navigateToTab("PORTFOLIO_DETAIL")
+    }
+
     fun navigateToTab(tab: String) {
         if (currentTab.value != tab) {
             tabBackStack.add(currentTab.value)
@@ -43,7 +68,7 @@ class GlobalViewModel constructor(
     val showSplash = MutableStateFlow(true)
     val showOnboarding = MutableStateFlow(false)
     val showCelebration = MutableStateFlow(false)
-    val syncState = MutableStateFlow(SyncState.Synced)
+    val syncState = MutableStateFlow<SyncState>(SyncState.Synced)
     val toastMessage = MutableStateFlow<String?>(null)
     
     val themeMode = MutableStateFlow("SYSTEM") // SYSTEM, LIGHT, DARK
@@ -52,6 +77,16 @@ class GlobalViewModel constructor(
     val globalSettings = repository.globalAdSettings.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val featureFlags: StateFlow<List<com.example.data.model.FeatureFlag>> = repository.getAllFeatureFlagsFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val platformSettings: StateFlow<com.example.data.model.PlatformSettings> = repository.getPlatformSettingsFlow()
+        .map { it ?: com.example.data.model.PlatformSettings() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.example.data.model.PlatformSettings())
+
+    val onboardingSlides: StateFlow<List<com.example.data.model.OnboardingSlide>> = repository.getAllOnboardingSlidesFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val welcomeMessages: StateFlow<List<com.example.data.model.WelcomeMessage>> = repository.getAllWelcomeMessagesFlow()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val changelogEntries = repository.changelogDao.getAllChangelogEntries()
@@ -178,6 +213,7 @@ class GlobalViewModel constructor(
     }
     
     val allUsers: Flow<List<UserProfile>> = repository.userDao.getAllUsers()
+    val allWorkspaceMembers = repository.getAllWorkspaceMembersFlow().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val allProjectProposals: Flow<List<com.example.data.model.ProjectProposalWithData>> = repository.allProjectProposals
     val lookingForWorkListings: Flow<List<com.example.data.model.LookingForWork>> = repository.allActiveWorkListings
     
@@ -234,6 +270,10 @@ class GlobalViewModel constructor(
 
     // --- RETENTION & GROWTH FEATURE OPERATIONS ---
     val weeklyDigestEnabled = MutableStateFlow(true)
+    val onboardingChecklistDismissed = MutableStateFlow(false)
+    val uiTextSize = MutableStateFlow("NORMAL") // SMALL, NORMAL, LARGE
+    val syncFrequency = MutableStateFlow("HOURLY") // REALTIME, HOURLY, DAILY
+    val hapticFeedbackEnabled = MutableStateFlow(true)
 
     fun loadWeeklyDigestSetting(userId: String) {
         viewModelScope.launch {
@@ -248,12 +288,85 @@ class GlobalViewModel constructor(
         }
     }
 
+    fun loadUiTextSizeSetting(userId: String) {
+        viewModelScope.launch {
+            uiTextSize.value = repository.getUiTextSizeSetting(userId) ?: "NORMAL"
+        }
+    }
+
+    fun setUiTextSizeSetting(userId: String, size: String) {
+        viewModelScope.launch {
+            uiTextSize.value = size
+            repository.setUiTextSizeSetting(userId, size)
+        }
+    }
+
+    fun loadSyncFrequencySetting(userId: String) {
+        viewModelScope.launch {
+            syncFrequency.value = repository.getSyncFrequencySetting(userId) ?: "HOURLY"
+        }
+    }
+
+    fun setSyncFrequencySetting(userId: String, frequency: String) {
+        viewModelScope.launch {
+            syncFrequency.value = frequency
+            repository.setSyncFrequencySetting(userId, frequency)
+        }
+    }
+
+    fun loadOnboardingChecklistDismissed(userId: String) {
+        viewModelScope.launch {
+            onboardingChecklistDismissed.value = repository.getOnboardingChecklistDismissed(userId)
+        }
+    }
+
+    fun setOnboardingChecklistDismissed(userId: String, dismissed: Boolean) {
+        viewModelScope.launch {
+            onboardingChecklistDismissed.value = dismissed
+            repository.setOnboardingChecklistDismissed(userId, dismissed)
+        }
+    }
+
+    fun loadHapticFeedbackSetting(userId: String) {
+        viewModelScope.launch {
+            val enabled = repository.getHapticFeedbackSetting(userId)
+            hapticFeedbackEnabled.value = enabled
+            FeedbackManager.isHapticEnabled = enabled
+        }
+    }
+
+    fun setHapticFeedbackSetting(userId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            hapticFeedbackEnabled.value = enabled
+            FeedbackManager.isHapticEnabled = enabled
+            repository.setHapticFeedbackSetting(userId, enabled)
+        }
+    }
+
+    val allConnectionRequests: StateFlow<List<com.example.data.model.ConnectionRequest>> = repository.allConnectionRequestsFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
+    )
+
     fun generateOrGetReferralCode(user: UserProfile) {
-        if (user.referralCode.isEmpty()) {
-            val prefix = if (user.displayName.length >= 4) user.displayName.take(4).uppercase() else "CREA"
-            val randomPart = (1000..9999).random()
-            val code = "$prefix-$randomPart"
+        if (user.referralCode.isNullOrEmpty()) {
             viewModelScope.launch {
+                val basePrefix = if (user.displayName.length >= 4) {
+                    user.displayName.filter { it.isLetterOrDigit() }.take(4).uppercase()
+                } else "CREA"
+                var code = "$basePrefix-${(1000..9999).random()}"
+                var isUnique = false
+                var attempts = 0
+                while (!isUnique && attempts < 15) {
+                    val existing = repository.getUserByReferralCode(code)
+                    if (existing == null) {
+                        isUnique = true
+                    } else {
+                        code = "$basePrefix-${(1000..9999).random()}"
+                        attempts++
+                    }
+                }
                 repository.updateUserProfile(user.copy(referralCode = code))
             }
         }
@@ -282,6 +395,7 @@ class GlobalViewModel constructor(
 
     fun getNotificationsForUser(userId: String) = repository.getNotificationsForUser(userId)
     fun markNotificationAsRead(id: String) = viewModelScope.launch { repository.markNotificationAsRead(id) }
+    fun updateNotificationReadState(id: String, isRead: Boolean) = viewModelScope.launch { repository.updateNotificationReadState(id, isRead) }
     fun markAllNotificationsAsRead(userId: String) = viewModelScope.launch { repository.markAllNotificationsAsRead(userId) }
     fun deleteNotification(notification: com.example.data.model.Notification) {
         viewModelScope.launch {
@@ -295,6 +409,18 @@ class GlobalViewModel constructor(
                     }
                 }
             )
+        }
+    }
+
+    fun pinNotification(id: String, isPinned: Boolean) {
+        viewModelScope.launch {
+            repository.pinNotification(id, isPinned)
+        }
+    }
+
+    fun archiveNotification(id: String, isArchived: Boolean) {
+        viewModelScope.launch {
+            repository.archiveNotification(id, isArchived)
         }
     }
 
@@ -373,5 +499,71 @@ class GlobalViewModel constructor(
 
     suspend fun hasAppliedReferralCode(userId: String): Boolean {
         return repository.getReferralForUser(userId) != null
+    }
+
+    // --- ADVANCED OFFLINE SYNCHRONIZATION ---
+    val allSyncEvents = repository.allSyncEvents.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val lastSyncTime = MutableStateFlow<Long>(System.currentTimeMillis())
+    val isSyncActive = MutableStateFlow<Boolean>(false)
+    val conflictPolicy = MutableStateFlow("CLIENT_WINS")
+
+    fun triggerManualSync() {
+        if (isSyncActive.value) return
+        viewModelScope.launch {
+            isSyncActive.value = true
+            syncState.value = SyncState.Syncing
+            try {
+                // 1. Process pending local uploads / writes first
+                repository.syncUpPendingEvents()
+                
+                // 2. Fetch latest changes from remote server
+                if (SupabaseConfig.isNetworkAvailable(application) &&
+                    !SupabaseConfig.supabaseUrl.contains("your-project")) {
+                    SupabaseSynchronizer.syncDownEverything(application, repository)
+                }
+                
+                lastSyncTime.value = System.currentTimeMillis()
+                
+                // Check if there are still any pending offline edits
+                val remainingCount = repository.syncDao.getPendingSyncEventsSuspend().size
+                if (remainingCount > 0) {
+                    syncState.value = SyncState.PendingLocalChanges
+                } else {
+                    syncState.value = SyncState.Synced
+                }
+                toastMessage.value = "Synchronization complete!"
+            } catch (e: Exception) {
+                android.util.Log.e("GlobalViewModel", "Manual synchronization failed", e)
+                syncState.value = SyncState.OfflineSandbox
+                toastMessage.value = "Sync failed: ${e.localizedMessage ?: "Offline Mode"}"
+            } finally {
+                isSyncActive.value = false
+            }
+        }
+    }
+
+    fun retrySyncEvent(eventId: String) {
+        viewModelScope.launch {
+            val event = allSyncEvents.value.find { it.id == eventId } ?: return@launch
+            repository.updateSyncEvent(event.copy(syncStatus = "PENDING", retryCount = 0, lastAttemptedAt = System.currentTimeMillis()))
+            triggerManualSync()
+        }
+    }
+
+    fun deleteSyncEvent(eventId: String) {
+        viewModelScope.launch {
+            repository.deleteSyncEvent(eventId)
+        }
+    }
+
+    fun clearSyncedHistory() {
+        viewModelScope.launch {
+            repository.clearSyncedHistory()
+            toastMessage.value = "Synced logs cleared"
+        }
+    }
+
+    fun setConflictPolicy(policy: String) {
+        conflictPolicy.value = policy
     }
 }

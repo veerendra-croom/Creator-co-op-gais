@@ -25,6 +25,8 @@ import com.example.ui.theme.*
 import com.example.ui.components.*
 import com.example.ui.viewmodels.ChatViewModel
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @Composable
 fun WorkspaceChat(
@@ -77,12 +79,17 @@ fun WorkspaceChat(
         return
     }
 
-    val dbMessages by chatViewModel.getActiveMessages(flowOf(workspaceId)).collectAsState()
+    val dbMessages by remember(workspaceId) { chatViewModel.getActiveMessages(workspaceId) }.collectAsState(initial = emptyList())
+    val dbDMs by remember(workspaceId, userId) { chatViewModel.getDMsForWorkspace(workspaceId, userId) }.collectAsState(initial = emptyList())
+    
     var searchKeyword by remember { mutableStateOf("") }
     var messageMode by remember { mutableStateOf("CHANNELS") } // CHANNELS or DIRECT_MESSAGES
     var activeChannel by remember { mutableStateOf("general") }
     var selectedDMContactId by remember { mutableStateOf<String?>(null) }
     var messageText by remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
+    var channelsList by remember { mutableStateOf(listOf("general", "ideas", "edits", "publish")) }
+    var showCreateChannelDialog by remember { mutableStateOf(false) }
 
     // Hardcoded DM Threads for high-fidelity SaaS simulation
     val isTestEnv = try {
@@ -102,22 +109,93 @@ fun WorkspaceChat(
         emptyList()
     }
 
-    // Simulated DM chat messages
-    val dmChatsMap = remember {
-        mutableStateMapOf<String, MutableList<ChatMessageSim>>().apply {
-            if (isTestEnv) {
-                put("alex", mutableListOf(
-                    ChatMessageSim("alex", "Alex Mercer", "Hey there! Are the storyboard templates working out for you?", 1719210000000L),
-                    ChatMessageSim("me", "You", "Yes, they provide an incredibly clear blueprint layout.", 1719210600000L),
-                    ChatMessageSim("alex", "Alex Mercer", "Awesome! Let's schedule a final huddle before we push the edits.", 1719211200000L),
-                    ChatMessageSim("me", "You", "Agreed. Pinned the milestone agenda in the general channel.", 1719211800000L),
-                    ChatMessageSim("alex", "Alex Mercer", "Sure, let's sync up on the pacing details.", 1719225600000L)
-                ))
-                put("maya", mutableListOf(
-                    ChatMessageSim("maya", "Maya Lin", "Draft composite for scene 3 is ready.", 1719221000000L),
-                    ChatMessageSim("me", "You", "Looks spectacular, especially the neon bloom effects.", 1719221500000L),
-                    ChatMessageSim("maya", "Maya Lin", "Sent the raw Blender renders to the Files Hub.", 1719222000000L)
-                ))
+    // Auto-seed empty direct message conversation states into Room so that they persist and stay real
+    LaunchedEffect(workspaceId, userId) {
+        if (isTestEnv && dbDMs.isEmpty()) {
+            val preseeded = listOf(
+                com.example.data.model.Message(
+                    id = "seed_alex_1",
+                    workspaceId = workspaceId,
+                    senderId = "alex",
+                    recipientId = userId,
+                    senderName = "Alex Mercer",
+                    senderRole = "LEAD STORYTELLER",
+                    messageBody = "Hey there! Are the storyboard templates working out for you?",
+                    timestamp = System.currentTimeMillis() - 3600 * 1000
+                ),
+                com.example.data.model.Message(
+                    id = "seed_me_1",
+                    workspaceId = workspaceId,
+                    senderId = userId,
+                    recipientId = "alex",
+                    senderName = userProfile?.displayName ?: "Creator",
+                    senderRole = userProfile?.systemRole ?: "CREATOR",
+                    messageBody = "Yes, they provide an incredibly clear blueprint layout.",
+                    timestamp = System.currentTimeMillis() - 3000 * 1000
+                ),
+                com.example.data.model.Message(
+                    id = "seed_alex_2",
+                    workspaceId = workspaceId,
+                    senderId = "alex",
+                    recipientId = userId,
+                    senderName = "Alex Mercer",
+                    senderRole = "LEAD STORYTELLER",
+                    messageBody = "Awesome! Let's schedule a final huddle before we push the edits.",
+                    timestamp = System.currentTimeMillis() - 2400 * 1000
+                ),
+                com.example.data.model.Message(
+                    id = "seed_me_2",
+                    workspaceId = workspaceId,
+                    senderId = userId,
+                    recipientId = "alex",
+                    senderName = userProfile?.displayName ?: "Creator",
+                    senderRole = userProfile?.systemRole ?: "CREATOR",
+                    messageBody = "Agreed. Pinned the milestone agenda in the general channel.",
+                    timestamp = System.currentTimeMillis() - 1800 * 1000
+                ),
+                com.example.data.model.Message(
+                    id = "seed_alex_3",
+                    workspaceId = workspaceId,
+                    senderId = "alex",
+                    recipientId = userId,
+                    senderName = "Alex Mercer",
+                    senderRole = "LEAD STORYTELLER",
+                    messageBody = "Sure, let's sync up on the pacing details.",
+                    timestamp = System.currentTimeMillis() - 600 * 1000
+                ),
+                com.example.data.model.Message(
+                    id = "seed_maya_1",
+                    workspaceId = workspaceId,
+                    senderId = "maya",
+                    recipientId = userId,
+                    senderName = "Maya Lin",
+                    senderRole = "3D VFX ARTIST",
+                    messageBody = "Draft composite for scene 3 is ready.",
+                    timestamp = System.currentTimeMillis() - 3600 * 1000
+                ),
+                com.example.data.model.Message(
+                    id = "seed_me_3",
+                    workspaceId = workspaceId,
+                    senderId = userId,
+                    recipientId = "maya",
+                    senderName = userProfile?.displayName ?: "Creator",
+                    senderRole = userProfile?.systemRole ?: "CREATOR",
+                    messageBody = "Looks spectacular, especially the neon bloom effects.",
+                    timestamp = System.currentTimeMillis() - 3000 * 1000
+                ),
+                com.example.data.model.Message(
+                    id = "seed_maya_2",
+                    workspaceId = workspaceId,
+                    senderId = "maya",
+                    recipientId = userId,
+                    senderName = "Maya Lin",
+                    senderRole = "3D VFX ARTIST",
+                    messageBody = "Sent the raw Blender renders to the Files Hub.",
+                    timestamp = System.currentTimeMillis() - 2400 * 1000
+                )
+            )
+            preseeded.forEach { msg ->
+                chatViewModel.insertSystemMessage(msg)
             }
         }
     }
@@ -176,7 +254,33 @@ fun WorkspaceChat(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DS.Space8)
             ) {
-                listOf("general", "ideas", "edits", "publish").forEach { channel ->
+                // Add channel action chip
+                Box(
+                    modifier = Modifier
+                        .clip(DS.RadiusMedium)
+                        .background(AccentBlue.copy(alpha = 0.1f))
+                        .border(1.dp, AccentBlue.copy(alpha = 0.3f), DS.RadiusMedium)
+                        .clickable { showCreateChannelDialog = true }
+                        .padding(horizontal = DS.Space12, vertical = DS.Space6)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Create Channel",
+                            tint = AccentBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(DS.Space4))
+                        Text(
+                            text = "CHANNEL",
+                            color = AccentBlue,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                channelsList.forEach { channel ->
                     val isSelected = activeChannel == channel
                     Box(
                         modifier = Modifier
@@ -314,7 +418,10 @@ fun WorkspaceChat(
                 // A specific DM conversation is open
                 val currentContact = dmContacts.find { it.id == selectedDMContactId }
                 if (currentContact != null) {
-                    val conversation = dmChatsMap[currentContact.id] ?: remember { mutableStateListOf() }
+                    val conversation = dbDMs.filter {
+                        (it.senderId == selectedDMContactId && it.recipientId == userId) ||
+                        (it.senderId == userId && it.recipientId == selectedDMContactId)
+                    }
 
                     // Top partner row with active status & back button
                     Row(
@@ -398,10 +505,10 @@ fun WorkspaceChat(
                         verticalArrangement = Arrangement.spacedBy(DS.Space12)
                     ) {
                         items(filteredDmFeed) { msg ->
-                            val isMe = msg.senderId == "me"
+                            val isMe = msg.senderId == userId
                             MessageCardRow(
                                 senderName = if (isMe) "You" else currentContact.name,
-                                roleLabel = if (isMe) "ME" else "MEMBER",
+                                roleLabel = if (isMe) "ME" else currentContact.role,
                                 roleColor = if (isMe) NeonEmerald else currentContact.color,
                                 messageText = msg.messageBody,
                                 timestampStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(msg.timestamp)),
@@ -473,14 +580,45 @@ fun WorkspaceChat(
                 IconButton(
                     onClick = {
                         if (messageText.isNotBlank()) {
+                            val userMsg = messageText
                             if (selectedDMContactId != null) {
-                                // Add to direct messages map
-                                val list = dmChatsMap[selectedDMContactId!!] ?: mutableListOf()
-                                list.add(ChatMessageSim("me", "You", messageText, System.currentTimeMillis()))
-                                dmChatsMap[selectedDMContactId!!] = list
+                                val contactId = selectedDMContactId!!
+                                chatViewModel.sendDirectMessage(workspaceId, contactId, userMsg, userId, userProfile)
+
+                                // Auto bot response simulation
+                                coroutineScope.launch {
+                                    kotlinx.coroutines.delay(1200)
+                                    val replyText = when (contactId) {
+                                        "coop_bot" -> {
+                                            when {
+                                                userMsg.contains("help", ignoreCase = true) || userMsg.contains("status", ignoreCase = true) -> 
+                                                    "I have completed a fresh compliance check on the '$workspaceId' workspace shard. Status is active and all IP splits conform to standard media structures."
+                                                userMsg.contains("agreement", ignoreCase = true) || userMsg.contains("contract", ignoreCase = true) -> 
+                                                    "All current members have signed off. P2P splits are securely anchored and ready for payout triggers."
+                                                else -> "Acknowledged. I am continuously auditing this co-op workspace for milestone splits, SLA responses, and active compliance metrics."
+                                            }
+                                        }
+                                        "alex" -> "Awesome! Let's finalize the storyboard and schedule a rapid huddle. I can deliver the edits right after we lock down the pacing."
+                                        "maya" -> "Just finished rendering the VFX sequence in Blender. Let me know if you need any adjustments to the camera bloom or neon lighting!"
+                                        "thomas" -> "Finalizing the ambient backing tracks now. The soundscape matches our futuristic theme perfectly."
+                                        else -> "Thanks for reaching out! Let's discuss details in the general chat channel."
+                                    }
+                                    val currentContact = dmContacts.find { it.id == contactId }
+                                    val botMsg = com.example.data.model.Message(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        workspaceId = workspaceId,
+                                        senderId = contactId,
+                                        recipientId = userId,
+                                        senderName = currentContact?.name ?: contactId,
+                                        senderRole = currentContact?.role ?: "MEMBER",
+                                        messageBody = replyText,
+                                        timestamp = System.currentTimeMillis()
+                                    )
+                                    chatViewModel.insertSystemMessage(botMsg)
+                                }
                             } else {
                                 // Default DB Workspace Chat send
-                                chatViewModel.sendMessage(workspaceId, messageText, userId, userProfile)
+                                chatViewModel.sendMessage(workspaceId, userMsg, userId, userProfile)
                             }
                             messageText = ""
                         }
@@ -499,6 +637,58 @@ fun WorkspaceChat(
                     )
                 }
             }
+        }
+
+        if (showCreateChannelDialog) {
+            var newChannelName by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { showCreateChannelDialog = false },
+                containerColor = SurfaceColor,
+                titleContentColor = Color.White,
+                textContentColor = TextSecondary,
+                title = { Text("Create Channel", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Add a custom channel topic for this workspace shard.", fontSize = 13.sp)
+                        OutlinedTextField(
+                            value = newChannelName,
+                            onValueChange = { newChannelName = it },
+                            placeholder = { Text("e.g. sponsorship-assets", color = TextSecondary) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AccentBlue,
+                                unfocusedBorderColor = ColorDivider,
+                                focusedContainerColor = PrimaryBackground,
+                                unfocusedContainerColor = PrimaryBackground
+                            )
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newChannelName.isNotBlank()) {
+                                val cleaned = newChannelName.trim().lowercase().replace("\\s+".toRegex(), "-")
+                                if (!channelsList.contains(cleaned)) {
+                                    channelsList = channelsList + cleaned
+                                    activeChannel = cleaned
+                                }
+                            }
+                            showCreateChannelDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                    ) {
+                        Text("CREATE")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showCreateChannelDialog = false }) {
+                        Text("CANCEL", color = TextSecondary)
+                    }
+                }
+            )
         }
     }
 }

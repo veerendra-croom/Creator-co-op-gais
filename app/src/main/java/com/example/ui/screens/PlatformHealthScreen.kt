@@ -84,34 +84,9 @@ fun PlatformHealthScreen(
         String.format("%02dh %02dm %02ds", hours, minutes, seconds)
     }
 
+    var showHelpDialog by remember { mutableStateOf(false) }
+
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "SYSTEM HEALTH MONITOR",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 16.sp,
-                            letterSpacing = 1.sp,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Real-time engine diagnostics & database allocations",
-                            color = TextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground)
-            )
-        },
         containerColor = PrimaryBackground
     ) { innerPadding ->
         LazyColumn(
@@ -230,10 +205,10 @@ fun PlatformHealthScreen(
                 }
             }
 
-            // Database Space & Counts
+            // Local resource storage metrics
             item {
                 Text(
-                    text = "LOCAL DATABASE METRICS",
+                    text = "LOCAL STORAGE METRICS",
                     color = Color.White,
                     fontWeight = FontWeight.Black,
                     fontSize = 12.sp,
@@ -249,15 +224,15 @@ fun PlatformHealthScreen(
                     border = BorderStroke(1.dp, ColorDivider)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Room Database Tables", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Secure Offline Categories", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         
-                        TableMetricRow("admin_audit_logs", auditLogs.size, "ledger")
-                        TableMetricRow("user_profiles", users.size, "identity")
-                        TableMetricRow("workspaces", workspaces.size, "coop")
-                        TableMetricRow("production_tasks", tasks.size, "pipeline")
-                        TableMetricRow("support_tickets", tickets.size, "help")
-                        TableMetricRow("reports", reports.size, "moderation")
-                        TableMetricRow("announcements", announcements.size, "broadcast")
+                        TableMetricRow("Admin Audit Ledger", auditLogs.size, "ledger")
+                        TableMetricRow("User Directory Ledger", users.size, "identity")
+                        TableMetricRow("Creator Workspaces", workspaces.size, "coop")
+                        TableMetricRow("Active Production Milestones", tasks.size, "pipeline")
+                        TableMetricRow("Support Tickets", tickets.size, "help")
+                        TableMetricRow("Moderation Incidents", reports.size, "moderation")
+                        TableMetricRow("System Announcements", announcements.size, "broadcast")
                     }
                 }
             }
@@ -288,7 +263,7 @@ fun PlatformHealthScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Default.CloudQueue, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
-                                Text("Supabase Cloud Platform", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Enterprise Cloud Synchronization", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                             
                             val hasSupabase = !SupabaseConfig.supabaseUrl.contains("your-project")
@@ -302,7 +277,7 @@ fun PlatformHealthScreen(
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = if (hasSupabase) "CONFIGURED" else "SANDBOX",
+                                    text = if (hasSupabase) "CONFIGURED" else "STANDALONE",
                                     color = if (hasSupabase) NeonEmerald else AccentRed,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold
@@ -317,7 +292,7 @@ fun PlatformHealthScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Default.Dns, null, tint = CrispAmber, modifier = Modifier.size(16.dp))
-                                Text("Local SQLite Engine", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Secure Offline Vault Cache", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                             
                             Box(
@@ -337,6 +312,10 @@ fun PlatformHealthScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    if (showHelpDialog) {
+        AdminHelpDialog(onDismiss = { showHelpDialog = false })
     }
 }
 

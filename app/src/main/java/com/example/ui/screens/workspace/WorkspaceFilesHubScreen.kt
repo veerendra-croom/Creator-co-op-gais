@@ -2,6 +2,8 @@ package com.example.ui.screens.workspace
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -15,10 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.ui.components.*
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WorkspaceFilesHubScreen(
     workspaceId: String,
@@ -92,7 +99,8 @@ fun WorkspaceFilesHubScreen(
                             title = asset.fileName,
                             type = asset.fileType,
                             size = "v${asset.version}",
-                            date = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(java.util.Date(asset.createdAt))
+                            date = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(java.util.Date(asset.createdAt)),
+                            onDelete = { viewModel.deleteAsset(asset.id) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(12.dp)) }
@@ -100,7 +108,12 @@ fun WorkspaceFilesHubScreen(
             }
             if (filteredAssets.isEmpty()) {
                 item {
-                    Text("No assets uploaded.", color = TextSecondary, fontSize = 14.sp)
+                    EmptyState(
+                        message = "No assets uploaded yet.",
+                        icon = Icons.Default.Folder,
+                        actionText = "Upload Asset",
+                        onAction = { showUploadDialog = true }
+                    )
                 }
             }
             
@@ -121,45 +134,185 @@ fun WorkspaceFilesHubScreen(
     if (showUploadDialog) {
         var uploadName by remember { mutableStateOf("") }
         var uploadCategory by remember { mutableStateOf(categories.first()) }
-        var uploadType by remember { mutableStateOf("VIDEO") }
+        var uploadType by remember { mutableStateOf("Video") }
+        val types = listOf("Video", "Image", "Audio", "Document")
+
+        var isUploading by remember { mutableStateOf(false) }
+        var uploadProgress by remember { mutableStateOf(0f) }
+        val uploadScope = rememberCoroutineScope()
 
         AlertDialog(
-            onDismissRequest = { showUploadDialog = false },
-            title = { Text("Upload Asset") },
+            onDismissRequest = { if (!isUploading) showUploadDialog = false },
+            title = {
+                Text(
+                    "Upload New Resource",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+            },
+            containerColor = SurfaceColor,
+            tonalElevation = 6.dp,
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = uploadName,
-                        onValueChange = { uploadName = it },
-                        label = { Text("Asset Name") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    // Simplify category selection for now
-                    OutlinedTextField(
-                        value = uploadCategory,
-                        onValueChange = { uploadCategory = it },
-                        label = { Text("Category (e.g., RAW_FOOTAGE, EXPORTS)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (isUploading) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                "UPLOADING TO CO-OP CLOUD...",
+                                color = AccentRed,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                letterSpacing = 1.sp
+                            )
+                            LinearProgressIndicator(
+                                progress = { uploadProgress },
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+                                color = AccentRed,
+                                trackColor = ColorDivider
+                            )
+                            Text(
+                                "Hashing payload & replicating state: ${(uploadProgress * 100).toInt()}%",
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = uploadName,
+                            onValueChange = { uploadName = it },
+                            label = { Text("Asset Name", color = TextSecondary) },
+                            placeholder = { Text("e.g. final_v3_cut", color = TextSecondary.copy(alpha = 0.5f)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = AccentRed,
+                                unfocusedBorderColor = ColorDivider,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "ASSET CATEGORY",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                categories.forEach { cat ->
+                                    val isSelected = uploadCategory == cat
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) AccentRed.copy(alpha = 0.15f) else Color.Transparent)
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (isSelected) AccentRed else ColorDivider,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { uploadCategory = cat }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = cat.replace("_", " "),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (isSelected) Color.White else TextSecondary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "FILE TYPE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                types.forEach { t ->
+                                    val isSelected = uploadType == t
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) AccentBlue.copy(alpha = 0.15f) else Color.Transparent)
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (isSelected) AccentBlue else ColorDivider,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { uploadType = t }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = t,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (isSelected) Color.White else TextSecondary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    viewModel.uploadAsset(
-                        workspaceId = workspaceId,
-                        uploaderId = currentUserId,
-                        fileName = uploadName.takeIf { it.isNotBlank() } ?: "Untitled Asset",
-                        fileType = uploadType,
-                        category = uploadCategory,
-                        taskId = null
-                    )
-                    showUploadDialog = false
-                }) {
-                    Text("Upload")
+                Button(
+                    onClick = {
+                        uploadScope.launch {
+                            isUploading = true
+                            uploadProgress = 0f
+                            while (uploadProgress < 1f) {
+                                delay(80)
+                                uploadProgress += 0.05f
+                            }
+                            viewModel.uploadAsset(
+                                workspaceId = workspaceId,
+                                uploaderId = currentUserId,
+                                fileName = uploadName.takeIf { it.isNotBlank() } ?: "Untitled Asset",
+                                fileType = uploadType,
+                                category = uploadCategory,
+                                taskId = null
+                            )
+                            isUploading = false
+                            showUploadDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isUploading
+                ) {
+                    Text("Upload", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showUploadDialog = false }) { Text("Cancel") }
+                TextButton(
+                    onClick = { showUploadDialog = false },
+                    enabled = !isUploading
+                ) {
+                    Text("Cancel", color = TextSecondary)
+                }
             }
         )
     }
@@ -185,7 +338,7 @@ fun FolderItem(title: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun FileItem(title: String, type: String, size: String, date: String) {
+fun FileItem(title: String, type: String, size: String, date: String, onDelete: (() -> Unit)? = null) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -222,6 +375,11 @@ fun FileItem(title: String, type: String, size: String, date: String) {
                 }
             }
             Text(date, color = TextSecondary, fontSize = 12.sp)
+            if (onDelete != null) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete asset", tint = TextMuted, modifier = Modifier.size(16.dp))
+                }
+            }
         }
     }
 }

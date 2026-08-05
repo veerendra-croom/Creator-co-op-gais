@@ -1,8 +1,19 @@
 package com.example.data.model
 
-enum class SyncState {
-    Synced,
-    PendingLocalChanges,
-    OfflineSandbox,
-    Syncing
+@kotlinx.serialization.Serializable
+sealed class SyncState {
+    @kotlinx.serialization.Serializable
+    object Synced : SyncState()
+    
+    @kotlinx.serialization.Serializable
+    object Syncing : SyncState()
+    
+    @kotlinx.serialization.Serializable
+    object PendingLocalChanges : SyncState()
+    
+    @kotlinx.serialization.Serializable
+    object OfflineSandbox : SyncState()
+    
+    @kotlinx.serialization.Serializable
+    object Error : SyncState()
 }

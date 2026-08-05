@@ -1,6 +1,7 @@
 package com.example.ui.screens.workspace
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -64,23 +65,25 @@ fun TeamSpaceScreen(
                         "Workspace Tasks Locked",
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp
                     )
                     Text(
                         "Team tasks and collaborative assets are disabled until the team agreement is acknowledged by all parties.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary,
+                        fontSize = 14.sp,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Button(
                         onClick = onGoToAgreement,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Default.HistoryEdu, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Review & Acknowledge Agreement", fontWeight = FontWeight.Bold)
+                        Text("Review & Acknowledge Agreement", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }
@@ -99,6 +102,8 @@ fun TeamSpaceScreen(
     val isHead = myMember?.assignedRoleTitle in listOf("Lead Creator", "Head") || workspace?.createdBy == userId
 
     val calendarItems by viewModel.activeCalendarItems.collectAsState()
+    val allUsers by viewModel.allUsers.collectAsState()
+    val currentUserProfile by viewModel.currentUserProfile.collectAsState()
 
     var activeTab by remember { mutableStateOf("BOARD") } // "BOARD", "CALENDAR"
     var showCreateTaskDialog by remember { mutableStateOf(false) }
@@ -180,25 +185,31 @@ fun TeamSpaceScreen(
             when (tab) {
                 "BOARD" -> {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        if (prodTasks.isEmpty()) {
-                            Box(
-                                modifier = Modifier.fillMaxSize().padding(DS.Space24),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                EmptyState(
-                                    message = "No active production deliverables deployed yet.",
-                                    icon = Icons.Default.Task,
-                                    actionText = if (canModify) "Create Backlog Task" else null,
-                                    onAction = { showCreateTaskDialog = true }
-                                )
-                            }
-                        } else {
-                            LazyRow(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(horizontal = DS.Space16, vertical = DS.Space16),
-                                horizontalArrangement = Arrangement.spacedBy(DS.Space16)
-                            ) {
-                                items(lanes) { lane ->
+                        AnimatedContent(
+                            targetState = prodTasks.isEmpty(),
+                            transitionSpec = { fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300)) },
+                            label = "team_board_empty_transition",
+                            modifier = Modifier.fillMaxSize()
+                        ) { isEmpty ->
+                            if (isEmpty) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize().padding(DS.Space24),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    EmptyState(
+                                        message = "No active production deliverables deployed yet.",
+                                        icon = Icons.Default.Task,
+                                        actionText = if (canModify) "Create Backlog Task" else null,
+                                        onAction = { showCreateTaskDialog = true }
+                                    )
+                                }
+                            } else {
+                                LazyRow(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(horizontal = DS.Space16, vertical = DS.Space16),
+                                    horizontalArrangement = Arrangement.spacedBy(DS.Space16)
+                                ) {
+                                items(lanes, key = { it }) { lane ->
                                     val laneTasks = prodTasks.filter { it.kanbanLane == lane }
                                     
                                     val (laneColor, laneIcon) = when(lane) {
@@ -334,18 +345,18 @@ fun TeamSpaceScreen(
                                             }
                                         }
                                         
-                                        if (lane == "TODO" && canModify) {
+                                        if (lane == "IDEAS" && canModify) {
                                             Spacer(modifier = Modifier.height(DS.Space12))
                                             Button(
                                                 onClick = { showCreateTaskDialog = true },
-                                                modifier = Modifier.fillMaxWidth().height(44.dp),
+                                                modifier = Modifier.fillMaxWidth().height(48.dp),
                                                 colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
                                                 shape = DS.RadiusMedium,
                                                 border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
                                             ) {
-                                                Icon(Icons.Default.Add, null, tint = AccentRed, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Default.Add, null, tint = AccentRed, modifier = Modifier.size(18.dp))
                                                 Spacer(modifier = Modifier.width(DS.Space8))
-                                                Text("New Task", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                                                Text("New Task", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
@@ -354,6 +365,7 @@ fun TeamSpaceScreen(
                         }
                     }
                 }
+            }
                 "CALENDAR" -> {
                     CalendarView(
                         viewModel = viewModel,
@@ -410,27 +422,14 @@ fun TeamSpaceScreen(
     }
 
     if (selectedTask != null) {
-        AlertDialog(
-            onDismissRequest = { selectedTask = null },
-            containerColor = SurfaceColor,
-            title = { Text(selectedTask!!.title, color = Color.White, fontWeight = FontWeight.Black) },
-            text = { Text(selectedTask!!.contentBody, color = TextSecondary) },
-            confirmButton = {
-                if (canModify) {
-                    Button(
-                        onClick = {
-                            viewModel.deleteTask(selectedTask!!.id, userId)
-                            selectedTask = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
-                    ) {
-                        Text("Delete Task")
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { selectedTask = null }) { Text("Close", color = Color.White) }
-            }
+        TaskDetailsDialog(
+            task = selectedTask!!,
+            viewModel = viewModel,
+            repository = viewModel.repository,
+            userId = userId,
+            currentUser = currentUserProfile,
+            allUsers = allUsers,
+            onDismiss = { selectedTask = null }
         )
     }
 
@@ -497,7 +496,7 @@ fun TeamSpaceScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.heightIn(max = 200.dp)
                         ) {
-                            items(templates) { template ->
+                            items(templates, key = { it.id }) { template ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -658,7 +657,15 @@ fun CalendarView(
                                 shape = RoundedCornerShape(12.dp),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (dayItems.isNotEmpty()) AccentRed.copy(alpha = 0.5f) else ColorDivider
+                                    if (dayItems.isNotEmpty()) {
+                                        val firstItem = dayItems.first()
+                                        when (firstItem.status) {
+                                            "Published" -> NeonEmerald.copy(alpha = 0.5f)
+                                            "Scheduled" -> CrispAmber.copy(alpha = 0.5f)
+                                            "Editing" -> AccentBlue.copy(alpha = 0.5f)
+                                            else -> ColorDivider
+                                        }
+                                    } else ColorDivider
                                 )
                             ) {
                                 Column(
@@ -670,7 +677,15 @@ fun CalendarView(
                                         text = dayNum.toString(),
                                         fontWeight = FontWeight.ExtraBold,
                                         fontSize = 12.sp,
-                                        color = if (dayItems.isNotEmpty()) AccentRed else Color.White
+                                        color = if (dayItems.isNotEmpty()) {
+                                            val firstItem = dayItems.first()
+                                            when (firstItem.status) {
+                                                "Published" -> NeonEmerald
+                                                "Scheduled" -> CrispAmber
+                                                "Editing" -> AccentBlue
+                                                else -> Color.White
+                                            }
+                                        } else Color.White
                                     )
 
                                     if (dayItems.isNotEmpty()) {
@@ -680,17 +695,23 @@ fun CalendarView(
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             dayItems.take(2).forEach { item ->
+                                                val statusColor = when (item.status) {
+                                                    "Published" -> NeonEmerald
+                                                    "Scheduled" -> CrispAmber
+                                                    "Editing" -> AccentBlue
+                                                    else -> TextSecondary
+                                                }
                                                 Box(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .background(AccentRed.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                                        .border(0.5.dp, AccentRed.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                                        .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                                        .border(0.5.dp, statusColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
                                                         .padding(horizontal = 4.dp, vertical = 2.dp)
                                                 ) {
                                                     Text(
                                                         text = item.title,
                                                         color = Color.White,
-                                                        fontSize = 8.sp,
+                                                        fontSize = 10.sp,
                                                         maxLines = 1,
                                                         fontWeight = FontWeight.SemiBold,
                                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -700,7 +721,7 @@ fun CalendarView(
                                             if (dayItems.size > 2) {
                                                 Text(
                                                     text = "+${dayItems.size - 2} more",
-                                                    fontSize = 8.sp,
+                                                    fontSize = 10.sp,
                                                     color = TextSecondary,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -769,17 +790,42 @@ fun CalendarView(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = item.title,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = item.title,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                                val statusColor = when (item.status) {
+                                                    "Published" -> NeonEmerald
+                                                    "Scheduled" -> CrispAmber
+                                                    "Editing" -> AccentBlue
+                                                    else -> TextSecondary
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                                        .border(0.5.dp, statusColor, RoundedCornerShape(4.dp))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = item.status,
+                                                        color = statusColor,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
                                             if (linkedTask != null) {
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = "Linked to: ${linkedTask.title}",
-                                                    color = AccentRed,
+                                                    color = AccentBlue,
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -838,6 +884,7 @@ fun CalendarView(
             var itemTitle by remember { mutableStateOf("") }
             var selectedTaskIdToLink by remember { mutableStateOf<String?>(null) }
             var isLinkingTaskMode by remember { mutableStateOf(false) }
+            var selectedStatus by remember { mutableStateOf("Drafting") }
 
             val linkableTasks = prodTasks
 
@@ -862,18 +909,20 @@ fun CalendarView(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (!isLinkingTaskMode) AccentRed else Color.White.copy(alpha = 0.05f)
                                 ),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                shape = DS.RadiusMedium
                             ) {
-                                Text("New Event")
+                                Text("New Event", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                             Button(
                                 onClick = { isLinkingTaskMode = true },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isLinkingTaskMode) AccentRed else Color.White.copy(alpha = 0.05f)
                                 ),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                shape = DS.RadiusMedium
                             ) {
-                                Text("Link Existing Task")
+                                Text("Link Existing Task", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
 
@@ -893,8 +942,8 @@ fun CalendarView(
                             Text(
                                 "Select Task to Link:",
                                 color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp
                             )
                             if (linkableTasks.isEmpty()) {
                                 Text("No tasks on board.", color = TextSecondary)
@@ -903,7 +952,7 @@ fun CalendarView(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.heightIn(max = 160.dp)
                                 ) {
-                                    items(linkableTasks) { task ->
+                                    items(linkableTasks, key = { it.id }) { task ->
                                         val isSelected = selectedTaskIdToLink == task.id
                                         Card(
                                             modifier = Modifier
@@ -922,10 +971,50 @@ fun CalendarView(
                                                 modifier = Modifier.padding(12.dp),
                                                 color = Color.White,
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp
+                                                fontSize = 14.sp
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Select Status:",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf("Drafting", "Editing", "Scheduled", "Published").forEach { status ->
+                                val isSelected = selectedStatus == status
+                                val statusColor = when (status) {
+                                    "Published" -> NeonEmerald
+                                    "Scheduled" -> CrispAmber
+                                    "Editing" -> AccentBlue
+                                    else -> NeutralColor
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) statusColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.03f))
+                                        .border(1.dp, if (isSelected) statusColor else ColorDivider, RoundedCornerShape(8.dp))
+                                        .clickable { selectedStatus = status },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = status,
+                                        color = if (isSelected) statusColor else TextSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -944,16 +1033,19 @@ fun CalendarView(
                                     title = finalTitle,
                                     scheduledDate = dateStr,
                                     linkedTaskId = if (isLinkingTaskMode) selectedTaskIdToLink else null,
-                                    userId = userId
+                                    userId = userId,
+                                    status = selectedStatus
                                 )
                             }
                             showCreateItemDialog = false
                             selectedDateForDetails = null
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                        enabled = if (isLinkingTaskMode) selectedTaskIdToLink != null else itemTitle.isNotBlank()
+                        enabled = if (isLinkingTaskMode) selectedTaskIdToLink != null else itemTitle.isNotBlank(),
+                        modifier = Modifier.height(48.dp),
+                        shape = DS.RadiusMedium
                     ) {
-                        Text("Add Event")
+                        Text("Add Event", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 },
                 dismissButton = {

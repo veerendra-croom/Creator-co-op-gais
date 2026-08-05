@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.feedback.*
@@ -32,10 +33,12 @@ import com.example.ui.theme.*
 import com.example.ui.components.CreationSpeedDialFab
 import com.example.analytics.AnalyticsManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.viewmodels.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import com.example.CreatorCoopApp
 
 @Composable
@@ -50,7 +53,6 @@ fun CreatorCoOpDashboard(
     val feedViewModel: CommunityFeedViewModel = viewModel(factory = factory)
     val discoveryViewModel: DiscoveryViewModel = viewModel(factory = factory)
     val adminViewModel: AdminViewModel = viewModel(factory = factory)
-    val adManagementViewModel: AdManagementViewModel = viewModel(factory = factory)
     val chatViewModel: ChatViewModel = viewModel(factory = factory)
     val agreementViewModel: AgreementViewModel = viewModel(factory = factory)
     val analyticsViewModel: AnalyticsViewModel = viewModel(factory = factory)
@@ -85,6 +87,9 @@ fun CreatorCoOpDashboard(
     }
     val syncState by globalViewModel.syncState.collectAsState()
     val isSuspended = user?.systemRole == "SUSPENDED"
+
+    val platformSettings by globalViewModel.platformSettings.collectAsState()
+    val isUnderMaintenance = platformSettings.maintenanceMode && !(user?.systemRole == "PLATFORM_ADMIN" || user?.systemRole == "ADMIN" || user?.globalRole == "ADMIN")
 
     BackHandler(enabled = currentTab != "HOME" || (currentTab == "WORKSPACES" && workspaceViewModel.workspaceViewMode.value == "VIEW") || (currentTab == "SYNDICATE" && discoveryViewModel.selectedNicheFilter.value != "All")) {
         val handledByScreen = when(currentTab) {
@@ -164,37 +169,103 @@ fun CreatorCoOpDashboard(
     Scaffold(
         snackbarHost = { GlobalSnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            if (currentTab != "CREATE_WORKSPACE" && !showOnboarding && !isWorkspaceDetail) {
+            if (currentTab != "CREATE_WORKSPACE" && !showOnboarding && !isWorkspaceDetail && !isUnderMaintenance) {
                 val isTopLevel = currentTab in listOf("HOME", "WORKSPACES", "NOTIFICATIONS", "PROFILE", "MORE")
-                GlobalSyncTopBar(
-                    globalViewModel = globalViewModel,
-                    showBack = !isTopLevel,
-                    onBack = {
-                        val handledByScreen = when(currentTab) {
-                            "WORKSPACES" -> {
-                                if (workspaceViewModel.workspaceViewMode.value == "VIEW") {
-                                    if (workspaceViewModel.workspaceSubTab.value != "STATE") {
-                                        workspaceViewModel.workspaceSubTab.value = "STATE"
-                                    } else {
-                                        workspaceViewModel.selectWorkspace(null)
-                                    }
-                                    true
-                                } else false
+                val screenTitle = if (isTopLevel) "Creator Co-Op" else when (currentTab) {
+                    "DISCOVERY" -> "Discovery Hub"
+                    "COMMONS" -> "Creator Commons"
+                    "ADMIN" -> "Admin Console"
+                    "ANALYTICS" -> "Analytics Dashboard"
+                    "CONTENT_PIPELINE" -> "Content Pipeline"
+                    "VIDEO_HUDDLE" -> "Video Huddle"
+                    "KNOWLEDGE_BASE" -> "Knowledge Base"
+                    "PREMIUM_SUBSCRIPTION" -> "Creator Premium"
+                    "SUPPORT_CENTER" -> "Support Center"
+                    "FOUNDER_CRM" -> "Founder CRM"
+                    "COMM_CENTER" -> "Comm Center"
+                    "PLATFORM_CONTROL" -> "Platform Control"
+                    "FOUNDER_COMMAND" -> "Founder Command"
+                    "ACTIVITY_CENTER" -> "Activity Center"
+                    "CONNECTION_REQUESTS" -> "Connection Requests"
+                    "BLOCKED_USERS" -> "Blocked Users"
+                    "REFER_TEAMMATE" -> "Refer a Teammate"
+                    "COMMUNITY_GUIDELINES" -> "Community Guidelines"
+                    "LEGAL" -> "Legal & Terms"
+                    "SEARCH" -> "Global Search"
+                    "CREATE_ROLE" -> "Post a Role"
+                    "TASK_DETAILS" -> "Task Details"
+                    "PUBLIC_PROFILE" -> "Public Profile"
+                    "WORKSPACE_SETTINGS" -> "Workspace Settings"
+                    "WORKSPACE_FILES" -> "Workspace Files"
+                    "PORTFOLIO_DETAIL" -> "Portfolio Detail"
+                    "REPORT_USER" -> "Report Moderation"
+                    "ADMIN_AUDIT" -> "Admin Audit Log"
+                    "BACKUP_CENTER" -> "Backup Center"
+                    "PLATFORM_HEALTH" -> "Platform Health"
+                    else -> "Creator Co-Op"
+                }
+                Column {
+                    GlobalSyncTopBar(
+                        globalViewModel = globalViewModel,
+                        showBack = !isTopLevel,
+                        title = screenTitle,
+                        onBack = {
+                            val handledByScreen = when(currentTab) {
+                                "WORKSPACES" -> {
+                                    if (workspaceViewModel.workspaceViewMode.value == "VIEW") {
+                                        if (workspaceViewModel.workspaceSubTab.value != "STATE") {
+                                            workspaceViewModel.workspaceSubTab.value = "STATE"
+                                        } else {
+                                            workspaceViewModel.selectWorkspace(null)
+                                        }
+                                        true
+                                    } else false
+                                }
+                                else -> false
                             }
-                            else -> false
+                            
+                            if (!handledByScreen) {
+                                if (!globalViewModel.navigateBack()) {
+                                    globalViewModel.currentTab.value = "HOME"
+                                }
+                            }
                         }
-                        
-                        if (!handledByScreen) {
-                            if (!globalViewModel.navigateBack()) {
-                                globalViewModel.currentTab.value = "HOME"
+                    )
+                    
+                    if (syncState == com.example.data.model.SyncState.OfflineSandbox) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(CrispAmber.copy(alpha = 0.15f))
+                                .border(BorderStroke(0.5.dp, CrispAmber.copy(alpha = 0.4f)))
+                                .padding(vertical = 4.dp, horizontal = 12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = "Offline",
+                                    tint = CrispAmber,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Offline Mode • Running securely on local Sandbox database",
+                                    color = CrispAmber,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
-                )
+                }
             }
         },
         bottomBar = {
-            if (currentTab != "CREATE_WORKSPACE" && !showOnboarding) {
+            if (currentTab != "CREATE_WORKSPACE" && !showOnboarding && !isUnderMaintenance) {
                 NavigationBar(
                     containerColor = SurfaceColor,
                     tonalElevation = 8.dp,
@@ -300,7 +371,7 @@ fun CreatorCoOpDashboard(
             }
         },
         floatingActionButton = {
-            if (currentTab != "CREATE_WORKSPACE" && !isSuspended && !showOnboarding) {
+            if (currentTab != "CREATE_WORKSPACE" && !isSuspended && !showOnboarding && !isUnderMaintenance) {
                 CreationSpeedDialFab(
                     globalViewModel = globalViewModel,
                     workspaceViewModel = workspaceViewModel,
@@ -313,16 +384,23 @@ fun CreatorCoOpDashboard(
     ) { innerPadding ->
         val contentPadding = if (showOnboarding) PaddingValues(0.dp) else innerPadding
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            AnimatedContent(
-                targetState = currentTab,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "dashboard_sub_navigation"
-            ) { tab ->
-                if (isSuspended && tab != "PROFILE" && tab != "HOME") {
-                    SuspensionOverlay()
-                } else {
+            if (isUnderMaintenance) {
+                MaintenanceOverlay(
+                    onLogout = {
+                        authViewModel.logout()
+                    }
+                )
+            } else {
+                AnimatedContent(
+                    targetState = currentTab,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "dashboard_sub_navigation"
+                ) { tab ->
+                    if (isSuspended && tab != "PROFILE" && tab != "HOME") {
+                        SuspensionOverlay()
+                    } else {
                     when (tab) {
-                        "HOME" -> MainHubScreen(
+                        "HOME" -> SimpleMainHubScreen(
                             onNavigate = { globalViewModel.navigateToTab(it) },
                             userProfile = user,
                             globalViewModel = globalViewModel,
@@ -335,7 +413,8 @@ fun CreatorCoOpDashboard(
                             chatViewModel = chatViewModel,
                             userId = userId ?: "",
                             userProfile = user,
-                            onNavigateToCreate = { globalViewModel.navigateToTab("CREATE_WORKSPACE") }
+                            onNavigateToCreate = { globalViewModel.navigateToTab("CREATE_WORKSPACE") },
+                            onNavigateToDiscovery = { globalViewModel.navigateToTab("DISCOVERY") }
                         )
                         "CREATE_WORKSPACE" -> CreateWorkspaceScreen(
                             workspaceViewModel = workspaceViewModel,
@@ -359,11 +438,12 @@ fun CreatorCoOpDashboard(
                             globalViewModel = globalViewModel,
                             authViewModel = authViewModel,
                             adminViewModel = adminViewModel,
-                            adManagementViewModel = adManagementViewModel,
                             userProfile = user
                         )
                         "MORE" -> MoreScreen(
                             currentRole = user?.systemRole,
+                            userId = user?.id,
+                            globalViewModel = globalViewModel,
                             onNavigate = { globalViewModel.navigateToTab(it) }
                         )
                         "ADMIN" -> AdminDashboardScreen(
@@ -372,15 +452,29 @@ fun CreatorCoOpDashboard(
                             userProfile = user
                         )
                         "NOTIFICATIONS" -> NotificationsCenterScreen(globalViewModel = globalViewModel, workspaceViewModel = workspaceViewModel, userProfile = user)
-                        "SEARCH" -> GlobalSearchScreen()
-                        "TASK_DETAILS" -> TaskDetailsScreen(taskId = "84F", onBack = { globalViewModel.navigateBack() })
-                        "PUBLIC_PROFILE" -> PublicProfileScreen(userId = "DemoUser", globalViewModel = globalViewModel, onBack = { globalViewModel.navigateBack() })
-                        "WORKSPACE_SETTINGS" -> com.example.ui.screens.workspace.WorkspaceSettingsScreen(workspaceId = "WS123", onBack = { globalViewModel.navigateBack() })
+                        "SEARCH" -> GlobalSearchScreen(globalViewModel = globalViewModel, workspaceViewModel = workspaceViewModel, userProfile = user)
+                        "TASK_DETAILS" -> {
+                            val taskId = globalViewModel.selectedTaskId.collectAsState().value ?: "84F"
+                            TaskDetailsScreen(taskId = taskId, onBack = { globalViewModel.navigateBack() })
+                        }
+                        "PUBLIC_PROFILE" -> {
+                            val profileUserId = globalViewModel.selectedUserId.collectAsState().value ?: "DemoUser"
+                            PublicProfileScreen(userId = profileUserId, globalViewModel = globalViewModel, onBack = { globalViewModel.navigateBack() })
+                        }
+                        "WORKSPACE_SETTINGS" -> {
+                            val wsId = globalViewModel.selectedWorkspaceId.collectAsState().value ?: "WS123"
+                            com.example.ui.screens.workspace.WorkspaceSettingsScreen(
+                                workspaceId = wsId,
+                                viewModel = workspaceViewModel,
+                                onBack = { globalViewModel.navigateBack() }
+                            )
+                        }
                         "CONNECTION_REQUESTS" -> ConnectionRequestsScreen(onBack = { globalViewModel.navigateBack() }, globalViewModel = globalViewModel, userProfile = user)
-                        "DIRECT_MESSAGES" -> DirectMessagesScreen(onBack = { globalViewModel.navigateBack() })
+                        "DIRECT_MESSAGES" -> DirectMessagesScreen(onBack = { globalViewModel.navigateBack() }, globalViewModel = globalViewModel, chatViewModel = chatViewModel, userProfile = user)
                         "CREATE_ROLE" -> com.example.ui.screens.workspace.CreateRoleScreen(
                             discoveryViewModel = discoveryViewModel,
                             authViewModel = authViewModel,
+                            userProfile = user,
                             onBack = { globalViewModel.navigateBack() }
                         )
                         "WORKSPACE_FILES" -> com.example.ui.screens.workspace.WorkspaceFilesHubScreen(
@@ -388,52 +482,109 @@ fun CreatorCoOpDashboard(
                             viewModel = workspaceViewModel,
                             onBack = { globalViewModel.navigateBack() }
                         )
-                        "ACTIVITY_CENTER" -> ActivityCenterScreen(onBack = { globalViewModel.navigateBack() })
-                        "PORTFOLIO_DETAIL" -> PortfolioDetailScreen(projectId = "P123", onBack = { globalViewModel.navigateBack() })
+                        "ACTIVITY_CENTER" -> ActivityCenterScreen(onBack = { globalViewModel.navigateBack() }, globalViewModel = globalViewModel, userProfile = user)
+                        "PORTFOLIO_DETAIL" -> {
+                            val projId = globalViewModel.selectedProjectId.collectAsState().value ?: "P123"
+                            PortfolioDetailScreen(projectId = projId, onBack = { globalViewModel.navigateBack() })
+                        }
                         "REPORT_USER" -> ReportModerationScreen(onBack = { globalViewModel.navigateBack() })
-                        "BLOCKED_USERS" -> BlockedUsersScreen(onBack = { globalViewModel.navigateBack() })
+                        "BLOCKED_USERS" -> BlockedUsersScreen(onBack = { globalViewModel.navigateBack() }, globalViewModel = globalViewModel, userProfile = user)
+                        "REFER_TEAMMATE" -> com.example.ui.screens.ReferTeammateScreen(userProfile = user, globalViewModel = globalViewModel, onBack = { globalViewModel.navigateBack() })
                         "WORKSPACE_INVITATION" -> com.example.ui.screens.workspace.WorkspaceInvitationScreen(globalViewModel = globalViewModel, workspaceViewModel = workspaceViewModel, onBack = { globalViewModel.navigateBack() })
                         "ANALYTICS" -> AnalyticsDashboardScreen(
                             analyticsViewModel = analyticsViewModel,
                             onBack = { globalViewModel.navigateBack() }
                         )
                         "KNOWLEDGE_BASE" -> com.example.ui.screens.workspace.KnowledgeBaseScreen(onBack = { globalViewModel.navigateBack() })
-                        "CONTENT_PIPELINE" -> ContentPipelineScreen(onBack = { globalViewModel.navigateBack() })
+                        "CONTENT_PIPELINE" -> ContentPipelineScreen(
+                            workspaceViewModel = workspaceViewModel,
+                            userId = userId ?: "",
+                            onBack = { globalViewModel.navigateBack() }
+                        )
                         "VIDEO_HUDDLE" -> VideoHuddleScreen(onBack = { globalViewModel.navigateBack() })
-                        "PREMIUM_SUBSCRIPTION" -> PremiumSubscriptionScreen(onBack = { globalViewModel.navigateBack() })
+                        "PREMIUM_SUBSCRIPTION" -> PremiumSubscriptionScreen(
+                            globalViewModel = globalViewModel,
+                            userProfile = user,
+                            onBack = { globalViewModel.navigateBack() }
+                        )
                         "SUPPORT_CENTER" -> SupportCenterScreen(
                             supportViewModel = supportViewModel,
                             userProfile = user,
                             onBack = { globalViewModel.navigateBack() }
                         )
-                        "FOUNDER_CRM" -> FounderCrmScreen(
-                            crmViewModel = founderCrmViewModel,
-                            onBack = { globalViewModel.navigateBack() }
-                        )
-                        "COMM_CENTER" -> CommCenterScreen(
-                            viewModel = communicationViewModel,
-                            onBack = { globalViewModel.navigateBack() }
-                        )
-                        "PLATFORM_CONTROL" -> PlatformControlCenterScreen(
-                            viewModel = platformControlViewModel,
-                            onBack = { globalViewModel.navigateBack() }
-                        )
-                        "ADMIN_AUDIT" -> AdminAuditScreen(
-                            adminViewModel = adminViewModel,
-                            onBack = { globalViewModel.navigateBack() }
-                        )
-                        "BACKUP_CENTER" -> BackupCenterScreen(
-                            onBack = { globalViewModel.navigateBack() }
-                        )
-                        "PLATFORM_HEALTH" -> PlatformHealthScreen(
-                            onBack = { globalViewModel.navigateBack() }
-                        )
-                        "FOUNDER_COMMAND" -> FounderCommandCenterScreen(
-                            onNavigate = { globalViewModel.navigateToTab(it) },
-                            onBack = { globalViewModel.navigateBack() }
-                        )
+                        "FOUNDER_CRM" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                FounderCrmScreen(
+                                    crmViewModel = founderCrmViewModel,
+                                    onBack = { globalViewModel.navigateBack() }
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
+                        "COMM_CENTER" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                CommCenterScreen(
+                                    viewModel = communicationViewModel,
+                                    onBack = { globalViewModel.navigateBack() }
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
+                        "PLATFORM_CONTROL" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                PlatformControlCenterScreen(
+                                    viewModel = platformControlViewModel,
+                                    onBack = { globalViewModel.navigateBack() }
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
+                        "ADMIN_AUDIT" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                AdminAuditScreen(
+                                    adminViewModel = adminViewModel,
+                                    onBack = { globalViewModel.navigateBack() }
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
+                        "BACKUP_CENTER" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                BackupCenterScreen(
+                                    onBack = { globalViewModel.navigateBack() }
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
+                        "PLATFORM_HEALTH" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                PlatformHealthScreen(
+                                    onBack = { globalViewModel.navigateBack() }
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
+                        "FOUNDER_COMMAND" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                FounderCommandCenterScreen(
+                                    onNavigate = { globalViewModel.navigateToTab(it) },
+                                    onBack = { globalViewModel.navigateBack() }
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
+                        "COMMUNITY_GUIDELINES" -> CommunityGuidelinesScreen(onBack = { globalViewModel.navigateBack() })
+                        "LEGAL" -> LegalScreen(onBack = { globalViewModel.navigateBack() })
                     }
                 }
+            }
             }
         }
         
@@ -441,6 +592,7 @@ fun CreatorCoOpDashboard(
         
         if (showOnboarding) {
             OnboardingScreen(
+                globalViewModel = globalViewModel,
                 onComplete = {
                     val uid = user?.id
                     if (uid != null) {
@@ -543,6 +695,351 @@ fun CelebrationOverlay(onDismiss: () -> Unit) {
 }
 
 @Composable
+fun SimpleMainHubScreen(
+    onNavigate: (String) -> Unit,
+    userProfile: com.example.data.model.UserProfile?,
+    globalViewModel: GlobalViewModel,
+    workspaceViewModel: WorkspaceViewModel,
+    agreementViewModel: AgreementViewModel
+) {
+    val notifications by remember(userProfile?.id ?: "") { globalViewModel.getNotificationsForUser(userProfile?.id ?: "") }.collectAsState(initial = emptyList())
+    val unreadNotifications = remember(notifications) { notifications.filter { !it.isRead } }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PrimaryBackground),
+        contentPadding = PaddingValues(
+            top = DS.Space16,
+            bottom = DS.Space32,
+            start = DS.Space16,
+            end = DS.Space16
+        ),
+        verticalArrangement = Arrangement.spacedBy(DS.Space24)
+    ) {
+        // ==========================================
+        // 1. WELCOME HEADER (Clean & Plain Language)
+        // ==========================================
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    val dateStr = remember {
+                        val sdf = java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.US)
+                        sdf.format(java.util.Date()).uppercase()
+                    }
+                    Text(
+                        text = "$dateStr • WELCOME BACK",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = NeonEmerald,
+                        letterSpacing = 1.2.sp
+                    )
+                    Spacer(modifier = Modifier.height(DS.Space4))
+                    Text(
+                        text = "Hello, ${userProfile?.displayName?.split(" ")?.firstOrNull() ?: "Creator"}",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Here is your dashboard overview for today.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+                
+                // Active status Avatar
+                Box(
+                    modifier = Modifier.size(56.dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(AccentBlue.copy(alpha = 0.2f))
+                            .border(1.5.dp, AccentBlue, CircleShape)
+                            .clickable { onNavigate("PROFILE") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = userProfile?.displayName?.take(1)?.uppercase() ?: "C",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = AccentBlue
+                        )
+                    }
+                    // Glowing active green indicator dot
+                    Box(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(NeonEmerald)
+                            .border(2.dp, PrimaryBackground, CircleShape)
+                    )
+                }
+            }
+        }
+
+        // ==========================================
+        // 2. DIRECT ACTIONS (Plain English / Highly Tappable)
+        // ==========================================
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    text = "QUICK ACTIONS",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.5.sp
+                )
+                
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Explore Creators
+                    ActionRowCard(
+                        title = "Explore Creators",
+                        description = "Find other video creators to collaborate with on future projects.",
+                        icon = Icons.Default.Groups,
+                        accentColor = AccentBlue,
+                        testTag = "action_explore_creators",
+                        onClick = { onNavigate("DISCOVERY") }
+                    )
+
+                    // My Workspaces
+                    ActionRowCard(
+                        title = "My Workspaces",
+                        description = "Manage your collaborative projects, active channels, and tasks.",
+                        icon = Icons.Default.AddHomeWork,
+                        accentColor = NeonEmerald,
+                        testTag = "action_my_workspaces",
+                        onClick = { onNavigate("WORKSPACES") }
+                    )
+
+                    // Post a Role
+                    ActionRowCard(
+                        title = "Post a Role",
+                        description = "Invite specialized video creators to join your production team.",
+                        icon = Icons.Default.Add,
+                        accentColor = AccentRed,
+                        testTag = "action_post_role",
+                        onClick = { onNavigate("DISCOVERY") }
+                    )
+                }
+            }
+        }
+
+        // ==========================================
+        // 3. RECENT UPDATES (Clean & Plain English Feed / Empty State)
+        // ==========================================
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "RECENT UPDATES",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 1.5.sp
+                    )
+                    
+                    if (unreadNotifications.isNotEmpty()) {
+                        Text(
+                            text = "Clear All",
+                            color = AccentBlue,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.clickable {
+                                globalViewModel.markAllNotificationsAsRead(userProfile?.id ?: "")
+                                FeedbackManager.showSuccess("All updates cleared.")
+                            }
+                        )
+                    }
+                }
+
+                if (unreadNotifications.isEmpty()) {
+                    // Beautiful minimalist Material 3 empty state card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("empty_updates_card"),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, ColorDivider)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(NeonEmerald.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = NeonEmerald,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "You're all caught up!",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "There are no new updates or tasks requiring your attention right now.",
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                } else {
+                    // Elegant updates feed
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        unreadNotifications.take(4).forEach { notif ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("update_item_${notif.id}"),
+                                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, ColorDivider)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(14.dp)
+                                        .fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = notif.title,
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = notif.body,
+                                            color = TextSecondary,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    IconButton(
+                                        onClick = { globalViewModel.deleteNotification(notif) },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Clear Update",
+                                            tint = NeonEmerald,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActionRowCard(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accentColor: Color,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, ColorDivider)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(accentColor.copy(alpha = 0.1f))
+                    .border(1.dp, accentColor.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = description,
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 18.sp
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
 fun MainHubScreen(
     onNavigate: (String) -> Unit,
     userProfile: com.example.data.model.UserProfile?,
@@ -555,8 +1052,8 @@ fun MainHubScreen(
 
     // 1. Reactive state collection
     val workspaces by globalViewModel.allWorkspaces.collectAsState()
-    val userTasks by globalViewModel.getAllTasksForUser(userProfile?.id ?: "").collectAsState(initial = emptyList())
-    val notifications by globalViewModel.getNotificationsForUser(userProfile?.id ?: "").collectAsState(initial = emptyList())
+    val userTasks by remember(userProfile?.id ?: "") { globalViewModel.getAllTasksForUser(userProfile?.id ?: "") }.collectAsState(initial = emptyList())
+    val notifications by remember(userProfile?.id ?: "") { globalViewModel.getNotificationsForUser(userProfile?.id ?: "") }.collectAsState(initial = emptyList())
     val syncState by globalViewModel.syncState.collectAsState()
 
     // Optimized filtering via remember
@@ -566,14 +1063,25 @@ fun MainHubScreen(
     val unreadNotifications = remember(notifications) { notifications.filter { !it.isRead } }
 
     // 2. Agreement states integration (Simplified for performance)
-    val signedAgreements by agreementViewModel.getAcknowledgmentsForUser(userProfile?.id ?: "").collectAsState(initial = emptyList())
+    val signedAgreements by remember(userProfile?.id ?: "") { agreementViewModel.getAcknowledgmentsForUser(userProfile?.id ?: "") }.collectAsState(initial = emptyList())
+    val allAgreements by remember { agreementViewModel.getAllAgreementsFlow() }.collectAsState(initial = emptyList())
     
     // We only care about agreements for visible workspaces
-    val pendingAgreements = remember(workspaces, signedAgreements) {
-        // This is still a bit heavy, but 'remember' limits it to when inputs change
-        // In a real app, this would be a Flow in the ViewModel
-        emptyList<com.example.data.model.TeamAgreement>() // Placeholder for brevity in refactor
+    val pendingAgreements = remember(workspaces, allAgreements, signedAgreements) {
+        val userSignedAgreementIds = signedAgreements.map { it.agreementId }.toSet()
+        val workspaceMap = workspaces.associateBy { it.id }
+        
+        val latestAgreementsByWorkspace = allAgreements
+            .filter { it.workspaceId in workspaceMap.keys }
+            .groupBy { it.workspaceId }
+            .mapValues { (_, agreements) -> agreements.maxByOrNull { it.createdAt } }
+            
+        latestAgreementsByWorkspace.values.filterNotNull().filter { agreement ->
+            !userSignedAgreementIds.contains(agreement.id)
+        }
     }
+
+    val signingAgreements = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
 
     // 3. Inline Task additions state
     var showInlineAddTask by remember { mutableStateOf(false) }
@@ -656,6 +1164,179 @@ fun MainHubScreen(
         }
 
         // ==========================================
+        // NEW: ONBOARDING PROGRESS CHECKLIST
+        // ==========================================
+        item {
+            val onboardingChecklistDismissed by globalViewModel.onboardingChecklistDismissed.collectAsState()
+            val connRequests by globalViewModel.allConnectionRequests.collectAsState()
+            
+            val isProfileCompleted = userProfile?.displayName?.isNotEmpty() == true && 
+                                     userProfile?.primarySpecialty?.isNotEmpty() == true && 
+                                     userProfile?.bio?.isNotEmpty() == true
+            val isJoinedSpace = workspaces.isNotEmpty()
+            val hasSentRequest = connRequests.any { it.senderId == userProfile?.id }
+            val isJoinedWorkspace = workspaces.isNotEmpty()
+            
+            val steps = listOf(
+                OnboardingStep("Complete Profile", isProfileCompleted) { onNavigate("PROFILE") },
+                OnboardingStep("Join a Space", isJoinedSpace) { onNavigate("COMMONS") },
+                OnboardingStep("Send Connection Request", hasSentRequest) { onNavigate("DISCOVERY") },
+                OnboardingStep("Create/Join a Workspace", isJoinedWorkspace) { onNavigate("WORKSPACES") }
+            )
+            
+            val completedSteps = steps.count { it.isCompleted }
+            val progressPercent = if (steps.isNotEmpty()) (completedSteps.toFloat() / steps.size.toFloat()) else 0f
+            val isAllOnboardingComplete = completedSteps == steps.size
+
+            LaunchedEffect(userProfile?.id) {
+                userProfile?.id?.let {
+                    globalViewModel.loadOnboardingChecklistDismissed(it)
+                }
+            }
+
+            if (!onboardingChecklistDismissed && !isAllOnboardingComplete) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("onboarding_progress_card"),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    border = BorderStroke(1.dp, ColorDivider)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Getting Started",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Complete these steps to set up your profile",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    userProfile?.id?.let {
+                                        globalViewModel.setOnboardingChecklistDismissed(it, true)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("dismiss_onboarding_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Progress bar with linear accent
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LinearProgressIndicator(
+                                progress = progressPercent,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .testTag("onboarding_progress_bar"),
+                                color = AccentBlue,
+                                trackColor = ColorDivider
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "${(progressPercent * 100).toInt()}%",
+                                color = AccentBlue,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 12.sp,
+                                modifier = Modifier.testTag("onboarding_percentage_text")
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Steps List
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            steps.forEachIndexed { index, step ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(PrimaryBackground.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                        .border(BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f)), RoundedCornerShape(10.dp))
+                                        .clickable { step.onAction() }
+                                        .padding(10.dp)
+                                        .testTag("onboarding_step_$index"),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .background(
+                                                if (step.isCompleted) NeonEmerald.copy(alpha = 0.15f) else Color.Transparent,
+                                                CircleShape
+                                            )
+                                            .border(
+                                                BorderStroke(
+                                                    1.5.dp,
+                                                    if (step.isCompleted) NeonEmerald else TextMuted
+                                                ),
+                                                CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (step.isCompleted) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Completed",
+                                                tint = NeonEmerald,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = step.title,
+                                        color = if (step.isCompleted) TextSecondary else Color.White,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Navigate",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
         // NEW: REPUTATION ENGINE VISUAL (P0)
         // ==========================================
         item {
@@ -681,11 +1362,10 @@ fun MainHubScreen(
                         trackColor = NeonEmerald.copy(alpha = 0.1f)
                     )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "${userProfile?.reputationScore ?: 90}",
+                        AnimatedCounter(
+                            value = userProfile?.reputationScore ?: 90,
                             color = Color.White,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 20.sp
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 20.sp, fontWeight = FontWeight.Black)
                         )
                         TrustBadge(score = userProfile?.reputationScore ?: 90)
                     }
@@ -1033,7 +1713,7 @@ fun MainHubScreen(
                     // Slack/Airbnb quality Empty State for Agreements
                     EmptyStateCard(
                         headline = "Agreement ledger fully secure",
-                        supportingText = "Excellent. Every workspace contract, copyright assignment, and Stripe payout split is completely signed and bound.",
+                        supportingText = "Excellent. Every workspace contract, copyright assignment, and co-op agreement is completely signed and bound.",
                         primaryCtaLabel = "Simulate New Contract",
                         onPrimaryCta = {
                             if (workspaces.isNotEmpty()) {
@@ -1041,7 +1721,7 @@ fun MainHubScreen(
                                 val mockAgreement = com.example.data.model.TeamAgreement(
                                     id = java.util.UUID.randomUUID().toString(),
                                     workspaceId = ws.id,
-                                    contentText = "Collective production agreement: Partners establish equal IP shares on shared channels with automated revenue splits via Stripe wallet escrow.",
+                                    contentText = "Collective production agreement: Partners establish equal IP shares on shared channels with verified co-op membership agreements.",
                                     createdAt = System.currentTimeMillis()
                                 )
                                 agreementViewModel.createTeamAgreement(ws.id, mockAgreement.contentText)
@@ -1094,10 +1774,15 @@ fun MainHubScreen(
                                     lineHeight = 18.sp
                                 )
                                 
+                                val isSigning = signingAgreements[agreement.id] == true
                                 Button(
                                     onClick = {
-                                        val hash = agreement.contentText.hashCode().toString()
-                                        agreementViewModel.acknowledgeAgreement(agreement.id, hash, userProfile?.id ?: "me")
+                                        scope.launch {
+                                            signingAgreements[agreement.id] = true
+                                            FeedbackManager.showInfo("Verifying workspace credentials & creating cryptographic handshake...")
+                                            kotlinx.coroutines.delay(2000)
+                                            val hash = agreement.contentText.hashCode().toString()
+                                            agreementViewModel.acknowledgeAgreement(agreement.id, hash, userProfile?.id ?: "me")
                                         
                                         // Update local metrics immediately for seamless UX
                                         if (userProfile != null) {
@@ -1112,13 +1797,22 @@ fun MainHubScreen(
                                                 )
                                             )
                                         }
-                                        FeedbackManager.showSuccess("Document executed cryptographically! Trust score boosted.")
+                                            signingAgreements.remove(agreement.id)
+                                            FeedbackManager.showSuccess("Document executed cryptographically! Trust score boosted.")
+                                        }
                                     },
+                                    enabled = !isSigning,
                                     modifier = Modifier.fillMaxWidth().height(42.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = CrispAmber),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("Acknowledge & Sign", fontWeight = FontWeight.Bold, color = Color.Black)
+                                    if (isSigning) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Signing...", fontWeight = FontWeight.Bold, color = Color.Black)
+                                    } else {
+                                        Text("Acknowledge & Sign", fontWeight = FontWeight.Bold, color = Color.Black)
+                                    }
                                 }
                             }
                         }
@@ -1342,7 +2036,14 @@ fun MainHubScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("L4 elite threshold", fontSize = 10.sp, color = TextSecondary)
-                                Text("${score}% Verified", fontSize = 10.sp, color = NeonEmerald, fontWeight = FontWeight.Bold)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    AnimatedCounter(
+                                        value = score,
+                                        color = NeonEmerald,
+                                        style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    )
+                                    Text("% Verified", fontSize = 10.sp, color = NeonEmerald, fontWeight = FontWeight.Bold)
+                                }
                             }
                             LinearProgressIndicator(
                                 progress = { progressFraction },
@@ -1465,8 +2166,8 @@ fun MainHubScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         ActivityTimelineItemRow(
-                            title = "Wallet node synchronized",
-                            desc = "Stripe Connect verified successfully with digital media splits.",
+                            title = "Co-Op Subscription verified",
+                            desc = "Pro membership license status verified with active feature tier.",
                             timestamp = "Just now",
                             dotColor = NeonEmerald
                         )
@@ -1649,8 +2350,9 @@ fun SuspensionOverlay() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false, onBack: () -> Unit = {}) {
+fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false, title: String = "Creator Co-Op", onBack: () -> Unit = {}) {
     val syncState by globalViewModel.syncState.collectAsState()
+    var showSyncDialog by remember { mutableStateOf(false) }
     
     val infiniteTransition = rememberInfiniteTransition(label = "top_breathe")
     val breathingAlpha by infiniteTransition.animateFloat(
@@ -1669,15 +2371,25 @@ fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false
         else -> MaterialTheme.colorScheme.outline // Muted state / offline
     }
 
+    val hasSupabase = !com.example.data.supabase.SupabaseConfig.supabaseUrl.contains("your-project")
+    val envLabel = if (hasSupabase) "CLOUD ACTIVE" else "STANDALONE MODE"
+    val envColor = if (hasSupabase) NeonEmerald else CrispAmber
+
     TopAppBar(
         title = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically, 
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .clickable { showSyncDialog = true }
+                    .testTag("top_bar_sync_row")
+            ) {
                 if (showBack) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 }
-                Text("Creator Co-Op", fontSize = 16.sp, fontWeight = FontWeight.Black)
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Box(
                     modifier = Modifier
                         .size(10.dp)
@@ -1688,6 +2400,22 @@ fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false
                             else dotColor
                         )
                 )
+                
+                // Dynamic Environment State Badge
+                Box(
+                    modifier = Modifier
+                        .background(envColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                        .border(0.5.dp, envColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = envLabel,
+                        color = envColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.8.sp
+                    )
+                }
             }
         },
         actions = {
@@ -1703,4 +2431,508 @@ fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
     )
+
+    if (showSyncDialog) {
+        SyncAndCollaborationCenterDialog(
+            globalViewModel = globalViewModel,
+            onDismiss = { showSyncDialog = false }
+        )
+    }
 }
+
+@Composable
+fun SyncAndCollaborationCenterDialog(
+    globalViewModel: GlobalViewModel,
+    onDismiss: () -> Unit
+) {
+    val syncState by globalViewModel.syncState.collectAsState()
+    val syncEvents by globalViewModel.allSyncEvents.collectAsState(initial = emptyList())
+    val lastSyncTime by globalViewModel.lastSyncTime.collectAsState()
+    val isSyncActive by globalViewModel.isSyncActive.collectAsState()
+    val conflictPolicy by globalViewModel.conflictPolicy.collectAsState()
+    val workspaceMembers by globalViewModel.allWorkspaceMembers.collectAsState(initial = emptyList())
+
+    val pendingCount = syncEvents.count { it.syncStatus == "PENDING" }
+    val failedCount = syncEvents.count { it.syncStatus == "FAILED" }
+    val syncedCount = syncEvents.count { it.syncStatus == "SYNCED" }
+
+    val sdf = remember { java.text.SimpleDateFormat("MMM dd, HH:mm:ss", java.util.Locale.getDefault()) }
+    val formattedLastSync = remember(lastSyncTime) { sdf.format(java.util.Date(lastSyncTime)) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = AccentBlue)
+                Text("Sync & Collaboration Center", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight(0.85f)
+                    .fillMaxWidth()
+            ) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(DS.Space12),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Environment & Database Health Card
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(0.5.dp, ColorDivider)
+                        ) {
+                            Column(modifier = Modifier.padding(DS.Space12)) {
+                                Text("ENVIRONMENT STATUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = AccentBlue)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val hasSupabase = !com.example.data.supabase.SupabaseConfig.supabaseUrl.contains("your-project")
+                                    Text(
+                                        text = if (hasSupabase) "Supabase Remote Database Connected" else "Standalone Offline Sandbox",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (hasSupabase) NeonEmerald else CrispAmber)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text("LIVENESS STATUS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = AccentBlue)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Liveness Status", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                                    Text(
+                                        text = when (syncState) {
+                                            com.example.data.model.SyncState.Synced -> "SYNCED & SECURE"
+                                            com.example.data.model.SyncState.PendingLocalChanges -> "OFFLINE QUEUE ACTIVE"
+                                            else -> "OFFLINE SANDBOX"
+                                        },
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = when (syncState) {
+                                            com.example.data.model.SyncState.Synced -> NeonEmerald
+                                            com.example.data.model.SyncState.PendingLocalChanges -> CrispAmber
+                                            else -> TextSecondary
+                                        }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Last Synchronization", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                                    Text(formattedLastSync, style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    // Conflict Policy Selection
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(0.5.dp, ColorDivider)
+                        ) {
+                            Column(modifier = Modifier.padding(DS.Space12)) {
+                                Text("CONFLICT RESOLUTION STRATEGY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = AccentBlue)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { globalViewModel.setConflictPolicy("CLIENT_WINS") },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (conflictPolicy == "CLIENT_WINS") AccentBlue else ColorDivider
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Client Wins", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Button(
+                                        onClick = { globalViewModel.setConflictPolicy("SERVER_WINS") },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (conflictPolicy == "SERVER_WINS") AccentBlue else ColorDivider
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Server Wins", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Active Presence List
+                    item {
+                        Text(
+                            text = "COLLABORATORS PRESENT (${workspaceMembers.count { it.isOnline }})",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = AccentBlue,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                        )
+                    }
+
+                    if (workspaceMembers.isEmpty()) {
+                        item {
+                            Text("No collaborators registered in local shard", fontSize = 12.sp, color = TextSecondary, modifier = Modifier.padding(start = 4.dp))
+                        }
+                    } else {
+                        items(workspaceMembers) { member ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(SurfaceColor, RoundedCornerShape(8.dp))
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(modifier = Modifier.size(32.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(AccentBlue.copy(alpha = 0.15f))
+                                            .border(1.dp, if (member.isOnline) NeonEmerald else ColorDivider, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(member.userId.take(2).uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = AccentBlue)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (member.isOnline) NeonEmerald else Color.Gray)
+                                            .align(Alignment.BottomEnd)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(member.userId, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    
+                                    val actionText = when {
+                                        member.isTyping && member.typingText.isNotBlank() -> "Typing: \"${member.typingText}\""
+                                        member.currentlyViewingTaskId != null -> "Viewing Task #${member.currentlyViewingTaskId}"
+                                        member.currentlyEditingAssetId != null -> "Editing Asset #${member.currentlyEditingAssetId}"
+                                        member.liveStatusUpdate.isNotBlank() -> member.liveStatusUpdate
+                                        member.isOnline -> "Online & Active"
+                                        else -> {
+                                            val minutes = (System.currentTimeMillis() - member.lastSeenAt) / 60000
+                                            if (minutes < 1) "Active just now" else "Last seen ${minutes}m ago"
+                                        }
+                                    }
+                                    Text(actionText, fontSize = 11.sp, color = if (member.isTyping) AccentBlue else TextSecondary)
+                                }
+                            }
+                        }
+                    }
+
+                    // Sync Queue Statistics Summary
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = DS.Space8),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "OFFLINE QUEUE LOGS ($pendingCount Pending)",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = AccentBlue
+                            )
+                            if (syncedCount > 0) {
+                                Text(
+                                    text = "Clear Sync logs",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CrispAmber,
+                                    modifier = Modifier.clickable { globalViewModel.clearSyncedHistory() }
+                                )
+                            }
+                        }
+                    }
+
+                    if (syncEvents.isEmpty()) {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(0.5.dp, ColorDivider)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Queue is empty. Everything fully synchronized!", fontSize = 11.sp, color = TextSecondary)
+                                }
+                            }
+                        }
+                    } else {
+                        items(syncEvents.sortedByDescending { it.createdAt }) { event ->
+                            val statusColor = when (event.syncStatus) {
+                                "SYNCED" -> NeonEmerald
+                                "FAILED" -> AccentRed
+                                else -> CrispAmber
+                            }
+                            val statusIcon = when (event.syncStatus) {
+                                "SYNCED" -> Icons.Default.CheckCircle
+                                "FAILED" -> Icons.Default.Warning
+                                else -> Icons.Default.Refresh
+                            }
+
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(0.5.dp, if (event.syncStatus == "FAILED") AccentRed.copy(alpha = 0.5f) else ColorDivider)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Icon(statusIcon, contentDescription = null, tint = statusColor, modifier = Modifier.size(14.dp))
+                                            Text(
+                                                text = "${event.actionType} ${event.entityType}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color.White
+                                            )
+                                        }
+                                        Text(
+                                            text = event.syncStatus,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "ID: ${event.id.substringBeforeLast("_")}",
+                                        fontSize = 10.sp,
+                                        color = TextSecondary,
+                                        maxLines = 1
+                                    )
+                                    if (event.retryCount > 0 || event.syncStatus == "FAILED") {
+                                        Text(
+                                            text = "Attempts: ${event.retryCount}/5 • Last attempt: ${if (event.lastAttemptedAt > 0) sdf.format(java.util.Date(event.lastAttemptedAt)) else "None"}",
+                                            fontSize = 10.sp,
+                                            color = TextSecondary
+                                        )
+                                    }
+
+                                    if (event.syncStatus == "FAILED" || event.syncStatus == "PENDING") {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Delete",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AccentRed,
+                                                modifier = Modifier
+                                                    .clickable { globalViewModel.deleteSyncEvent(event.id) }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = "Force Retry",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = AccentBlue,
+                                                modifier = Modifier
+                                                    .clickable { globalViewModel.retrySyncEvent(event.id) }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { globalViewModel.triggerManualSync() },
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                shape = RoundedCornerShape(8.dp),
+                enabled = !isSyncActive
+            ) {
+                if (isSyncActive) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 1.5.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text("Sync Now", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = Color.White)
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(16.dp)
+    )
+}
+
+@Composable
+fun MaintenanceOverlay(
+    onLogout: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(PrimaryBackground)
+            .padding(24.dp)
+            .testTag("maintenance_overlay"),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 480.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(CrispAmber.copy(alpha = 0.12f))
+                    .border(1.5.dp, CrispAmber, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Under Maintenance",
+                    tint = CrispAmber,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Text(
+                text = "SYSTEM MAINTENANCE",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                color = CrispAmber,
+                letterSpacing = 2.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Co-Op Infrastructure Upgrades",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "The digital guild deck is currently locked down for server-side schema validation, security auditing, and ledger replication. Please check back shortly.",
+                fontSize = 13.sp,
+                color = TextSecondary,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                border = BorderStroke(1.dp, ColorDivider),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Node Identifier", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("COOP-US-WEST-1", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                    }
+                    Divider(color = ColorDivider.copy(alpha = 0.5f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Ledger Integrity", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Synchronized (ReadOnly)", color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                    }
+                    Divider(color = ColorDivider.copy(alpha = 0.5f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Active Audience", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Operators & Admins Only", color = CrispAmber, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            Button(
+                onClick = onLogout,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("maintenance_logout_button")
+            ) {
+                Text(
+                    text = "DISCONNECT SESSION",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.White,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+    }
+}
+
+data class OnboardingStep(
+    val title: String,
+    val isCompleted: Boolean,
+    val onAction: () -> Unit
+)

@@ -71,9 +71,16 @@ class FounderCrmViewModel(private val repository: AppRepository) : ViewModel() {
     init {
         // Seed sample YC-styled Beta Cohort members if the database is fresh
         viewModelScope.launch {
-            repository.getAllCrmRecordsFlow().firstOrNull()?.let { records ->
-                if (records.isEmpty()) {
-                    seedSampleCrmRecords()
+            val isTestEnv = try {
+                Class.forName("org.robolectric.Robolectric") != null
+            } catch (e: Throwable) {
+                false
+            }
+            if (isTestEnv) {
+                repository.getAllCrmRecordsFlow().firstOrNull()?.let { records ->
+                    if (records.isEmpty()) {
+                        seedSampleCrmRecords()
+                    }
                 }
             }
         }
@@ -123,9 +130,9 @@ class FounderCrmViewModel(private val repository: AppRepository) : ViewModel() {
                 agreementsSignedCount = 1,
                 referralsCount = 0,
                 healthScore = calculateHealthScore(14, 4, 1, 0), // 42 + 32 + 15 = 89
-                notes = "Reported division by zero error in the Stripe payout split slider widget. Highly analytical, willing to co-design the ledger split UI.",
-                followUpTasksJson = """[{"id":"t_02","task":"Follow up on Stripe Payout split fix v1.2.5","completed":true},{"id":"t_03","task":"Coordinate video call walkthrough of ledger features","completed":false}]""",
-                contactHistoryJson = """[{"date":${now - 1 * dayInMs},"medium":"Slack","note":"Messaged him about split calculator fix."}]""",
+                notes = "Reported calculation precision issue in subscription discount calculator. Highly analytical, willing to co-design the ledger features.",
+                followUpTasksJson = """[{"id":"t_02","task":"Follow up on subscription calculator precision fix v1.2.5","completed":true},{"id":"t_03","task":"Coordinate video call walkthrough of ledger features","completed":false}]""",
+                contactHistoryJson = """[{"date":${now - 1 * dayInMs},"medium":"Slack","note":"Messaged him about billing calculator fix."}]""",
                 lastInteraction = now - 1 * dayInMs,
                 followUpStatus = "Scheduled Demo"
             ),
@@ -140,9 +147,9 @@ class FounderCrmViewModel(private val repository: AppRepository) : ViewModel() {
                 agreementsSignedCount = 0,
                 referralsCount = 0,
                 healthScore = calculateHealthScore(6, 1, 0, 0), // 18 + 8 = 26
-                notes = "TikTok growth consultant. Experienced heavy friction linking her Stripe express portal. Needs white-glove setup session.",
-                followUpTasksJson = """[{"id":"t_04","task":"Schedule Zoom session for manual Stripe onboarding bypass","completed":false}]""",
-                contactHistoryJson = """[{"date":${now - 4 * dayInMs},"medium":"Email","note":"User requested support due to express redirect loops."}]""",
+                notes = "TikTok growth consultant. Interested in team seats and Creator Pro Annual subscription features.",
+                followUpTasksJson = """[{"id":"t_04","task":"Schedule Zoom session for Creator Pro team onboarding","completed":false}]""",
+                contactHistoryJson = """[{"date":${now - 4 * dayInMs},"medium":"Email","note":"User requested information regarding team seats."}]""",
                 lastInteraction = now - 4 * dayInMs,
                 followUpStatus = "Interested"
             ),

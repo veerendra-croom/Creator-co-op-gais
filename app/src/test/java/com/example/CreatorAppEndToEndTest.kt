@@ -97,6 +97,7 @@ class CreatorAppEndToEndTest {
     fun dashboard_profile_test() {
         val userProfile = com.example.data.model.UserProfile(
             id = "me",
+            email = "test@creator.co",
             displayName = "Group Creator",
             primarySpecialty = "Creative Director",
             systemRole = "ADMIN",
@@ -132,6 +133,7 @@ class CreatorAppEndToEndTest {
         // Submit a post via feedViewModel to populate the feed
         val userProfile = com.example.data.model.UserProfile(
             id = "me",
+            email = "test@creator.co",
             displayName = "Group Creator",
             primarySpecialty = "Creative Director",
             systemRole = "ADMIN",
@@ -161,6 +163,29 @@ class CreatorAppEndToEndTest {
 
     @Test
     fun workspace_management_and_agreement_test() {
+        kotlinx.coroutines.runBlocking {
+            repository.userDao.insertUser(
+                com.example.data.model.UserProfile(
+                    id = "me",
+                    email = "test@creator.co",
+                    displayName = "Group Creator",
+                    primarySpecialty = "Creative Director",
+                    systemRole = "ADMIN",
+                    isVerifiedPro = true
+                )
+            )
+            repository.setOnboardingChecklistDismissed("me", true)
+            repository.insertMember(
+                com.example.data.model.WorkspaceMember(
+                    id = "test_membership_me",
+                    workspaceId = "ws_youtube_main",
+                    userId = "me",
+                    assignedRoleTitle = "Lead Creator",
+                    canModifyProduction = true
+                )
+            )
+        }
+
         composeTestRule.setContent {
             MyApplicationTheme {
                 CreatorCoOpDashboard(
@@ -172,11 +197,19 @@ class CreatorAppEndToEndTest {
 
         composeTestRule.waitForIdle()
 
-        // Assert workspaces tab is open, find prepopulated project card and click it
-        composeTestRule.onNodeWithText("TechPulse Main Channel").assertExists()
-        composeTestRule.onNodeWithText("YOUTUBE").assertExists()
-        composeTestRule.onNodeWithText("TechPulse Main Channel").performClick()
+        // Navigate to the workspaces tab
+        globalViewModel.navigateToTab("WORKSPACES")
+        composeTestRule.waitForIdle()
 
+        // Assert workspaces tab is open, find prepopulated project card and click it
+        composeTestRule.onAllNodesWithText("TechPulse Main Channel").onFirst().assertExists()
+        composeTestRule.onNodeWithText("YOUTUBE").assertExists()
+        composeTestRule.onAllNodesWithText("TechPulse Main Channel").onFirst().performClick()
+
+        composeTestRule.waitForIdle()
+
+        // Click TechPulse Main Channel again in the workspaces list to enter details
+        composeTestRule.onAllNodesWithText("TechPulse Main Channel").onFirst().performClick()
         composeTestRule.waitForIdle()
 
         // Verify the details screen elements (the detail view tabs) are visible with simple down-to-earth words
@@ -188,19 +221,20 @@ class CreatorAppEndToEndTest {
         composeTestRule.onNodeWithText("My Drafts").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("PERSONAL DRAFTING PAD").assertExists()
-        composeTestRule.onNodeWithText("Private to this account. Promote to the Team Space to collaborate.").assertExists()
+        composeTestRule.onNodeWithText("Encrypted private drafts. Promote to the Team Space to collaborate.").assertExists()
 
         // Click "Chat" Tab row
         composeTestRule.onNodeWithText("Chat").performClick()
         composeTestRule.waitForIdle()
         // Verify Chat is locked pending agreement signature
-        composeTestRule.onNodeWithText("Chat Locked").assertExists()
+        composeTestRule.onNodeWithText("Communications Locked").assertExists()
     }
 
     @Test
     fun syndicate_matchmaking_and_sybil_throttling_test() {
         val userProfile = com.example.data.model.UserProfile(
             id = "me",
+            email = "test@creator.co",
             displayName = "Group Creator",
             primarySpecialty = "Creative Director",
             systemRole = "ADMIN",
@@ -239,7 +273,7 @@ class CreatorAppEndToEndTest {
         composeTestRule.waitForIdle()
 
         // 3. Complete and submit the pitch dialog
-        composeTestRule.onNodeWithTag("pitch_message_input").performTextInput("Hi, I would love to write for you! Here is my stellar script portfolio.")
+        composeTestRule.onNodeWithTag("pitch_cover_input").performTextInput("Hi, I would love to write for you! Here is my stellar script portfolio.")
         composeTestRule.onNodeWithTag("pitch_portfolio_input").performTextInput("https://cosmic.portfolio.com")
         composeTestRule.onNodeWithTag("pitch_submit_button").performClick()
         composeTestRule.waitForIdle()

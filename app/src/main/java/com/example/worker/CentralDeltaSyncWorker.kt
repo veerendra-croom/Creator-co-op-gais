@@ -62,7 +62,7 @@ class CentralDeltaSyncWorker(
                             val matches = proposals.filter { data ->
                                 val proposal = data.proposal
                                 proposal.createdAt > search.lastNotifiedAt &&
-                                (filter.niche == "All" || proposal.niche.equals(filter.niche, ignoreCase = true)) &&
+                                ((filter.niche ?: "All") == "All" || proposal.niche.equals(filter.niche, ignoreCase = true)) &&
                                 (filter.searchQuery.isBlank() || proposal.title.contains(filter.searchQuery, ignoreCase = true) || proposal.brief.contains(filter.searchQuery, ignoreCase = true))
                             }
                             if (matches.isNotEmpty()) {
@@ -74,9 +74,9 @@ class CentralDeltaSyncWorker(
                             }.filter { listing ->
                                 val user = allUsers[listing.userId]
                                 val userMatch = user != null && (
-                                    filter.niche == "All" || 
+                                    (filter.niche ?: "All") == "All" || 
                                     user.primarySpecialty.equals(filter.niche, ignoreCase = true) ||
-                                    user.skillsJson.contains(filter.niche, ignoreCase = true)
+                                    user.skillsJson.contains(filter.niche ?: "", ignoreCase = true)
                                 )
                                 val detailsMatch = filter.searchQuery.isBlank() || listing.detailsJson.contains(filter.searchQuery, ignoreCase = true)
                                 userMatch && detailsMatch
@@ -97,6 +97,55 @@ class CentralDeltaSyncWorker(
                             )
                         }
                     }
+                }
+
+                // --- MOCK WEEKLY DIGEST GENERATION ---
+                try {
+                    val allFeatureFlags = repository.getAllFeatureFlagsFlow().first()
+                    val isWeeklyDigestFlagEnabled = allFeatureFlags.find { it.flagKey == "weekly_digest_enabled" }?.isEnabled ?: true
+                    
+                    if (isWeeklyDigestFlagEnabled) {
+                        val allUsersList = repository.userDao.getAllUsers().first()
+                        allUsersList.forEach { user ->
+                            val isDigestEnabled = repository.getWeeklyDigestPreference(user.id)
+                            if (isDigestEnabled) {
+                                // Find matching open roles (proposals)
+                                val nowTime = System.currentTimeMillis()
+                                val proposalsList = repository.projectProposalDao.getAllProjectProposalsList(nowTime).first()
+                                val userSpecialty = user.primarySpecialty
+                                val matchingRoles = proposalsList.filter { data ->
+                                    data.proposal.niche.equals(userSpecialty, ignoreCase = true) ||
+                                    data.proposal.title.contains(userSpecialty, ignoreCase = true)
+                                }
+                                
+                                // Find unread workspace activity (notifications)
+                                val notifications = repository.getNotificationsForUser(user.id).first()
+                                val unreadCount = notifications.count { !it.isRead }
+                                
+                                // If there are matching roles or unread workspace activities, send digest notification
+                                if (matchingRoles.isNotEmpty() || unreadCount > 0) {
+                                    val roleText = if (matchingRoles.isNotEmpty()) {
+                                        "${matchingRoles.size} matched open role(s)"
+                                    } else {
+                                        "no new matching roles"
+                                    }
+                                    val unreadText = if (unreadCount > 0) {
+                                        "${unreadCount} unread activity alert(s)"
+                                    } else {
+                                        "no unread updates"
+                                    }
+                                    
+                                    NotificationHelper.showNotification(
+                                        applicationContext,
+                                        "Weekly Co-Op Digest for ${user.displayName}",
+                                        "Weekly Digest: $roleText and $unreadText compiled for you."
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } catch (ex: Exception) {
+                    Log.e("CentralDeltaSyncWorker", "Weekly digest compilation failed: ${ex.message}")
                 }
 
                 Result.success()

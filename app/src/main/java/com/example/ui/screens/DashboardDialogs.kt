@@ -34,6 +34,12 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     fontSize = 13.sp,
                     lineHeight = 18.sp
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Leadership", fontWeight = FontWeight.Bold, color = AccentBlue, fontSize = 14.sp)
+                Text("Botla Veerendra (Founder)\nMacha Praveen (Co-Founder)", color = TextPrimary, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Contact", fontWeight = FontWeight.Bold, color = AccentBlue, fontSize = 14.sp)
+                Text("veerendrabotla@gmail.com\npraveenmacha777@gmail.com", color = TextSecondary, fontSize = 13.sp)
             }
         },
         confirmButton = {
@@ -95,7 +101,7 @@ fun LicensesDialog(onDismiss: () -> Unit) {
                         "Jetpack Compose - Apache 2.0",
                         "Room Persistence Library - Apache 2.0",
                         "Kotlin Coroutines - Apache 2.0",
-                        "Supabase Kotlin - MIT",
+                        "Cloud Gateway SDK - MIT",
                         "Ktor Client - Apache 2.0",
                         "Coil Image Loading - Apache 2.0",
                         "Material Design 3 - Apache 2.0",

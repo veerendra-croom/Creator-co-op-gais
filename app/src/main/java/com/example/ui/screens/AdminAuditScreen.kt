@@ -23,10 +23,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.example.data.model.AuditLog
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.AdminViewModel
-import java.text.SimpleDateFormat
+import com.example.util.DateTimeUtils
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +45,7 @@ fun AdminAuditScreen(
     
     var showExportDialog by remember { mutableStateOf(false) }
     var exportFormat by remember { mutableStateOf("JSON") } // JSON or CSV
+    var showHelpDialog by remember { mutableStateOf(false) }
     
     // Derived states
     val filteredLogs = remember(auditLogs, searchQuery, actionFilter, targetFilter) {
@@ -69,6 +72,7 @@ fun AdminAuditScreen(
     }
 
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     
     val exportDataString = remember(filteredLogs, exportFormat) {
         if (exportFormat == "JSON") {
@@ -101,42 +105,6 @@ fun AdminAuditScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "ADMIN AUDIT CENTER",
-                            fontWeight = FontWeight.Black,
-                            fontFamily = FontFamily.SansSerif,
-                            letterSpacing = 1.sp,
-                            fontSize = 16.sp,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Immutable compliance & operations ledger",
-                            color = TextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("back_button")) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { showExportDialog = true },
-                        modifier = Modifier.testTag("export_audit_logs_button")
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = "Export Audit Ledger", tint = AccentBlue)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground)
-            )
-        },
         containerColor = PrimaryBackground
     ) { innerPadding ->
         Column(
@@ -247,6 +215,9 @@ fun AdminAuditScreen(
                                 text = { Text(action, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                                 onClick = {
                                     actionFilter = action
+                                    if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
                                     actionExpanded = false
                                 }
                             )
@@ -290,6 +261,9 @@ fun AdminAuditScreen(
                                 text = { Text(target, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                                 onClick = {
                                     targetFilter = target
+                                    if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
                                     targetExpanded = false
                                 }
                             )
@@ -329,7 +303,7 @@ fun AdminAuditScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(filteredLogs) { log ->
+                    items(filteredLogs, key = { it.id }) { log ->
                         AuditLogItem(log)
                     }
                 }
@@ -378,7 +352,7 @@ fun AdminAuditScreen(
                             ) {
                                 Icon(Icons.Default.Code, null, tint = if (exportFormat == "JSON") AccentBlue else TextSecondary)
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("JSON Format", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Raw Structure", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -399,7 +373,7 @@ fun AdminAuditScreen(
                             ) {
                                 Icon(Icons.Default.TableChart, null, tint = if (exportFormat == "CSV") AccentBlue else TextSecondary)
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("CSV Format", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Spreadsheet", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -421,7 +395,7 @@ fun AdminAuditScreen(
                                 Text(
                                     text = exportDataString,
                                     color = TextSecondary,
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
@@ -432,13 +406,15 @@ fun AdminAuditScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
                         // Simulate export or copy to clipboard
-                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.SharedPreferences
                         val clipboardManager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         val clip = android.content.ClipData.newPlainText("Creator Co-op Audit Ledger", exportDataString)
                         clipboardManager.setPrimaryClip(clip)
                         showExportDialog = false
-                        android.widget.Toast.makeText(context, "Ledger copied to clipboard in $exportFormat format!", android.widget.Toast.LENGTH_SHORT).show()
+                        com.example.ui.feedback.FeedbackManager.showSuccess("Audit Ledger $exportFormat data copied to secure clipboard.")
                     }
                 ) {
                     Text("COPY DATA", fontWeight = FontWeight.Black, color = AccentBlue)
@@ -453,12 +429,15 @@ fun AdminAuditScreen(
             shape = RoundedCornerShape(16.dp)
         )
     }
+
+    if (showHelpDialog) {
+        AdminHelpDialog(onDismiss = { showHelpDialog = false })
+    }
 }
 
 @Composable
 fun AuditLogItem(log: AuditLog) {
-    val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US) }
-    val formattedTime = remember(log.createdAt) { formatter.format(Date(log.createdAt)) }
+    val formattedTime = remember(log.createdAt) { DateTimeUtils.getRelativeTimeSpanString(log.createdAt) }
     
     val badgeColor = remember(log.actionTaken) {
         when {
@@ -520,7 +499,7 @@ fun AuditLogItem(log: AuditLog) {
                 Text(
                     text = formattedTime,
                     color = TextMuted,
-                    fontSize = 10.sp
+                    fontSize = 11.sp
                 )
             }
 
@@ -550,16 +529,16 @@ fun AuditLogItem(log: AuditLog) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Security, "Admin Operator", tint = TextSecondary, modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Operator: ", color = TextMuted, fontSize = 10.sp)
-                    Text(log.adminName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                    Text("Operator: ", color = TextMuted, fontSize = 11.sp)
+                    Text(log.adminName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
 
                 // Target Detail
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Adjust, "Target", tint = TextSecondary, modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("${log.targetType}: ", color = TextMuted, fontSize = 10.sp)
-                    Text(log.targetId.take(12) + if (log.targetId.length > 12) "..." else "", color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                    Text("${log.targetType}: ", color = TextMuted, fontSize = 11.sp)
+                    Text(log.targetId.take(12) + if (log.targetId.length > 12) "..." else "", color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }

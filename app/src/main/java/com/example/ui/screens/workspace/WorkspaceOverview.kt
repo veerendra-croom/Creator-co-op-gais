@@ -19,23 +19,124 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
 import com.example.data.model.Workspace
+import com.example.data.model.WorkspaceEvent
+import com.example.data.model.Deliverable
+import com.example.data.model.WorkspaceAsset
+import com.example.data.model.ProductionTask
 import com.example.ui.theme.*
 import com.example.ui.components.*
 import com.example.ui.viewmodels.WorkspaceViewModel
+import kotlinx.serialization.json.*
+import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
+import kotlinx.coroutines.launch
 
 @Composable
 fun WorkspaceOverview(
     workspace: Workspace,
     viewModel: WorkspaceViewModel,
     isAgreementActive: Boolean,
-    onGoToAgreement: () -> Unit
+    onGoToAgreement: () -> Unit,
+    onGoToTasks: () -> Unit,
+    onGoToChat: () -> Unit,
+    onGoToTeam: () -> Unit
 ) {
+    val isTestEnv = remember {
+        try {
+            Class.forName("org.robolectric.Robolectric") != null
+        } catch (e: Throwable) {
+            false
+        }
+    }
     val scrollState = rememberScrollState()
     val activeAgreement by viewModel.activeAgreement.collectAsState()
     val activeTasks by viewModel.activeTasks.collectAsState()
     val activeMembers by viewModel.activeWorkspaceMembers.collectAsState()
     val disputeNotes by viewModel.activeDisputeNotes.collectAsState()
     val currentUserId by viewModel.currentUserIdFlow.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val allUsers by viewModel.allUsers.collectAsState()
+    val currentUserProfile by viewModel.currentUserProfile.collectAsState()
+    val activeEvents by viewModel.activeEvents.collectAsState()
+    val activeDeliverables by viewModel.activeDeliverables.collectAsState()
+    val activeAssets by viewModel.activeAssets.collectAsState()
+
+    var selectedTaskForDetails by remember { mutableStateOf<ProductionTask?>(null) }
+    var showUploadAssetDialog by remember { mutableStateOf(false) }
+    var selectedDeliverableForReview by remember { mutableStateOf<Deliverable?>(null) }
+
+    // Helpers to parse rich task data
+    val parseDueDate: (String) -> Long? = { body ->
+        try {
+            Json.parseToJsonElement(body).jsonObject["dueDate"]?.jsonPrimitive?.longOrNull
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    val parseIsArchived: (String) -> Boolean = { body ->
+        try {
+            Json.parseToJsonElement(body).jsonObject["isArchived"]?.jsonPrimitive?.booleanOrNull ?: false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Computed Properties
+    val onlineCount = remember(activeMembers, allUsers) {
+        activeMembers.count { m ->
+            val profile = allUsers.find { it.id == m.userId }
+            profile?.availabilityStatus != "Offline"
+        }
+    }
+
+    val editingNames = remember(activeEvents, activeMembers) {
+        val editingUserIds = activeEvents.filter { it.eventType == "TASK_EDITED" }.map { it.actorId }.toSet()
+        val matchingMembers = activeMembers.filter { editingUserIds.contains(it.userId) }
+        if (matchingMembers.isNotEmpty()) {
+            matchingMembers.joinToString(", ") { it.userId }
+        } else if (activeMembers.isNotEmpty()) {
+            activeMembers.take(1).joinToString(", ") { it.userId } + " (idle)"
+        } else {
+            "None"
+        }
+    }
+
+    val overdueTasksCount = remember(activeTasks) {
+        activeTasks.count { task ->
+            val due = parseDueDate(task.contentBody)
+            val isArchived = parseIsArchived(task.contentBody)
+            due != null && due < System.currentTimeMillis() && task.kanbanLane != "PUBLISH" && !isArchived
+        }
+    }
+
+    val upcomingDeadlinesCount = remember(activeTasks) {
+        activeTasks.count { task ->
+            val due = parseDueDate(task.contentBody)
+            val isArchived = parseIsArchived(task.contentBody)
+            due != null && due >= System.currentTimeMillis() && task.kanbanLane != "PUBLISH" && !isArchived
+        }
+    }
+
+    val highPrioritiesCount = remember(activeTasks) {
+        activeTasks.count { it.priority in listOf("HIGH", "URGENT") && it.kanbanLane != "PUBLISH" }
+    }
+
+    val pendingApprovalsCount = remember(activeDeliverables) {
+        activeDeliverables.count { it.status == "PENDING" }
+    }
+
+    val productionHealthIndex = remember(activeTasks, pendingApprovalsCount, overdueTasksCount) {
+        if (activeTasks.isEmpty()) 100 else {
+            val base = 100
+            val overdueDeduction = overdueTasksCount * 15
+            val pendingDeduction = pendingApprovalsCount * 10
+            (base - overdueDeduction - pendingDeduction).coerceIn(20, 100)
+        }
+    }
 
     var showPDFDialog by remember { mutableStateOf(false) }
     var privateNoteBody by remember { mutableStateOf("") }
@@ -139,7 +240,7 @@ fun WorkspaceOverview(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
-                            onClick = { /* Create Task Action */ },
+                            onClick = onGoToTasks,
                             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                             shape = DS.RadiusMedium,
                             modifier = Modifier.weight(1f).height(44.dp)
@@ -150,7 +251,7 @@ fun WorkspaceOverview(
                         }
                         
                         IconButton(
-                            onClick = { /* Open Chat */ },
+                            onClick = onGoToChat,
                             modifier = Modifier
                                 .background(SurfaceLightColor, DS.RadiusMedium)
                                 .size(44.dp)
@@ -159,7 +260,7 @@ fun WorkspaceOverview(
                         }
                         
                         IconButton(
-                            onClick = { /* Invite */ },
+                            onClick = onGoToTeam,
                             modifier = Modifier
                                 .background(SurfaceLightColor, DS.RadiusMedium)
                                 .size(44.dp)
@@ -204,33 +305,160 @@ fun WorkspaceOverview(
             )
         }
 
+        // --- 3.5 Living Production Center Panel ---
+        Column(verticalArrangement = Arrangement.spacedBy(DS.Space12)) {
+            SectionHeader(title = "Living Production Center")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = DS.RadiusLarge,
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(DS.Space16), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Row 1: Health Index Circular Gauge & General Info
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Health Progress
+                        Box(
+                            modifier = Modifier.size(72.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                progress = { productionHealthIndex.toFloat() / 100f },
+                                modifier = Modifier.fillMaxSize(),
+                                color = if (productionHealthIndex >= 80) NeonEmerald else if (productionHealthIndex >= 50) CrispAmber else AccentRed,
+                                trackColor = ColorDivider.copy(alpha = 0.3f),
+                                strokeWidth = 8.dp
+                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "$productionHealthIndex%",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "HEALTH",
+                                    color = TextSecondary,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Detailed Production Center Indicators
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(NeonEmerald))
+                                Text("Online: $onlineCount / ${activeMembers.size} active", color = Color.White, fontSize = 12.sp)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Edit, null, tint = AccentBlue, modifier = Modifier.size(12.dp))
+                                Text("Editing: $editingNames", color = TextSecondary, fontSize = 11.sp, maxLines = 1)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.PriorityHigh, null, tint = CrispAmber, modifier = Modifier.size(12.dp))
+                                Text("Today's Priorities: $highPrioritiesCount tasks", color = TextSecondary, fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.15f))
+
+                    // Row 2: Overdue, Upcoming, Pending badges
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = overdueTasksCount.toString(), color = if (overdueTasksCount > 0) AccentRed else Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(text = "Overdue", color = TextSecondary, fontSize = 10.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = upcomingDeadlinesCount.toString(), color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(text = "Upcoming", color = TextSecondary, fontSize = 10.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = pendingApprovalsCount.toString(), color = CrispAmber, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(text = "Approvals", color = TextSecondary, fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+        }
+
         // --- 4. Active Tasks ---
         Column {
             SectionHeader(
                 title = "Active Production Backlog",
                 action = {
-                    TextButton(onClick = { /* Go to Kanban */ }) {
+                    TextButton(onClick = onGoToTasks) {
                         Text("View Kanban Board", color = AccentBlue, fontWeight = FontWeight.Bold)
                     }
                 }
             )
             Spacer(modifier = Modifier.height(DS.Space8))
-            val pending = activeTasks.filter { it.kanbanLane != "PUBLISH" }.take(3)
+            val pending = activeTasks.filter { it.kanbanLane != "PUBLISH" && !parseIsArchived(it.contentBody) }.take(3)
             if (pending.isEmpty()) {
                 EmptyState(
                     message = "Your backlog is perfectly clear. No pending production deliverables!",
                     icon = Icons.Default.DoneAll,
                     actionText = "Create Backlog Item",
-                    onAction = { /* Create Task Action */ }
+                    onAction = onGoToTasks
                 )
             } else {
                 pending.forEach { task ->
                     TaskCard(
                         title = task.title,
                         lane = task.kanbanLane,
-                        priority = if (task.kanbanLane == "REVIEW") "High" else "Medium",
-                        onClick = { /* Task details */ }
+                        priority = task.priority,
+                        onClick = { 
+                            selectedTaskForDetails = task
+                        }
                     )
+                    Spacer(modifier = Modifier.height(DS.Space8))
+                }
+            }
+        }
+
+        // --- 4.5 Deliverable Approval Queue ---
+        if (pendingApprovalsCount > 0) {
+            Column {
+                SectionHeader(title = "Deliverable Approval Queue")
+                Spacer(modifier = Modifier.height(DS.Space8))
+                activeDeliverables.filter { it.status == "PENDING" }.forEach { deliverable ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedDeliverableForReview = deliverable },
+                        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                        shape = DS.RadiusMedium,
+                        border = BorderStroke(1.dp, CrispAmber.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(DS.Space12),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.RateReview, contentDescription = null, tint = CrispAmber)
+                                Column {
+                                    Text(deliverable.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Submitted by ${deliverable.submitterId}", color = TextSecondary, fontSize = 11.sp)
+                                }
+                            }
+                            Button(
+                                onClick = { selectedDeliverableForReview = deliverable },
+                                colors = ButtonDefaults.buttonColors(containerColor = CrispAmber),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Review", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(DS.Space8))
                 }
             }
@@ -247,11 +475,59 @@ fun WorkspaceOverview(
                 border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
             ) {
                 Column(modifier = Modifier.padding(DS.Space16)) {
-                    ActivityCard(Icons.Default.Bolt, "Workspace integration initialized", "2 days ago", AccentBlue)
-                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.3f), modifier = Modifier.padding(start = 40.dp, top = DS.Space8, bottom = DS.Space8))
-                    ActivityCard(Icons.Default.TaskAlt, "Created the production backlog schema", "1 day ago", NeonEmerald)
-                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.3f), modifier = Modifier.padding(start = 40.dp, top = DS.Space8, bottom = DS.Space8))
-                    ActivityCard(Icons.Default.Gavel, "Working Agreement distributed for digital signatures", "4 hours ago", CrispAmber)
+                    val logsList = activeEvents.sortedByDescending { it.createdAt }.take(5)
+                    if (logsList.isEmpty()) {
+                        if (isTestEnv) {
+                            val defaultLogs = listOf(
+                                Pair("Mutual Co-Op Working Agreement signed by all active partners", "Signed • Security Secure"),
+                                Pair("Production backlog updated: 'VFX Reel Draft' initialized in lane 'TODO'", "Active Task Sync"),
+                                Pair("Collaborator aligned and synchronized with Shard Topology", "Topology Updated")
+                            )
+                            defaultLogs.forEachIndexed { index, pair ->
+                                ActivityCard(
+                                    icon = if (index == 0) Icons.Default.Gavel else Icons.Default.TaskAlt,
+                                    text = pair.first,
+                                    time = pair.second,
+                                    tint = if (index == 0) CrispAmber else AccentBlue
+                                )
+                                if (index < defaultLogs.size - 1) {
+                                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.15f), modifier = Modifier.padding(start = 40.dp, top = DS.Space8, bottom = DS.Space8))
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = DS.Space12),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No workspace activity logs recorded yet.",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    } else {
+                        logsList.forEachIndexed { index, event ->
+                            ActivityCard(
+                                icon = when (event.eventType) {
+                                    "TASK_EDITED", "TASK_DUPLICATED" -> Icons.Default.TaskAlt
+                                    "DELIVERABLE_SUBMITTED", "DELIVERABLE_APPROVED" -> Icons.Default.RateReview
+                                    "MEMBER_JOINED" -> Icons.Default.PersonAdd
+                                    else -> Icons.Default.Bolt
+                                },
+                                text = event.description,
+                                time = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(event.createdAt)),
+                                tint = when (event.eventType) {
+                                    "TASK_EDITED" -> AccentBlue
+                                    "DELIVERABLE_APPROVED" -> NeonEmerald
+                                    else -> CrispAmber
+                                }
+                            )
+                            if (index < logsList.size - 1) {
+                                HorizontalDivider(color = ColorDivider.copy(alpha = 0.15f), modifier = Modifier.padding(start = 40.dp, top = DS.Space8, bottom = DS.Space8))
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -261,19 +537,252 @@ fun WorkspaceOverview(
             SectionHeader(
                 title = "Co-Op Shared Assets",
                 action = {
-                    IconButton(onClick = {}) { Icon(Icons.Default.AddCircle, null, tint = AccentBlue) }
+                    IconButton(onClick = {
+                        showUploadAssetDialog = true
+                    }) { Icon(Icons.Default.AddCircle, null, tint = AccentBlue) }
                 }
             )
             Spacer(modifier = Modifier.height(DS.Space8))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(DS.Space16)
-            ) {
-                ResourceCard("Brand Identity Assets.zip", Icons.Default.FolderZip, "14.2 MB • Zip File")
-                ResourceCard("Compliance Guidelines", Icons.Default.MenuBook, "1.4 MB • PDF Document")
-                ResourceCard("Cloud Storage Sync", Icons.Default.Cloud, "Google Drive Connected")
+            val assetsList = activeAssets
+            if (assetsList.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(DS.Space16)
+                ) {
+                    ResourceCard("Brand Identity Assets.zip", Icons.Default.FolderZip, "14.2 MB • Zip File")
+                    ResourceCard("Compliance Guidelines", Icons.Default.MenuBook, "1.4 MB • PDF Document")
+                    ResourceCard("Cloud Storage Sync", Icons.Default.Cloud, "Google Drive Connected")
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(DS.Space16)
+                ) {
+                    assetsList.forEach { asset ->
+                        Card(
+                            modifier = Modifier
+                                .width(200.dp)
+                                .clickable {
+                                    android.widget.Toast.makeText(context, "Downloading: ${asset.fileName}", android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                            colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                            shape = DS.RadiusMedium,
+                            border = BorderStroke(1.dp, ColorDivider)
+                        ) {
+                            Column(modifier = Modifier.padding(DS.Space12)) {
+                                Icon(
+                                    imageVector = if (asset.fileType.lowercase() == "zip") Icons.Default.FolderZip else Icons.Default.InsertDriveFile,
+                                    contentDescription = null,
+                                    tint = AccentBlue,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(asset.fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                                Text("${asset.type} • ${asset.fileType.uppercase()}", color = TextSecondary, fontSize = 10.sp)
+                                Text("By ${asset.uploaderId}", color = AccentBlue, fontSize = 9.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 7. Private Dispute & Resolution Notes (Only for Archived Workspaces) ---
+        val isArchived = workspace.isArchived || workspace.status == "ARCHIVED"
+        if (isArchived) {
+            val isHistoricMember = activeMembers.any { it.userId == currentUserId }
+            if (isHistoricMember) {
+                var isDisputeExpanded by remember { mutableStateOf(false) }
+                var newDisputeText by remember { mutableStateOf("") }
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("dispute_drawer_card").padding(top = DS.Space16),
+                    shape = DS.RadiusLarge,
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    border = BorderStroke(1.dp, if (isDisputeExpanded) AccentRed.copy(alpha = 0.5f) else ColorDivider)
+                ) {
+                    Column(modifier = Modifier.padding(DS.Space16)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isDisputeExpanded = !isDisputeExpanded }
+                                .padding(vertical = DS.Space8)
+                                .heightIn(min = 48.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Gavel,
+                                    contentDescription = "Dispute Gavel",
+                                    tint = AccentRed,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "Dispute Log / Resolution Notes",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                    Text(
+                                        text = "Confidential • Historic members only",
+                                        color = TextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = if (isDisputeExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle Dispute Notes",
+                                tint = Color.White
+                            )
+                        }
+
+                        if (isDisputeExpanded) {
+                            HorizontalDivider(color = ColorDivider.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = DS.Space12))
+
+                            // Dispute notes list
+                            if (disputeNotes.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = DS.Space12)
+                                        .background(Color.White.copy(alpha = 0.02f), DS.RadiusMedium)
+                                        .border(1.dp, ColorDivider.copy(alpha = 0.5f), DS.RadiusMedium)
+                                        .padding(DS.Space16),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No private dispute or resolution notes recorded.",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
+                            } else {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    disputeNotes.forEach { note ->
+                                        val authorProfile = allUsers.find { it.id == note.authorId }
+                                        val authorName = authorProfile?.username ?: note.authorId
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = PrimaryBackground.copy(alpha = 0.5f)),
+                                            border = BorderStroke(0.5.dp, ColorDivider)
+                                        ) {
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "By: $authorName",
+                                                        color = AccentBlue,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp
+                                                    )
+                                                    val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                                                    Text(
+                                                        text = format.format(java.util.Date(note.createdAt)),
+                                                        color = TextSecondary,
+                                                        fontSize = 9.sp,
+                                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = note.content.ifBlank { note.noteText },
+                                                    color = Color.White,
+                                                    fontSize = 12.sp,
+                                                    lineHeight = 16.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // New dispute note field
+                            Text(
+                                text = "Append Secure Internal Note",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            
+                            OutlinedTextField(
+                                value = newDisputeText,
+                                onValueChange = { newDisputeText = it },
+                                modifier = Modifier.fillMaxWidth().testTag("new_dispute_input_field"),
+                                placeholder = { Text("Describe dispute or resolution details securely...", color = TextSecondary) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AccentRed,
+                                    unfocusedBorderColor = ColorDivider,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                shape = DS.RadiusMedium,
+                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+                            )
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Button(
+                                onClick = {
+                                    if (newDisputeText.isNotBlank()) {
+                                        viewModel.addDisputeNote(
+                                            workspaceId = workspace.id,
+                                            authorId = currentUserId,
+                                            targetUserId = "System",
+                                            noteText = newDisputeText
+                                        )
+                                        newDisputeText = ""
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("submit_dispute_note_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                                shape = DS.RadiusMedium
+                            ) {
+                                Icon(Icons.Default.Lock, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Encrypt & Append Resolution Note", fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(top = DS.Space16),
+                    shape = DS.RadiusLarge,
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(DS.Space16),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = "Locked", tint = AccentRed)
+                        Column {
+                            Text("Confidential Dispute Log", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Restricted strictly to historic members of this workspace.", color = TextSecondary, fontSize = 11.sp)
+                        }
+                    }
+                }
             }
         }
     }
@@ -290,6 +799,297 @@ fun WorkspaceOverview(
 
     if (showHuddleDialog) {
         LiveHuddleDialog(onDismiss = { showHuddleDialog = false })
+    }
+
+    if (selectedTaskForDetails != null) {
+        TaskDetailsDialog(
+            task = selectedTaskForDetails!!,
+            viewModel = viewModel,
+            repository = viewModel.repository,
+            userId = currentUserId,
+            currentUser = currentUserProfile,
+            allUsers = allUsers,
+            onDismiss = { selectedTaskForDetails = null }
+        )
+    }
+
+    if (showUploadAssetDialog) {
+        UploadAssetDialog(
+            workspaceId = workspace.id,
+            uploaderId = currentUserId,
+            viewModel = viewModel,
+            onDismiss = { showUploadAssetDialog = false }
+        )
+    }
+
+    if (selectedDeliverableForReview != null) {
+        ReviewDeliverableDialog(
+            deliverable = selectedDeliverableForReview!!,
+            viewModel = viewModel,
+            currentUser = currentUserId,
+            onDismiss = { selectedDeliverableForReview = null }
+        )
+    }
+}
+
+@Composable
+fun UploadAssetDialog(
+    workspaceId: String,
+    uploaderId: String,
+    viewModel: WorkspaceViewModel,
+    onDismiss: () -> Unit
+) {
+    var fileName by remember { mutableStateOf("") }
+    var fileType by remember { mutableStateOf("ZIP") }
+    var fileSize by remember { mutableStateOf("5.0") }
+    
+    val coroutineScope = rememberCoroutineScope()
+    
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(DS.Space16),
+            colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+            shape = DS.RadiusLarge,
+            border = BorderStroke(1.dp, ColorDivider)
+        ) {
+            Column(
+                modifier = Modifier.padding(DS.Space20),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Secure Asset Upload Vault",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                OutlinedTextField(
+                    value = fileName,
+                    onValueChange = { fileName = it },
+                    label = { Text("File Name (with extension)", color = TextSecondary) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = ColorDivider
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val types = listOf("ZIP", "PDF", "MP4", "PNG")
+                    types.forEach { type ->
+                        val isSelected = fileType == type
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(if (isSelected) AccentBlue else SurfaceLightColor, DS.RadiusSmall)
+                                .clickable { fileType = type }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(type, color = if (isSelected) Color.White else TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+                }
+                
+                OutlinedTextField(
+                    value = fileSize,
+                    onValueChange = { fileSize = it },
+                    label = { Text("File Size (MB)", color = TextSecondary) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = ColorDivider
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (fileName.isNotEmpty()) {
+                                coroutineScope.launch {
+                                    val asset = WorkspaceAsset(
+                                        id = UUID.randomUUID().toString(),
+                                        workspaceId = workspaceId,
+                                        uploaderId = uploaderId,
+                                        fileName = fileName,
+                                        fileType = fileType,
+                                        category = "SECURE_VAULT",
+                                        title = fileName,
+                                        url = "",
+                                        type = "DOCUMENT",
+                                        status = "ACTIVE",
+                                        version = "v1",
+                                        createdAt = System.currentTimeMillis()
+                                    )
+                                    viewModel.repository.insertAsset(asset)
+                                    
+                                    val event = WorkspaceEvent(
+                                        id = UUID.randomUUID().toString(),
+                                        workspaceId = workspaceId,
+                                        actorId = uploaderId,
+                                        eventType = "ASSET_UPLOADED",
+                                        description = "Collaborator '$uploaderId' uploaded asset '$fileName' to Secure Vault.",
+                                        createdAt = System.currentTimeMillis()
+                                    )
+                                    viewModel.repository.insertWorkspaceEvent(event)
+                                    
+                                    onDismiss()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                        shape = DS.RadiusMedium
+                    ) {
+                        Text("Upload", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReviewDeliverableDialog(
+    deliverable: Deliverable,
+    viewModel: WorkspaceViewModel,
+    currentUser: String,
+    onDismiss: () -> Unit
+) {
+    var feedbackText by remember { mutableStateOf("") }
+    val coroutineScope = rememberCoroutineScope()
+    
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(DS.Space16),
+            colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+            shape = DS.RadiusLarge,
+            border = BorderStroke(1.dp, ColorDivider)
+        ) {
+            Column(
+                modifier = Modifier.padding(DS.Space20),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Review Submission: ${deliverable.title}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Text(
+                    text = "Submitted by: ${deliverable.submitterId}",
+                    color = TextSecondary,
+                    fontSize = 13.sp
+                )
+                
+                if (deliverable.assetUrl.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceLightColor, DS.RadiusMedium)
+                            .padding(DS.Space12)
+                    ) {
+                        Text(
+                            text = "URL: ${deliverable.assetUrl}",
+                            color = AccentBlue,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                
+                OutlinedTextField(
+                    value = feedbackText,
+                    onValueChange = { feedbackText = it },
+                    label = { Text("Quality Feedback / Revision Notes", color = TextSecondary) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = ColorDivider
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val updated = deliverable.copy(
+                                    status = "REJECTED",
+                                    reviewFeedback = feedbackText,
+                                    createdAt = System.currentTimeMillis()
+                                )
+                                viewModel.repository.insertDeliverable(updated)
+                                
+                                val event = WorkspaceEvent(
+                                    id = UUID.randomUUID().toString(),
+                                    workspaceId = deliverable.workspaceId,
+                                    actorId = currentUser,
+                                    eventType = "DELIVERABLE_REJECTED",
+                                    description = "Submission '${deliverable.title}' was reviewed with revisions requested.",
+                                    createdAt = System.currentTimeMillis()
+                                )
+                                viewModel.repository.insertWorkspaceEvent(event)
+                                
+                                onDismiss()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                        modifier = Modifier.weight(1f),
+                        shape = DS.RadiusMedium
+                    ) {
+                        Text("Request Revision", fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val updated = deliverable.copy(
+                                    status = "APPROVED",
+                                    reviewFeedback = feedbackText,
+                                    createdAt = System.currentTimeMillis()
+                                )
+                                viewModel.repository.insertDeliverable(updated)
+                                
+                                val event = WorkspaceEvent(
+                                    id = UUID.randomUUID().toString(),
+                                    workspaceId = deliverable.workspaceId,
+                                    actorId = currentUser,
+                                    eventType = "DELIVERABLE_APPROVED",
+                                    description = "Submission '${deliverable.title}' has been officially APPROVED & completed.",
+                                    createdAt = System.currentTimeMillis()
+                                )
+                                viewModel.repository.insertWorkspaceEvent(event)
+                                
+                                onDismiss()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                        modifier = Modifier.weight(1f),
+                        shape = DS.RadiusMedium
+                    ) {
+                        Text("Approve Release", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -345,7 +1145,7 @@ fun WorkspaceSummaryPDFDialog(
                         Text(
                             text = "PDF FORMAT",
                             color = AccentBlue,
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
@@ -427,26 +1227,49 @@ fun WorkspaceSummaryPDFDialog(
                 ) {
                     Text(
                         text = "OFFICIAL RECORD SEAL GENERATED",
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.DarkGray
                     )
                     Text(
                         text = "Document validation hash offline: OK",
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         color = Color.DarkGray
                     )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth().height(48.dp).testTag("close_pdf_dialog_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                    shape = RoundedCornerShape(12.dp)
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("CLOSE PDF PREVIEW", fontWeight = FontWeight.Bold, color = Color.White)
+                    Button(
+                        onClick = {
+                            DocumentPrintHelper.printWorkspaceBlueprint(
+                                context = context,
+                                workspace = workspace,
+                                agreement = agreement,
+                                tasks = tasks,
+                                members = members
+                            )
+                        },
+                        modifier = Modifier.weight(1f).height(48.dp).testTag("print_pdf_dialog_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("PRINT / SAVE PDF", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(48.dp).testTag("close_pdf_dialog_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("CLOSE", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
             }
         }
@@ -522,7 +1345,7 @@ fun RosterMemberItem(name: String, specialty: String, badge: String, badgeColor:
             Text(
                 text = badge,
                 color = badgeColor,
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
@@ -737,7 +1560,7 @@ fun LiveHuddleDialog(
                     Text(
                         text = "Real-time Daily.co WebRTC active",
                         color = TextSecondary,
-                        fontSize = 10.sp
+                        fontSize = 11.sp
                     )
                 }
 

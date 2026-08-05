@@ -153,7 +153,7 @@ fun FeatureFlagItem(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(flag.flagKey, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(flag.description, color = TextSecondary, fontSize = 11.sp, lineHeight = 14.sp)
+                    Text(flag.description ?: "", color = TextSecondary, fontSize = 11.sp, lineHeight = 14.sp)
                 }
                 Switch(
                     checked = flag.isEnabled,

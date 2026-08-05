@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,6 +35,10 @@ import com.example.data.model.VerificationRequest
 import com.example.data.model.UserAuditLog
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.*
+import com.example.ui.components.*
+import com.example.ui.feedback.FeedbackManager
+
+
 
 @Composable
 fun AdminDashboardScreen(
@@ -62,6 +67,7 @@ fun AdminDashboardScreen(
     var resolutionReason by remember { mutableStateOf("") }
     var showFeatureFlags by remember { mutableStateOf(false) }
     var showSponsorships by remember { mutableStateOf(false) }
+    var showAdminHelp by remember { mutableStateOf(false) }
 
     // User management UI states
     var searchKeyword by remember { mutableStateOf("") }
@@ -80,6 +86,16 @@ fun AdminDashboardScreen(
     var selectedRiskFilter by remember { mutableStateOf("All") }
 
     val adminId = authViewModel.currentUserId.value ?: "admin"
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+    val toastMessage by adminViewModel.toastMessage.collectAsState()
+
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let { msg ->
+            FeedbackManager.showSuccess(msg)
+            adminViewModel.resetToast()
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -105,24 +121,36 @@ fun AdminDashboardScreen(
                     onClick = { showFeatureFlags = true },
                     colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.testTag("open_feature_flags_button").padding(end = 6.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    modifier = Modifier.testTag("open_feature_flags_button").padding(end = 6.dp).height(48.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
-                    Icon(Icons.Default.SettingsInputComponent, null, tint = AccentBlue, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("FLAGS", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.SettingsInputComponent, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(DS.Space8))
+                    Text("FLAGS", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
                     onClick = { showSponsorships = true },
                     colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.testTag("open_sponsorships_button"),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    modifier = Modifier.testTag("open_sponsorships_button").height(48.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
                 ) {
-                    Icon(Icons.Default.CardGiftcard, null, tint = NeonEmerald, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("SPONSORS", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.CardGiftcard, null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(DS.Space8))
+                    Text("SPONSORS", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = { showAdminHelp = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("open_admin_help_button").padding(start = 6.dp).height(48.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
+                ) {
+                    Icon(Icons.Default.HelpOutline, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(DS.Space8))
+                    Text("HELP", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -202,7 +230,7 @@ fun AdminDashboardScreen(
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
-                                        Text("OPEN REPORTS", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text("OPEN REPORTS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         Text(openCount.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
                                     }
                                 }
@@ -228,7 +256,7 @@ fun AdminDashboardScreen(
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
-                                        Text("RESOLVED", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text("RESOLVED", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         Text(resolvedCount.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
                                     }
                                 }
@@ -254,7 +282,7 @@ fun AdminDashboardScreen(
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
-                                        Text("RISKY USERS", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text("RISKY USERS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         Text(riskyCount.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
                                     }
                                 }
@@ -394,7 +422,7 @@ fun AdminDashboardScreen(
                                         verticalArrangement = Arrangement.spacedBy(10.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        items(pendingReports) { report ->
+                                        items(pendingReports, key = { it.id }) { report ->
                                             val reporterUser = users.find { it.id == report.reporterId }
                                             val targetUser = users.find { it.id == report.targetId }
                                             
@@ -423,7 +451,7 @@ fun AdminDashboardScreen(
                                                             Text(
                                                                 text = report.category.uppercase(),
                                                                 color = badgeColor,
-                                                                fontSize = 8.sp,
+                                                                fontSize = 11.sp,
                                                                 fontWeight = FontWeight.Black
                                                             )
                                                         }
@@ -433,17 +461,45 @@ fun AdminDashboardScreen(
                                                         Text(
                                                             text = "TICKET #${report.id.take(6).uppercase()}",
                                                             color = Color.White,
-                                                            fontSize = 10.sp,
+                                                            fontSize = 11.sp,
                                                             fontWeight = FontWeight.Bold
                                                         )
 
                                                         Spacer(modifier = Modifier.weight(1f))
 
                                                         Text(
-                                                            text = java.text.SimpleDateFormat("MMM dd, HH:mm").format(java.util.Date(report.createdAt)),
+                                                            text = com.example.util.DateTimeUtils.getRelativeTimeSpanString(report.createdAt),
                                                             color = TextSecondary,
-                                                            fontSize = 9.sp
+                                                            fontSize = 11.sp
                                                         )
+                                                    }
+
+                                                    val isAutoFlagged = report.reporterId == "SYSTEM_AUTOMATION" || report.reason.contains("Auto-flagged", ignoreCase = true)
+                                                    if (isAutoFlagged) {
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(CrispAmber.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                                                .border(androidx.compose.foundation.BorderStroke(1.dp, CrispAmber.copy(alpha = 0.5f)), RoundedCornerShape(8.dp))
+                                                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                                                        ) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Warning,
+                                                                    contentDescription = "Spam Warning",
+                                                                    tint = CrispAmber,
+                                                                    modifier = Modifier.size(14.dp)
+                                                                )
+                                                                Spacer(modifier = Modifier.width(6.dp))
+                                                                Text(
+                                                                    text = if (report.reason.contains("Auto-flagged:")) "Auto-flagged: " + report.reason.substringAfter("Auto-flagged:") else "Auto-flagged: " + report.reason,
+                                                                    color = CrispAmber,
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                        }
                                                     }
 
                                                     Spacer(modifier = Modifier.height(8.dp))
@@ -478,12 +534,12 @@ fun AdminDashboardScreen(
                                                         onClick = { selectedReportForAction = report },
                                                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                                                         shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        contentPadding = PaddingValues(vertical = 6.dp)
+                                                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                                                        contentPadding = PaddingValues(horizontal = 16.dp)
                                                     ) {
-                                                        Icon(Icons.Default.Security, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Text("AUDIT TICKET & GOVERN ACTION", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                        Icon(Icons.Default.Security, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(DS.Space8))
+                                                        Text("AUDIT TICKET & GOVERN ACTION", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }
@@ -512,7 +568,7 @@ fun AdminDashboardScreen(
                                         verticalArrangement = Arrangement.spacedBy(10.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        items(resolvedReports) { report ->
+                                        items(resolvedReports, key = { it.id }) { report ->
                                             val reporterUser = users.find { it.id == report.reporterId }
                                             val targetUser = users.find { it.id == report.targetId }
                                             
@@ -535,7 +591,7 @@ fun AdminDashboardScreen(
                                                             Text(
                                                                 text = report.status.uppercase(),
                                                                 color = if (isDismissed) Color.LightGray else NeonEmerald,
-                                                                fontSize = 8.sp,
+                                                                fontSize = 11.sp,
                                                                 fontWeight = FontWeight.Black
                                                             )
                                                         }
@@ -545,16 +601,16 @@ fun AdminDashboardScreen(
                                                         Text(
                                                             text = report.category.uppercase(),
                                                             color = TextSecondary,
-                                                            fontSize = 9.sp,
+                                                            fontSize = 11.sp,
                                                             fontWeight = FontWeight.Bold
                                                         )
 
                                                         Spacer(modifier = Modifier.weight(1f))
 
                                                         Text(
-                                                            text = java.text.SimpleDateFormat("MMM dd").format(java.util.Date(report.createdAt)),
+                                                            text = com.example.util.DateTimeUtils.getRelativeTimeSpanString(report.createdAt),
                                                             color = TextSecondary,
-                                                            fontSize = 9.sp
+                                                            fontSize = 11.sp
                                                         )
                                                     }
 
@@ -635,7 +691,7 @@ fun AdminDashboardScreen(
                                         verticalArrangement = Arrangement.spacedBy(10.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        items(riskyUsers) { (u, risk) ->
+                                        items(riskyUsers, key = { it.first.id }) { (u, risk) ->
                                             Card(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -707,7 +763,6 @@ fun AdminDashboardScreen(
                         }
                     }
                 }
-
                 1 -> {
                     // USER MANAGEMENT CENTER
                     Column(modifier = Modifier.fillMaxSize()) {
@@ -753,7 +808,7 @@ fun AdminDashboardScreen(
                                     onDismissRequest = { showRoleDropdown = false },
                                     modifier = Modifier.background(SurfaceColor)
                                 ) {
-                                    listOf("ALL", "REGISTERED_USER", "ADMIN", "SUSPENDED", "SOFT_DELETED").forEach { role ->
+                                    listOf("ALL", "APP_USER", "ADMIN", "SUSPENDED", "SOFT_DELETED").forEach { role ->
                                         DropdownMenuItem(
                                             text = { Text(role, color = Color.White, fontSize = 11.sp) },
                                             onClick = {
@@ -834,10 +889,10 @@ fun AdminDashboardScreen(
                             
                             val matchesRole = when (selectedRoleFilter) {
                                 "ALL" -> true
-                                "ADMIN" -> u.systemRole == "ADMIN" || u.systemRole == "PLATFORM_ADMIN"
+                                "ADMIN" -> u.systemRole == "ADMIN"
                                 "SUSPENDED" -> u.systemRole == "SUSPENDED"
                                 "SOFT_DELETED" -> u.systemRole == "SOFT_DELETED"
-                                "REGISTERED_USER" -> u.systemRole == "REGISTERED_USER"
+                                "APP_USER" -> u.systemRole == "APP_USER"
                                 else -> true
                             }
 
@@ -864,11 +919,28 @@ fun AdminDashboardScreen(
                                 modifier = Modifier.weight(1f).fillMaxWidth().background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("No user profiles match your search criteria.", color = TextSecondary, fontSize = 12.sp, textAlign = TextAlign.Center)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.SearchOff, contentDescription = null, tint = TextMuted, modifier = Modifier.size(32.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("No user profiles match your search criteria.", color = TextSecondary, fontSize = 12.sp, textAlign = TextAlign.Center)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            searchKeyword = ""
+                                            selectedRoleFilter = "ALL"
+                                            selectedVerificationFilter = "ALL"
+                                            selectedTrustFilter = "ALL"
+                                        },
+                                        border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.5f)),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Reset Filters", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
-                                items(filteredUsers) { user ->
+                                items(filteredUsers, key = { it.id }) { user ->
                                     Card(
                                         modifier = Modifier.fillMaxWidth().clickable { selectedUserForDetail = user },
                                         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -904,63 +976,18 @@ fun AdminDashboardScreen(
                                             Spacer(modifier = Modifier.width(12.dp))
 
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
                                                     Text(user.displayName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    // Trust Badge
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .background(
-                                                                when(user.reliabilityBadge.lowercase()) {
-                                                                    "gold" -> Color(0xFFFFD700).copy(alpha = 0.15f)
-                                                                    "silver" -> Color(0xFFC0C0C0).copy(alpha = 0.15f)
-                                                                    else -> Color(0xFFCD7F32).copy(alpha = 0.15f)
-                                                                },
-                                                                RoundedCornerShape(6.dp)
-                                                            )
-                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                    ) {
-                                                        Text(
-                                                            user.reliabilityBadge,
-                                                            color = when(user.reliabilityBadge.lowercase()) {
-                                                                "gold" -> Color(0xFFFFD700)
-                                                                "silver" -> Color(0xFFE0E0E0)
-                                                                else -> Color(0xFFCD7F32)
-                                                            },
-                                                            fontSize = 9.sp,
-                                                            fontWeight = FontWeight.Black
-                                                        )
-                                                    }
+                                                    ReliabilityBadge(badge = user.reliabilityBadge)
+                                                    UserRoleBadge(role = user.globalRole.ifBlank { user.systemRole }, isPro = user.isVerifiedPro)
                                                 }
                                                 Text("@${user.username} • ${user.email}", color = TextSecondary, fontSize = 11.sp)
                                             }
 
-                                            // Status Badge
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(
-                                                        when (user.systemRole) {
-                                                            "SUSPENDED" -> AccentRed.copy(alpha = 0.15f)
-                                                            "SOFT_DELETED" -> Color.Gray.copy(alpha = 0.15f)
-                                                            "ADMIN", "PLATFORM_ADMIN" -> NeonEmerald.copy(alpha = 0.15f)
-                                                            else -> AccentBlue.copy(alpha = 0.15f)
-                                                        },
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                                            ) {
-                                                Text(
-                                                    user.systemRole,
-                                                    color = when (user.systemRole) {
-                                                        "SUSPENDED" -> AccentRed
-                                                        "SOFT_DELETED" -> Color.LightGray
-                                                        "ADMIN", "PLATFORM_ADMIN" -> NeonEmerald
-                                                        else -> AccentBlue
-                                                    },
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Black
-                                                )
-                                            }
+                                            SubscriptionTierBadge(isPro = user.isVerifiedPro)
                                         }
                                     }
                                 }
@@ -968,7 +995,6 @@ fun AdminDashboardScreen(
                         }
                     }
                 }
-
                 2 -> {
                     // CREATOR VERIFICATION CENTER
                     val pendingRequests = verificationRequests.filter { it.status == "PENDING" }
@@ -987,7 +1013,7 @@ fun AdminDashboardScreen(
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Default.Verified, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("VERIFIED USERS", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    Text("VERIFIED USERS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     Text(users.count { it.isVerifiedPro }.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
                                 }
                             }
@@ -1000,7 +1026,7 @@ fun AdminDashboardScreen(
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("PENDING REVIEWS", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    Text("PENDING REVIEWS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     Text(pendingRequests.size.toString(), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
                                 }
                             }
@@ -1013,7 +1039,7 @@ fun AdminDashboardScreen(
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Default.TrendingUp, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("CONVERSION RATE", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    Text("CONVERSION RATE", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     Text("$conversionRate%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
                                 }
                             }
@@ -1029,11 +1055,11 @@ fun AdminDashboardScreen(
                                 modifier = Modifier.weight(1f).fillMaxWidth().background(SurfaceColor, RoundedCornerShape(16.dp)).padding(24.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("No verification requests recorded in the database.", color = TextSecondary, fontSize = 12.sp)
+                                Text("No active verification requests found.", color = TextSecondary, fontSize = 12.sp)
                             }
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
-                                items(verificationRequests) { req ->
+                                items(verificationRequests, key = { it.id }) { req ->
                                     Card(
                                         modifier = Modifier.fillMaxWidth(),
                                         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -1188,65 +1214,65 @@ fun AdminDashboardScreen(
                     Divider(color = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 10.dp))
 
                     // 1. Reporter Info Section
-                    Text("1. REPORTER", color = AccentBlue, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("1. REPORTER", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         colors = CardDefaults.cardColors(containerColor = PrimaryBackground),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
                             Text(
                                 text = reporter?.displayName ?: "System Flag / External User",
                                 color = Color.White,
-                                fontSize = 12.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "User ID: ${report.reporterId}",
                                 color = TextSecondary,
-                                fontSize = 9.sp
+                                fontSize = 11.sp
                             )
                             if (reporter != null) {
                                 Text(
                                     text = "Email: ${reporter.email} • Rating: ${reporter.peerRating}",
                                     color = TextSecondary,
-                                    fontSize = 9.sp
+                                    fontSize = 11.sp
                                 )
                             }
                         }
                     }
 
                     // 2. Reported Entity Section
-                    Text("2. REPORTED SUBJECT", color = AccentRed, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("2. REPORTED SUBJECT", color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         colors = CardDefaults.cardColors(containerColor = PrimaryBackground),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
                             if (report.targetType == "WORKSPACE") {
                                 Text(
                                     text = "Workspace: ID ${report.targetId}",
                                     color = Color.White,
-                                    fontSize = 12.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             } else {
                                 Text(
                                     text = targetUser?.displayName ?: "Unknown Subject",
                                     color = Color.White,
-                                    fontSize = 12.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
                                     text = "Role: ${targetUser?.globalRole ?: "APP_USER"} • System status: ${targetUser?.systemRole ?: "ACTIVE"}",
                                     color = TextSecondary,
-                                    fontSize = 9.sp
+                                    fontSize = 11.sp
                                 )
                                 Text(
                                     text = "Reputation: ${targetUser?.reputationScore ?: 100}/100 • Reliability: ${targetUser?.reliabilityBadge ?: "None"}",
                                     color = TextSecondary,
-                                    fontSize = 9.sp
+                                    fontSize = 11.sp
                                 )
                             }
                         }
@@ -1313,12 +1339,13 @@ fun AdminDashboardScreen(
                                         Text(
                                             text = "${log.actionTaken.uppercase()}: ${log.reason}",
                                             color = Color.White,
-                                            fontSize = 9.sp
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
                                         )
                                         Text(
-                                            text = "Logged at: ${java.text.SimpleDateFormat("MMM dd, yyyy").format(java.util.Date(log.createdAt))}",
+                                            text = "Logged ${com.example.util.DateTimeUtils.getRelativeTimeSpanString(log.createdAt)}",
                                             color = TextSecondary,
-                                            fontSize = 8.sp
+                                            fontSize = 11.sp
                                         )
                                     }
                                 }
@@ -1477,11 +1504,11 @@ fun AdminDashboardScreen(
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.weight(1f).background(PrimaryBackground, RoundedCornerShape(12.dp)).padding(10.dp)) {
-                            Text("REPUTATION", color = TextSecondary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Text("REPUTATION", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Text("${user.reputationScore} / 100", color = NeonEmerald, fontSize = 14.sp, fontWeight = FontWeight.Black)
                         }
                         Column(modifier = Modifier.weight(1f).background(PrimaryBackground, RoundedCornerShape(12.dp)).padding(10.dp)) {
-                            Text("RELIABILITY", color = TextSecondary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Text("RELIABILITY", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Text(user.reliabilityBadge, color = AccentBlue, fontSize = 14.sp, fontWeight = FontWeight.Black)
                         }
                     }
@@ -1490,11 +1517,11 @@ fun AdminDashboardScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.weight(1f).background(PrimaryBackground, RoundedCornerShape(12.dp)).padding(10.dp)) {
-                            Text("AGREEMENTS SIGNED", color = TextSecondary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Text("AGREEMENTS SIGNED", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Text(user.signedAgreementsCount.toString(), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black)
                         }
                         Column(modifier = Modifier.weight(1f).background(PrimaryBackground, RoundedCornerShape(12.dp)).padding(10.dp)) {
-                            Text("TASKS COMPLETED", color = TextSecondary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            Text("TASKS COMPLETED", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Text(user.completedProjectsCount.toString(), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black)
                         }
                     }
@@ -1507,7 +1534,11 @@ fun AdminDashboardScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Link, null, tint = AccentBlue, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Portfolio: ${user.websiteUrl}", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {})
+                            Text("Portfolio: ${user.websiteUrl}", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
+                                try {
+                                    uriHandler.openUri(if (user.websiteUrl.startsWith("http")) user.websiteUrl else "https://${user.websiteUrl}")
+                                } catch (e: Exception) {}
+                            })
                         }
                     }
                     
@@ -1532,13 +1563,13 @@ fun AdminDashboardScreen(
                                         Text(
                                             "[${log.actionTaken}] ${log.reason}",
                                             color = TextSecondary,
-                                            fontSize = 10.sp,
-                                            lineHeight = 13.sp
+                                            fontSize = 11.sp,
+                                            lineHeight = 15.sp
                                         )
                                         Text(
-                                            "Admin: ${log.adminId} • ${java.text.SimpleDateFormat("MMM dd, HH:mm").format(java.util.Date(log.createdAt))}",
+                                            "Admin: ${log.adminId} • ${com.example.util.DateTimeUtils.getRelativeTimeSpanString(log.createdAt)}",
                                             color = TextSecondary.copy(alpha = 0.7f),
-                                            fontSize = 8.sp
+                                            fontSize = 11.sp
                                         )
                                     }
                                 }
@@ -1768,7 +1799,11 @@ fun AdminDashboardScreen(
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("PORTFOLIO LINK", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text(req.portfolioUrl, color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.clickable {})
+                    Text(req.portfolioUrl, color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.clickable {
+                        try {
+                            uriHandler.openUri(if (req.portfolioUrl.startsWith("http")) req.portfolioUrl else "https://${req.portfolioUrl}")
+                        } catch (e: Exception) {}
+                    })
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("APPLICANT COVER STATEMENT", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -1841,6 +1876,10 @@ fun AdminDashboardScreen(
             onDismiss = { showSponsorships = false }
         )
     }
+
+    if (showAdminHelp) {
+        AdminHelpDialog(onDismiss = { showAdminHelp = false })
+    }
 }
 
 @Composable
@@ -1883,7 +1922,7 @@ fun SponsorshipManagementDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        items(workspaces) { ws ->
+                        items(workspaces, key = { it.id }) { ws ->
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable {
                                     selectedWorkspaceForEdit = ws
@@ -2043,4 +2082,3 @@ fun calculateRiskScore(
 
     return RiskCalculation(score = minOf(100, score), level = level, reasons = reasons)
 }
-

@@ -50,7 +50,7 @@ import com.example.data.model.*
         Deliverable::class,
         WorkspaceEvent::class
     ],
-    version = 32,
+    version = 35,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)

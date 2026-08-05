@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.example.ui.feedback.FeedbackManager
 
 class HapticFeedbackManager(private val context: Context) {
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -19,6 +20,7 @@ class HapticFeedbackManager(private val context: Context) {
      * Crispy micro double pulse for successful credentials/biometrics/actions
      */
     fun success() {
+        if (!FeedbackManager.isHapticEnabled) return
         if (vibrator == null || !vibrator.hasVibrator()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val timings = longArrayOf(0, 35, 60, 35)
@@ -35,6 +37,7 @@ class HapticFeedbackManager(private val context: Context) {
      * Short light tick for matching swipe decks or dragging cards (each tick represents a snap)
      */
     fun tick() {
+        if (!FeedbackManager.isHapticEnabled) return
         if (vibrator == null || !vibrator.hasVibrator()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val effect = VibrationEffect.createOneShot(12, 120)
@@ -49,6 +52,7 @@ class HapticFeedbackManager(private val context: Context) {
      * Severe high-intensity double vibration representing bad bounds, form inputs, or error states.
      */
     fun errorPulse() {
+        if (!FeedbackManager.isHapticEnabled) return
         if (vibrator == null || !vibrator.hasVibrator()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val timings = longArrayOf(0, 100, 80, 100)

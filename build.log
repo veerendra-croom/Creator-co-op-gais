@@ -1,0 +1,127 @@
+Reusing configuration cache.
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+w: file:///app/applet/app/src/main/java/com/example/data/local/AppDatabase.kt:107:18 'fun fallbackToDestructiveMigration(): RoomDatabase.Builder<AppDatabase>' is deprecated. Replace by overloaded version with parameter to indicate if all tables should be dropped or not.
+w: file:///app/applet/app/src/main/java/com/example/di/AppContainer.kt:19:14 'fun fallbackToDestructiveMigration(): RoomDatabase.Builder<AppDatabase>' is deprecated. Replace by overloaded version with parameter to indicate if all tables should be dropped or not.
+w: file:///app/applet/app/src/main/java/com/example/ui/CreatorCoOpDashboard.kt:676:21 'fun CircularProgressIndicator(progress: Float, modifier: Modifier = ..., color: Color = ..., strokeWidth: Dp = ..., trackColor: Color = ..., strokeCap: StrokeCap = ...): Unit' is deprecated. Use the overload that takes `progress` as a lambda.
+w: file:///app/applet/app/src/main/java/com/example/ui/CreatorCoOpDashboard.kt:1677:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/ActivityCenterScreen.kt:36:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AdminAuditScreen.kt:126:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AdminDashboardScreen.kt:163:45 'val Icons.Filled.Rule: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Rule.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AdminDashboardScreen.kt:1014:56 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AdminDashboardScreen.kt:1188:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AdminDashboardScreen.kt:1329:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AdminDashboardScreen.kt:1650:52 'val Icons.Filled.Logout: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Logout.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AdminFeatureFlagsScreen.kt:171:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AnalyticsDashboardScreen.kt:62:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/AnalyticsDashboardScreen.kt:122:37 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/BackupCenterScreen.kt:266:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/BlockedUsersScreen.kt:36:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/CommunityGuidelinesScreen.kt:36:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/ConnectionRequestsScreen.kt:56:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/ContentPipelineScreen.kt:34:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/CreatorCommonsScreen.kt:411:70 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/CreatorCommonsScreen.kt:499:48 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/CreatorCommonsScreen.kt:625:48 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/DashboardComponents.kt:457:32 'val Icons.Filled.Launch: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Launch.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/DashboardScreen.kt:988:57 'val Icons.Filled.ExitToApp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ExitToApp.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/DirectMessagesScreen.kt:39:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCommandCenterScreen.kt:93:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCommandCenterScreen.kt:566:36 'val Icons.Filled.NoteAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.NoteAdd.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:88:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:398:48 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:511:38 'val Icons.Filled.ContactSupport: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ContactSupport.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:617:17 'fun CircularProgressIndicator(progress: Float, modifier: Modifier = ..., color: Color = ..., strokeWidth: Dp = ..., trackColor: Color = ..., strokeCap: StrokeCap = ...): Unit' is deprecated. Use the overload that takes `progress` as a lambda.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:1211:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:1368:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:1399:33 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:1526:33 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:1611:37 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/FounderCrmScreen.kt:1737:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/GlobalSearchScreen.kt:126:46 'val Icons.Filled.Assignment: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Assignment.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/GlobalSearchScreen.kt:330:36 'val Icons.Filled.ManageSearch: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ManageSearch.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/LegalScreen.kt:36:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/MoreScreen.kt:40:78 'val Icons.Filled.ContactSupport: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ContactSupport.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/NotificationsCenterScreen.kt:139:34 'val Icons.Filled.Assignment: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Assignment.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/NotificationsCenterScreen.kt:140:37 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PlatformControlCenterScreen.kt:89:57 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PlatformControlCenterScreen.kt:181:29 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PlatformControlCenterScreen.kt:189:29 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PlatformControlCenterScreen.kt:197:29 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PlatformControlCenterScreen.kt:252:41 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PlatformHealthScreen.kt:109:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PortfolioDetailScreen.kt:38:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PremiumSubscriptionScreen.kt:34:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PublicProfileScreen.kt:81:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/PublicProfileScreen.kt:681:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/ReportModerationScreen.kt:35:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SupportCenterScreen.kt:90:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SupportCenterScreen.kt:146:48 'val Icons.Filled.ContactSupport: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ContactSupport.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SupportCenterScreen.kt:379:25 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SupportCenterScreen.kt:845:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SupportCenterScreen.kt:1152:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SupportCenterScreen.kt:1170:33 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SyndicateScreen.kt:409:50 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SyndicateScreen.kt:809:94 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SyndicateScreen.kt:1194:61 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SyndicateScreen.kt:2019:40 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SyndicateScreen.kt:2035:43 'val Icons.Filled.VolumeUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.VolumeUp.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/SyndicateScreen.kt:2036:46 'val Icons.Filled.TrendingUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.TrendingUp.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/TaskDetailsScreen.kt:73:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/TaskDetailsScreen.kt:88:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/VideoHuddleScreen.kt:69:45 'val Icons.Filled.ScreenShare: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ScreenShare.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/WorkspaceHub.kt:171:86 'val Icons.Filled.Assignment: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Assignment.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/WorkspaceHub.kt:249:45 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/CreateRoleScreen.kt:47:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/CreateWorkspaceScreen.kt:165:57 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/CreateWorkspaceScreen.kt:754:52 'val Icons.Filled.Launch: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Launch.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/KnowledgeBaseScreen.kt:59:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/PersonalSpaceScreen.kt:94:42 'val Icons.Filled.NoteAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.NoteAdd.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/PersonalSpaceScreen.kt:284:49 'val Icons.Filled.NoteAdd: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.NoteAdd.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/TeamSpaceScreen.kt:314:92 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/TeamSpaceScreen.kt:327:92 'val Icons.Filled.ArrowForward: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowForward.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceChat.kt:328:48 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceFilesHubScreen.kt:51:40 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceInvitationScreen.kt:78:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceMembers.kt:516:33 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:158:48 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:191:38 'val Icons.Filled.FormatListBulleted: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.FormatListBulleted.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:275:69 'val Icons.Filled.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:355:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:366:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:384:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:408:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:421:17 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:833:59 'val Icons.Filled.VolumeUp: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.VolumeUp.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceOverview.kt:833:87 'val Icons.Filled.VolumeMute: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.VolumeMute.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceSettingsScreen.kt:38:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceSettingsScreen.kt:48:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceSettingsScreen.kt:57:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/screens/workspace/WorkspaceSettingsScreen.kt:66:21 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:12:68 Unchecked cast of 'GlobalViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:15:82 Unchecked cast of 'AuthViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:18:58 Unchecked cast of 'WorkspaceViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:21:62 Unchecked cast of 'CommunityFeedViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:24:58 Unchecked cast of 'DiscoveryViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:27:54 Unchecked cast of 'AdminViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:30:61 Unchecked cast of 'AdManagementViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:33:53 Unchecked cast of 'ChatViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:36:58 Unchecked cast of 'AgreementViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:39:58 Unchecked cast of 'AnalyticsViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:42:56 Unchecked cast of 'SupportViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:45:59 Unchecked cast of 'FounderCrmViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:48:62 Unchecked cast of 'CommunicationViewModel' to 'T (of fun <T : ViewModel> create)'.
+w: file:///app/applet/app/src/main/java/com/example/ui/viewmodels/AppViewModelFactory.kt:51:64 Unchecked cast of 'PlatformControlViewModel' to 'T (of fun <T : ViewModel> create)'.
+
+BUILD SUCCESSFUL in 32s
+8 actionable tasks: 2 executed, 6 up-to-date
+Configuration cache entry reused.

@@ -57,17 +57,14 @@ fun AnalyticsDashboardScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                    Text("Founder Control Center", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                }
+                Text(
+                    text = "Cohort Performance & Revenue Telemetry",
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
                 
-                Row {
-                    IconButton(onClick = { analyticsViewModel.exportData("CSV") }) {
-                        Icon(Icons.Default.Download, contentDescription = "Export", tint = AccentBlue)
-                    }
+                IconButton(onClick = { analyticsViewModel.exportData("CSV") }) {
+                    Icon(Icons.Default.Download, contentDescription = "Export Data", tint = AccentBlue)
                 }
             }
 
@@ -157,7 +154,7 @@ fun AnalyticsDashboardScreen(
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border = BorderStroke(1.dp, ColorDivider)
                         ) {
-                            Text("Export CSV")
+                            Text("Table Export")
                         }
                         OutlinedButton(
                             onClick = { analyticsViewModel.exportData("JSON") },
@@ -165,7 +162,7 @@ fun AnalyticsDashboardScreen(
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             border = BorderStroke(1.dp, ColorDivider)
                         ) {
-                            Text("Export JSON")
+                            Text("Raw Export")
                         }
                     }
                     Spacer(modifier = Modifier.height(40.dp))
@@ -190,11 +187,49 @@ fun DashboardSectionHeader(title: String, color: Color = Color.White) {
 @Composable
 fun FunnelRow(name: String, count: Int, prevCount: Int) {
     val conversion = if (prevCount > 0) (count.toFloat() / prevCount * 100).toInt() else 100
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(name, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
-        Text("$count", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Spacer(modifier = Modifier.width(16.dp))
-        Text("$conversion%", color = if (conversion > 80) NeonEmerald else AccentBlue, fontSize = 10.sp, fontWeight = FontWeight.Black)
+    val progress = if (prevCount > 0) (count.toFloat() / prevCount) else 1f
+    
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("$count users", color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Box(
+                modifier = Modifier
+                    .background(
+                        if (conversion >= 80) NeonEmerald.copy(alpha = 0.15f) else AccentBlue.copy(alpha = 0.15f),
+                        RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "$conversion%",
+                    color = if (conversion >= 80) NeonEmerald else AccentBlue,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(ColorDivider.copy(alpha = 0.3f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction = progress.coerceIn(0.01f, 1f))
+                    .fillMaxHeight()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            colors = listOf(AccentBlue, if (conversion >= 80) NeonEmerald else AccentBlue)
+                        )
+                    )
+            )
+        }
     }
 }
 

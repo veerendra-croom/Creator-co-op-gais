@@ -5,6 +5,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -35,8 +37,8 @@ fun AgreementVault(
     isLead: Boolean = false,
     onBack: () -> Unit
 ) {
-    val activeAgreement by viewModel.getActiveAgreement(flowOf(workspaceId)).collectAsState()
-    val acks by viewModel.getAcknowledgments(viewModel.getActiveAgreement(flowOf(workspaceId))).collectAsState()
+    val activeAgreement by viewModel.getActiveAgreement(workspaceId).collectAsState(initial = null)
+    val acks by viewModel.getAcknowledgments(activeAgreement?.id).collectAsState(initial = emptyList())
     val hasAcked = acks.any { it.userId == userId }
 
     val defaultPreamble = "This Co-Op Production Contract is entered into secure block registers on this day, governing intellectual properties and compliance standards in Shard #$workspaceId."
@@ -62,7 +64,7 @@ fun AgreementVault(
     var editedTermsText by remember(activeAgreement) { mutableStateOf(activeAgreement?.contentText ?: templateText) }
     var isSigning by remember { mutableStateOf(false) }
     var signatureProgress by remember { mutableStateOf(0f) }
-    val history by viewModel.getAgreementHistory(flowOf(workspaceId)).collectAsState()
+    val history by viewModel.getAgreementHistory(workspaceId).collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
 
     // Parse the contract text sections (with fallbacks if edited)
@@ -86,7 +88,7 @@ fun AgreementVault(
                 description = "No production agreement has been initialized for this shard. Lead creators must establish the ledger terms before contributors can acknowledge them.",
                 icon = Icons.Default.Gavel,
                 actionText = "NOTIFY LEAD CREATOR",
-                onAction = { /* No-op or toast handled by ViewModel if we added a method */ }
+                onAction = { viewModel.notifyLeadCreator(workspaceId, userId) }
             )
         } else {
             // --- Header Block ---
@@ -135,8 +137,9 @@ fun AgreementVault(
             }
         }
 
-        if (activeAgreement != null) {
-            val sealHash = activeAgreement!!.contentText.hashCode().toString().take(8).uppercase()
+        val currentAgreement = activeAgreement
+        if (currentAgreement != null) {
+            val sealHash = currentAgreement.contentText.hashCode().toString().take(8).uppercase()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -200,6 +203,69 @@ fun AgreementVault(
 
         // --- CONTRACT SECURED SECTIONS ---
         if (activeAgreement != null) {
+            val compliance = remember(revenue) { validateSplitSum(revenue) }
+            
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (compliance.isCompliant) SurfaceColor else AccentRed.copy(alpha = 0.05f)
+                ),
+                shape = DS.RadiusLarge,
+                border = BorderStroke(
+                    width = 1.dp, 
+                    color = if (compliance.isCompliant) NeonEmerald.copy(alpha = 0.3f) else AccentRed.copy(alpha = 0.4f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(DS.Space16),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DS.Space16)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (compliance.isCompliant) NeonEmerald.copy(alpha = 0.1f) else AccentRed.copy(alpha = 0.15f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (compliance.isCompliant) Icons.Default.VerifiedUser else Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = if (compliance.isCompliant) NeonEmerald else AccentRed,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "SECURE LEDGER COMPLIANCE STATUS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = if (compliance.isCompliant) NeonEmerald else AccentRed,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = compliance.message,
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (compliance.values.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Detected splits: ${compliance.values.joinToString { "$it%" }} (Total Sum: ${compliance.sum}%)",
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+            }
+
             Text(
                 text = "FORMAL CONTRACT CLAUSES",
                 style = MaterialTheme.typography.labelSmall,
@@ -293,12 +359,14 @@ fun AgreementVault(
                                             text = "Creator ID: ${ack.userId}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color.White,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = "Block Sign Hash: SEC#$signatureHash • $dateStr",
+                                            text = "Block Sign Hash: SEC#$signatureHash • ${com.example.util.DateTimeUtils.getRelativeTimeSpanString(ack.acknowledgedAt)}",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = TextSecondary,
+                                            fontSize = 11.sp,
                                             fontFamily = FontFamily.Monospace
                                         )
                                     }
@@ -329,18 +397,18 @@ fun AgreementVault(
         if (activeAgreement != null && !hasAcked) {
             if (isSigning) {
                 Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("SECURE BIO-HANDSHAKE IN PROGRESS...", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 10.sp, letterSpacing = 1.sp)
+                    Text("SECURE BIO-HANDSHAKE IN PROGRESS...", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.sp)
                     LinearProgressIndicator(
                         progress = { signatureProgress },
                         modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
                         color = AccentRed,
                         trackColor = ColorDivider
                     )
-                    Text("VERIFYING IDENTITY & HASHING LEDGER...", color = TextSecondary, fontSize = 9.sp)
+                    Text("VERIFYING IDENTITY & HASHING LEDGER...", color = TextSecondary, fontSize = 11.sp)
                 }
             } else {
-                Button(
-                    onClick = {
+                SwipeToSignSlider(
+                    onSignCompleted = {
                         coroutineScope.launch {
                             isSigning = true
                             signatureProgress = 0f
@@ -348,21 +416,15 @@ fun AgreementVault(
                                 delay(100)
                                 signatureProgress += 0.05f
                             }
-                            val hash = activeAgreement!!.contentText.hashCode().toString()
-                            viewModel.acknowledgeAgreement(activeAgreement!!.id, hash, userId)
+                            val hash = currentAgreement?.contentText?.hashCode()?.toString() ?: ""
+                            currentAgreement?.let {
+                                viewModel.acknowledgeAgreement(it.id, hash, userId)
+                            }
                             isSigning = false
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                    shape = DS.RadiusMedium
-                ) {
-                    Icon(Icons.Default.HistoryEdu, null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(DS.Space8))
-                    Text("EXECUTE & SIGN CONTRACT", fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelLarge)
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         } else if (activeAgreement == null) {
             Button(
@@ -384,11 +446,12 @@ fun AgreementVault(
                         .height(52.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
                     shape = DS.RadiusMedium,
-                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.4f))
+                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.4f)),
+                    contentPadding = PaddingValues(horizontal = DS.Space12)
                 ) {
-                    Icon(Icons.Default.FileDownload, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.FileDownload, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(DS.Space8))
-                    Text("PDF COOP EXPORT", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text("PDF COOP EXPORT", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
                 
                 Card(
@@ -581,5 +644,136 @@ fun getSectionText(fullText: String, header: String, fallbackText: String): Stri
         sectionPart.substring(0, nextHeaderIndex).trim()
     } else {
         sectionPart
+    }
+}
+
+data class ComplianceResult(
+    val isCompliant: Boolean,
+    val message: String,
+    val sum: Int,
+    val values: List<Int>
+)
+
+fun validateSplitSum(text: String): ComplianceResult {
+    // Regex to match numbers with percentage symbols, or words followed by %
+    val regex = Regex("(\\d+)\\s*%|(\\d+)\\s*percent", RegexOption.IGNORE_CASE)
+    val matches = regex.findAll(text)
+    val values = matches.mapNotNull { match ->
+        val group = match.groupValues.getOrNull(1)?.takeIf { it.isNotEmpty() }
+            ?: match.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }
+        group?.toIntOrNull()
+    }.toList()
+    
+    if (values.isEmpty()) {
+        return ComplianceResult(
+            isCompliant = true, 
+            message = "No explicit splits detected in clauses. Safe equal revenue escrow shares enforced.", 
+            sum = 100,
+            values = emptyList()
+        )
+    }
+    
+    val sum = values.sum()
+    return if (sum == 100) {
+        ComplianceResult(
+            isCompliant = true, 
+            message = "Allocations validated at exactly 100%. Smart Escrow anchor status active.", 
+            sum = sum, 
+            values = values
+        )
+    } else {
+        ComplianceResult(
+            isCompliant = false, 
+            message = "Warning: Revenue splits total $sum% instead of exactly 100%!", 
+            sum = sum, 
+            values = values
+        )
+    }
+}
+
+@Composable
+fun SwipeToSignSlider(
+    onSignCompleted: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var dragAmount by remember { mutableStateOf(0f) }
+    var isCompleted by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(ColorDivider)
+            .border(BorderStroke(1.dp, AccentRed.copy(alpha = 0.4f)), RoundedCornerShape(28.dp)),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val widthPx = constraints.maxWidth.toFloat()
+        val buttonWidth = 56.dp
+        val buttonWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) { buttonWidth.toPx() }
+        val maxDrag = (widthPx - buttonWidthPx).coerceAtLeast(0f)
+
+        // Background Track Fill showing progress
+        val progressPercent = if (maxDrag > 0) (dragAmount / maxDrag).coerceIn(0f, 1f) else 0f
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(if (progressPercent <= 0f) 0.01f else progressPercent)
+                .background(AccentRed.copy(alpha = 0.3f))
+        )
+
+        // Center Instruction Text
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "SWIPE RIGHT TO SIGN",
+                color = Color.White.copy(alpha = (0.6f + (1f - progressPercent) * 0.4f).coerceIn(0f, 1f)),
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                letterSpacing = 1.5.sp
+            )
+        }
+
+        // Draggable Handle
+        val handleOffset = dragAmount
+        Box(
+            modifier = Modifier
+                .offset(x = with(androidx.compose.ui.platform.LocalDensity.current) { handleOffset.toDp() })
+                .size(buttonWidth)
+                .clip(CircleShape)
+                .background(AccentRed)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (dragAmount >= maxDrag * 0.9f) {
+                                isCompleted = true
+                                dragAmount = maxDrag
+                                onSignCompleted()
+                            } else {
+                                // bounce back
+                                dragAmount = 0f
+                            }
+                        },
+                        onDragCancel = {
+                            dragAmount = 0f
+                        },
+                        onHorizontalDrag = { _, dragAmountPx ->
+                            if (!isCompleted) {
+                                dragAmount = (dragAmount + dragAmountPx).coerceIn(0f, maxDrag)
+                            }
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowForward,
+                contentDescription = "Swipe Handle",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
     }
 }

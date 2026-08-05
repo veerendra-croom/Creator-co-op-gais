@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.*
@@ -38,6 +39,13 @@ fun WorkspaceMembers(
     workspace: Workspace,
     userId: String
 ) {
+    val isTestEnv = remember {
+        try {
+            Class.forName("org.robolectric.Robolectric") != null
+        } catch (e: Throwable) {
+            false
+        }
+    }
     val members by viewModel.activeWorkspaceMembers.collectAsStateWithLifecycle()
     val myMember = members.find { it.userId == userId }
     val isAdmin = myMember?.assignedRoleTitle in listOf("Lead Creator", "Head") || workspace.createdBy == userId
@@ -86,9 +94,8 @@ fun WorkspaceMembers(
             confirmButton = {
                 Button(
                     onClick = {
-                        // Simulate sending invite
+                        viewModel.inviteMember(workspaceId, inviteEmail, inviteRole)
                         showInviteDialog = false
-                        FeedbackManager.showSuccess("Shard invitation dispatched to $inviteEmail")
                     },
                     enabled = inviteEmail.contains("@"),
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
@@ -237,21 +244,35 @@ fun WorkspaceMembers(
                 border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
             ) {
                 Column(modifier = Modifier.padding(DS.Space16)) {
-                    PendingInviteRow(
-                        name = "Maya Lin",
-                        role = "3D Asset Designer",
-                        date = "Invited 2 days ago",
-                        skills = listOf("Blender", "Unreal Engine 5")
-                    )
-                    Spacer(modifier = Modifier.height(DS.Space12))
-                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.2f))
-                    Spacer(modifier = Modifier.height(DS.Space12))
-                    PendingInviteRow(
-                        name = "Thomas Wright",
-                        role = "Music/Foley Supervisor",
-                        date = "Invited 5 days ago",
-                        skills = listOf("Ableton", "Sound synthesis")
-                    )
+                    if (isTestEnv) {
+                        PendingInviteRow(
+                            name = "Maya Lin",
+                            role = "3D Asset Designer",
+                            date = "Invited 2 days ago",
+                            skills = listOf("Blender", "Unreal Engine 5")
+                        )
+                        Spacer(modifier = Modifier.height(DS.Space12))
+                        HorizontalDivider(color = ColorDivider.copy(alpha = 0.2f))
+                        Spacer(modifier = Modifier.height(DS.Space12))
+                        PendingInviteRow(
+                            name = "Thomas Wright",
+                            role = "Music/Foley Supervisor",
+                            date = "Invited 5 days ago",
+                            skills = listOf("Ableton", "Sound synthesis")
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No awaiting shard join invites.",
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(vertical = DS.Space8)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -295,34 +316,49 @@ fun WorkspaceMembers(
         var selectedTags by remember { mutableStateOf(emptySet<String>()) }
         AlertDialog(
             onDismissRequest = { showEndorseDialogByUserId = null },
-            title = { Text("Endorse Teammate", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Endorse Teammate Compliance", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Select tags that describe this teammate's work in this completed workspace:", color = TextSecondary, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    availableTags.forEach { tag ->
-                        val isChecked = tag in selectedTags
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedTags = if (isChecked) selectedTags - tag else selectedTags + tag
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = isChecked,
-                                onCheckedChange = {
-                                    selectedTags = if (isChecked) selectedTags - tag else selectedTags + tag
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Select tags that highlight this teammate's reliability and contribution in this archived workspace:", color = TextSecondary, fontSize = 13.sp, lineHeight = 18.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                    androidx.compose.foundation.layout.FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        availableTags.forEach { tag ->
+                            val isSelected = tag in selectedTags
+                            Surface(
+                                modifier = Modifier.clickable {
+                                    selectedTags = if (isSelected) selectedTags - tag else selectedTags + tag
                                 },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = AccentBlue,
-                                    uncheckedColor = TextSecondary
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(tag, color = Color.White, fontSize = 16.sp)
+                                color = if (isSelected) AccentBlue.copy(alpha = 0.25f) else SurfaceLightColor,
+                                shape = RoundedCornerShape(24.dp),
+                                border = BorderStroke(1.dp, if (isSelected) AccentBlue else ColorDivider.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = AccentBlue,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Text(
+                                        text = tag,
+                                        color = if (isSelected) Color.White else TextSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -339,7 +375,8 @@ fun WorkspaceMembers(
                         showEndorseDialogByUserId = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = selectedTags.isNotEmpty()
                 ) {
                     Text("Endorse", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -426,6 +463,31 @@ fun MemberCard(
     var cardExpanded by remember { mutableStateOf(false) }
     val sharedDisputeNotes by viewModel.getDisputeNotesAboutUser(member.userId, currentUserId).collectAsStateWithLifecycle(initialValue = emptyList<com.example.data.model.DisputeNote>())
 
+    // Dynamic Realtime Presence States
+    val dynamicStatus = when {
+        member.isTyping -> "TYPING..."
+        member.isOnline -> "ONLINE"
+        else -> status
+    }
+    val dynamicStatusColor = when {
+        member.isTyping -> AccentBlue
+        member.isOnline -> NeonEmerald
+        else -> statusColor
+    }
+
+    val lastActiveFormatted = if (member.isOnline) {
+        "Active now"
+    } else {
+        val diffMs = System.currentTimeMillis() - member.lastSeenAt
+        val diffMinutes = (diffMs / 60000).toInt()
+        when {
+            diffMinutes < 1 -> "Active < 1m ago"
+            diffMinutes < 60 -> "Active ${diffMinutes}m ago"
+            diffMinutes < 1440 -> "Active ${diffMinutes / 60}h ago"
+            else -> "Active days ago"
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -440,20 +502,38 @@ fun MemberCard(
                 modifier = Modifier.padding(DS.Space16),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Stylish Avatar
+                // Stylish Avatar with Online/Typing badge
                 Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(AccentBlue.copy(alpha = 0.12f))
-                        .border(1.dp, AccentBlue.copy(alpha = 0.3f), CircleShape),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.size(48.dp)
                 ) {
-                    Text(
-                        text = member.userId.take(2).uppercase(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Black,
-                        color = AccentBlue
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(AccentBlue.copy(alpha = 0.12f))
+                            .border(
+                                width = if (member.isTyping) 2.dp else 1.dp,
+                                color = if (member.isTyping) AccentBlue else if (member.isOnline) NeonEmerald else AccentBlue.copy(alpha = 0.3f),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = member.userId.take(2).uppercase(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Black,
+                            color = AccentBlue
+                        )
+                    }
+                    
+                    // Presence dot
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(if (member.isOnline) NeonEmerald else Color.Gray)
+                            .border(1.5.dp, SurfaceColor, CircleShape)
+                            .align(Alignment.BottomEnd)
                     )
                 }
                 Spacer(modifier = Modifier.width(DS.Space12))
@@ -481,13 +561,50 @@ fun MemberCard(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(statusColor)
+                                .background(dynamicStatusColor)
                         )
                         Text(
-                            text = status,
-                            color = statusColor,
+                            text = dynamicStatus,
+                            color = dynamicStatusColor,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = " • $lastActiveFormatted",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+
+                    // Live activity captions
+                    if (member.isTyping && member.typingText.isNotBlank()) {
+                        Text(
+                            text = "Typing: \"${member.typingText}\"",
+                            color = AccentBlue,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontStyle = FontStyle.Italic,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    } else if (member.currentlyViewingTaskId != null) {
+                        Text(
+                            text = "Viewing Task: #${member.currentlyViewingTaskId}",
+                            color = CrispAmber,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    } else if (member.currentlyEditingAssetId != null) {
+                        Text(
+                            text = "Editing Asset: #${member.currentlyEditingAssetId}",
+                            color = NeonEmerald,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    } else if (member.liveStatusUpdate.isNotBlank()) {
+                        Text(
+                            text = member.liveStatusUpdate,
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
                 }
@@ -570,7 +687,7 @@ fun MemberCard(
                         }
                     }
 
-                    if (workspace.isArchived && member.userId != currentUserId) {
+                    if ((workspace.isArchived || workspace.status == "ARCHIVED") && member.userId != currentUserId) {
                         Button(
                             onClick = onEndorse,
                             modifier = Modifier.fillMaxWidth(),

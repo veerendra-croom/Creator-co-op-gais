@@ -27,7 +27,7 @@ fun ReferFriendDialog(
     onDismiss: () -> Unit
 ) {
     var friendCode by remember { mutableStateOf("") }
-    val referralsCount by globalViewModel.getSuccessfulReferralCount(userProfile.id).collectAsState(initial = 0)
+    val referralsCount by remember(userProfile.id) { globalViewModel.getSuccessfulReferralCount(userProfile.id) }.collectAsState(initial = 0)
     
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -69,7 +69,7 @@ fun ReferFriendDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = userProfile.referralCode.ifEmpty { "Generating..." },
+                            text = userProfile.referralCode?.ifEmpty { "Generating..." } ?: "Generating...",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,

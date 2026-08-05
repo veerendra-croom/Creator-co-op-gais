@@ -51,7 +51,7 @@ CREATE TABLE users_table (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email VARCHAR(255) UNIQUE NOT NULL,
     display_name VARCHAR(100) NOT NULL,
-    system_role VARCHAR(20) NOT NULL CHECK (system_role IN ('PUBLIC_USER', 'REGISTERED_USER', 'PLATFORM_ADMIN', 'SUSPENDED')),
+    system_role VARCHAR(20) NOT NULL CHECK (system_role IN ('PUBLIC_USER', 'APP_USER', 'ADMIN', 'SUSPENDED', 'SOFT_DELETED')),
     portfolio_tags TEXT[], -- Array of strings e.g. ['Video Editor', 'Scriptwriter']
     avatar_url TEXT,
     bio TEXT DEFAULT '',
@@ -114,13 +114,13 @@ BEGIN
     BEGIN
         IF EXISTS (SELECT 1 FROM auth.users WHERE id = '00000000-0000-0000-0000-00000000000a') THEN
             INSERT INTO users_table (user_id, email, display_name, system_role)
-            VALUES ('00000000-0000-0000-0000-00000000000a', 'test_user_a@example.com', 'Test User A', 'REGISTERED_USER')
+            VALUES ('00000000-0000-0000-0000-00000000000a', 'test_user_a@example.com', 'Test User A', 'APP_USER')
             ON CONFLICT (user_id) DO NOTHING;
         END IF;
 
         IF EXISTS (SELECT 1 FROM auth.users WHERE id = '00000000-0000-0000-0000-00000000000b') THEN
             INSERT INTO users_table (user_id, email, display_name, system_role)
-            VALUES ('00000000-0000-0000-0000-00000000000b', 'test_user_b@example.com', 'Test User B', 'REGISTERED_USER')
+            VALUES ('00000000-0000-0000-0000-00000000000b', 'test_user_b@example.com', 'Test User B', 'APP_USER')
             ON CONFLICT (user_id) DO NOTHING;
         END IF;
     EXCEPTION
@@ -160,6 +160,9 @@ CREATE TABLE IF NOT EXISTS syndicate_projects_table (
     required_roles JSONB, -- Array of strings or requirement objects
     status VARCHAR(20) DEFAULT 'MATCHMAKING',
     is_archived BOOLEAN DEFAULT FALSE,
+    is_sponsored BOOLEAN DEFAULT FALSE,
+    sponsor_name VARCHAR(255),
+    sponsor_logo_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -206,6 +209,8 @@ CREATE TABLE IF NOT EXISTS production_tasks_table (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_production_tasks_workspace_state ON production_tasks_table(workspace_id, state_scope);
+
 -- 9. Messages
 CREATE TABLE IF NOT EXISTS messages_table (
     message_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -216,6 +221,8 @@ CREATE TABLE IF NOT EXISTS messages_table (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_messages_workspace_created ON messages_table(workspace_id, created_at DESC);
+
 -- 10. Reports Table
 CREATE TABLE IF NOT EXISTS reports_table (
     report_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -224,6 +231,9 @@ CREATE TABLE IF NOT EXISTS reports_table (
     target_id UUID NOT NULL,
     reason TEXT NOT NULL,
     status VARCHAR(20) DEFAULT 'PENDING', -- 'PENDING', 'RESOLVED', 'DISMISSED'
+    category VARCHAR(100) DEFAULT 'Spam',
+    evidence TEXT DEFAULT '',
+    workspace_id VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -231,6 +241,7 @@ CREATE TABLE IF NOT EXISTS reports_table (
 CREATE TABLE IF NOT EXISTS admin_audit_logs_table (
     log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     admin_id UUID REFERENCES users_table(user_id),
+    admin_name VARCHAR(100) DEFAULT 'System Admin',
     action_taken VARCHAR(100) NOT NULL, -- 'SUSPEND_USER', 'DELETE_POST', 'DISMISS_REPORT', etc.
     target_type VARCHAR(50) NOT NULL,
     target_id UUID NOT NULL,
@@ -506,7 +517,7 @@ CREATE POLICY select_all_reports ON reports_table
 FOR SELECT USING (
     EXISTS (
         SELECT 1 FROM users_table 
-        WHERE user_id = auth.uid() AND system_role = 'PLATFORM_ADMIN'
+        WHERE user_id = auth.uid() AND system_role = 'ADMIN'
     )
 );
 
@@ -516,7 +527,7 @@ CREATE POLICY select_all_logs ON admin_audit_logs_table
 FOR SELECT USING (
     EXISTS (
         SELECT 1 FROM users_table 
-        WHERE user_id = auth.uid() AND system_role = 'PLATFORM_ADMIN'
+        WHERE user_id = auth.uid() AND system_role = 'ADMIN'
     )
 );
 
@@ -525,7 +536,7 @@ CREATE POLICY insert_log ON admin_audit_logs_table
 FOR INSERT WITH CHECK (
     EXISTS (
         SELECT 1 FROM users_table 
-        WHERE user_id = auth.uid() AND system_role = 'PLATFORM_ADMIN'
+        WHERE user_id = auth.uid() AND system_role = 'ADMIN'
     ) AND admin_id = auth.uid()
 );
 
@@ -695,7 +706,7 @@ CREATE POLICY manage_ad_placements ON ad_placements_table
 FOR ALL USING (
     EXISTS (
         SELECT 1 FROM users_table 
-        WHERE user_id = auth.uid() AND system_role = 'PLATFORM_ADMIN'
+        WHERE user_id = auth.uid() AND system_role = 'ADMIN'
     )
 );
 
@@ -708,7 +719,7 @@ CREATE POLICY manage_global_settings ON global_settings_table
 FOR ALL USING (
     EXISTS (
         SELECT 1 FROM users_table 
-        WHERE user_id = auth.uid() AND system_role = 'PLATFORM_ADMIN'
+        WHERE user_id = auth.uid() AND system_role = 'ADMIN'
     )
 );
 
@@ -760,7 +771,7 @@ BEGIN
         NEW.id,
         NEW.email,
         NEW.display_name,
-        COALESCE(NEW.system_role, 'REGISTERED_USER'),
+        COALESCE(NEW.system_role, 'APP_USER'),
         NEW.avatar_url,
         CASE WHEN NEW.primary_specialty IS NOT NULL AND NEW.primary_specialty != '' THEN ARRAY[NEW.primary_specialty] ELSE '{}'::TEXT[] END,
         COALESCE(NEW.bio, ''),
@@ -817,7 +828,7 @@ BEGIN
         NEW.id,
         NEW.email,
         NEW.display_name,
-        COALESCE(NEW.system_role, 'REGISTERED_USER'),
+        COALESCE(NEW.system_role, 'APP_USER'),
         NEW.avatar_url,
         CASE WHEN NEW.primary_specialty IS NOT NULL AND NEW.primary_specialty != '' THEN ARRAY[NEW.primary_specialty] ELSE '{}'::TEXT[] END,
         COALESCE(NEW.bio, ''),
@@ -856,21 +867,30 @@ SELECT
     'YOUTUBE'::TEXT AS platform_type,
     manager_id AS created_by,
     is_archived,
-    EXTRACT(EPOCH FROM created_at)::BIGINT * 1000 AS created_at
+    EXTRACT(EPOCH FROM created_at)::BIGINT * 1000 AS created_at,
+    is_sponsored,
+    sponsor_name,
+    sponsor_logo_url
 FROM syndicate_projects_table;
 
 CREATE OR REPLACE FUNCTION insert_into_workspaces_func() RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO syndicate_projects_table (project_id, manager_id, channel_name, status, is_archived)
+    INSERT INTO syndicate_projects_table (project_id, manager_id, channel_name, status, is_archived, is_sponsored, sponsor_name, sponsor_logo_url)
     VALUES (
         COALESCE(NEW.id, uuid_generate_v4()),
         COALESCE(NEW.created_by, auth.uid()),
         NEW.name,
         'MATCHMAKING',
-        COALESCE(NEW.is_archived, FALSE)
+        COALESCE(NEW.is_archived, FALSE),
+        COALESCE(NEW.is_sponsored, FALSE),
+        NEW.sponsor_name,
+        NEW.sponsor_logo_url
     ) ON CONFLICT (project_id) DO UPDATE SET
         channel_name = EXCLUDED.channel_name,
-        is_archived = EXCLUDED.is_archived;
+        is_archived = EXCLUDED.is_archived,
+        is_sponsored = EXCLUDED.is_sponsored,
+        sponsor_name = EXCLUDED.sponsor_name,
+        sponsor_logo_url = EXCLUDED.sponsor_logo_url;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -963,7 +983,7 @@ SELECT
     m.sender_id,
     NULL::UUID AS recipient_id,
     COALESCE(u.display_name, 'Unknown') AS sender_name,
-    COALESCE(u.system_role, 'REGISTERED_USER') AS sender_role,
+    COALESCE(u.system_role, 'APP_USER') AS sender_role,
     m.message_body,
     m.attachment_json_meta,
     EXTRACT(EPOCH FROM m.created_at)::BIGINT * 1000 AS timestamp
@@ -1042,7 +1062,7 @@ SELECT
     c.author_id AS "authorId",
     c.post_id AS "postId",
     COALESCE(u.display_name, 'Anonymous') AS "authorName",
-    COALESCE(u.system_role, 'REGISTERED_USER') AS "authorRole",
+    COALESCE(u.system_role, 'APP_USER') AS "authorRole",
     c.content AS text,
     EXTRACT(EPOCH FROM c.created_at)::BIGINT * 1000 AS timestamp,
     EXTRACT(EPOCH FROM c.created_at)::BIGINT * 1000 AS "timestampMs"
@@ -1099,6 +1119,165 @@ DROP TRIGGER IF EXISTS insert_into_endorsements_trg ON endorsements;
 CREATE TRIGGER insert_into_endorsements_trg
 INSTEAD OF INSERT OR UPDATE ON endorsements
 FOR EACH ROW EXECUTE FUNCTION insert_into_endorsements_func();
+
+
+-- 9. team_agreements
+CREATE OR REPLACE VIEW team_agreements AS
+SELECT
+    agreement_id AS id,
+    project_id AS workspace_id,
+    version,
+    content_text,
+    is_locked,
+    EXTRACT(EPOCH FROM created_at)::BIGINT * 1000 AS created_at
+FROM team_agreements_table;
+
+CREATE OR REPLACE FUNCTION insert_into_team_agreements_func() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO team_agreements_table (agreement_id, project_id, version, content_text, is_locked, created_at)
+    VALUES (
+        COALESCE(NEW.id, uuid_generate_v4()),
+        NEW.workspace_id,
+        COALESCE(NEW.version, 1),
+        NEW.content_text,
+        COALESCE(NEW.is_locked, FALSE),
+        COALESCE(TO_TIMESTAMP(NEW.created_at / 1000.0), CURRENT_TIMESTAMP)
+    ) ON CONFLICT (agreement_id) DO UPDATE SET
+        project_id = EXCLUDED.project_id,
+        version = EXCLUDED.version,
+        content_text = EXCLUDED.content_text,
+        is_locked = EXCLUDED.is_locked;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS insert_into_team_agreements_trg ON team_agreements;
+CREATE TRIGGER insert_into_team_agreements_trg
+INSTEAD OF INSERT OR UPDATE ON team_agreements
+FOR EACH ROW EXECUTE FUNCTION insert_into_team_agreements_func();
+
+
+-- 10. agreement_acknowledgments
+CREATE OR REPLACE VIEW agreement_acknowledgments AS
+SELECT
+    acknowledgment_id AS id,
+    agreement_id,
+    user_id,
+    acknowledgment_hash,
+    EXTRACT(EPOCH FROM acknowledged_at)::BIGINT * 1000 AS acknowledged_at
+FROM agreement_acknowledgments_table;
+
+CREATE OR REPLACE FUNCTION insert_into_agreement_acknowledgments_func() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO agreement_acknowledgments_table (acknowledgment_id, agreement_id, user_id, acknowledgment_hash, acknowledged_at)
+    VALUES (
+        COALESCE(NEW.id, uuid_generate_v4()),
+        NEW.agreement_id,
+        NEW.user_id,
+        NEW.acknowledgment_hash,
+        COALESCE(TO_TIMESTAMP(NEW.acknowledged_at / 1000.0), CURRENT_TIMESTAMP)
+    ) ON CONFLICT (acknowledgment_id) DO UPDATE SET
+        agreement_id = EXCLUDED.agreement_id,
+        user_id = EXCLUDED.user_id,
+        acknowledgment_hash = EXCLUDED.acknowledgment_hash;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS insert_into_agreement_acknowledgments_trg ON agreement_acknowledgments;
+CREATE TRIGGER insert_into_agreement_acknowledgments_trg
+INSTEAD OF INSERT OR UPDATE ON agreement_acknowledgments
+FOR EACH ROW EXECUTE FUNCTION insert_into_agreement_acknowledgments_func();
+
+
+-- 11. reports
+CREATE OR REPLACE VIEW reports AS
+SELECT
+    report_id AS id,
+    reporter_id,
+    target_type,
+    target_id,
+    reason,
+    status,
+    category,
+    evidence,
+    workspace_id,
+    EXTRACT(EPOCH FROM created_at)::BIGINT * 1000 AS created_at
+FROM reports_table;
+
+CREATE OR REPLACE FUNCTION insert_into_reports_func() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO reports_table (report_id, reporter_id, target_type, target_id, reason, status, category, evidence, workspace_id, created_at)
+    VALUES (
+        COALESCE(NEW.id, uuid_generate_v4()),
+        NEW.reporter_id,
+        NEW.target_type,
+        NEW.target_id,
+        NEW.reason,
+        COALESCE(NEW.status, 'PENDING'),
+        COALESCE(NEW.category, 'Spam'),
+        COALESCE(NEW.evidence, ''),
+        NEW.workspace_id,
+        COALESCE(TO_TIMESTAMP(NEW.created_at / 1000.0), CURRENT_TIMESTAMP)
+    ) ON CONFLICT (report_id) DO UPDATE SET
+        reporter_id = EXCLUDED.reporter_id,
+        target_type = EXCLUDED.target_type,
+        target_id = EXCLUDED.target_id,
+        reason = EXCLUDED.reason,
+        status = EXCLUDED.status,
+        category = EXCLUDED.category,
+        evidence = EXCLUDED.evidence,
+        workspace_id = EXCLUDED.workspace_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS insert_into_reports_trg ON reports;
+CREATE TRIGGER insert_into_reports_trg
+INSTEAD OF INSERT OR UPDATE ON reports
+FOR EACH ROW EXECUTE FUNCTION insert_into_reports_func();
+
+
+-- 12. admin_audit_logs
+CREATE OR REPLACE VIEW admin_audit_logs AS
+SELECT
+    log_id AS id,
+    admin_id,
+    admin_name,
+    action_taken,
+    target_type,
+    target_id,
+    reason,
+    EXTRACT(EPOCH FROM created_at)::BIGINT * 1000 AS created_at
+FROM admin_audit_logs_table;
+
+CREATE OR REPLACE FUNCTION insert_into_admin_audit_logs_func() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO admin_audit_logs_table (log_id, admin_id, admin_name, action_taken, target_type, target_id, reason, created_at)
+    VALUES (
+        COALESCE(NEW.id, uuid_generate_v4()),
+        NEW.admin_id,
+        COALESCE(NEW.admin_name, 'System Admin'),
+        NEW.action_taken,
+        NEW.target_type,
+        NEW.target_id,
+        NEW.reason,
+        COALESCE(TO_TIMESTAMP(NEW.created_at / 1000.0), CURRENT_TIMESTAMP)
+    ) ON CONFLICT (log_id) DO UPDATE SET
+        admin_id = EXCLUDED.admin_id,
+        admin_name = EXCLUDED.admin_name,
+        action_taken = EXCLUDED.action_taken,
+        target_type = EXCLUDED.target_type,
+        target_id = EXCLUDED.target_id,
+        reason = EXCLUDED.reason;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS insert_into_admin_audit_logs_trg ON admin_audit_logs;
+CREATE TRIGGER insert_into_admin_audit_logs_trg
+INSTEAD OF INSERT OR UPDATE ON admin_audit_logs
+FOR EACH ROW EXECUTE FUNCTION insert_into_admin_audit_logs_func();
 
 
 

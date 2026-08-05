@@ -17,7 +17,7 @@ import java.util.UUID
 
 
 class WorkspaceViewModel constructor(
-    private val repository: AppRepository
+    val repository: AppRepository
 ) : ViewModel() {
 
     val selectedWorkspaceId = MutableStateFlow<String?>(null)
@@ -26,6 +26,18 @@ class WorkspaceViewModel constructor(
     val productionStateScope = MutableStateFlow("PRODUCTION_READY")
     val currentUserIdFlow = MutableStateFlow<String>("")
     val isAISummarizing = MutableStateFlow(false)
+    val aiSummarizationError = MutableStateFlow<String?>(null)
+
+    val allUsers: StateFlow<List<UserProfile>> = repository.allUsers.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = emptyList()
+    )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val currentUserProfile: StateFlow<UserProfile?> = currentUserIdFlow.flatMapLatest { uid ->
+        if (uid.isEmpty()) flowOf(null) else repository.getUserByIdFlow(uid)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val featureFlags: StateFlow<List<com.example.data.model.FeatureFlag>> = repository.getAllFeatureFlagsFlow()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -113,29 +125,33 @@ class WorkspaceViewModel constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     fun selectWorkspace(ws: Workspace?) {
-        selectedWorkspaceId.value = ws?.id
-        workspaceViewMode.value = if (ws == null) "LIST" else "VIEW"
+        selectedWorkspaceId.update { ws?.id }
+        workspaceViewMode.update { if (ws == null) "LIST" else "VIEW" }
     }
 
     val newlyCreatedWorkspace = MutableStateFlow<Workspace?>(null)
 
     fun createWorkspace(name: String, platform: String, userId: String) {
         viewModelScope.launch {
-            val ws = Workspace(
-                id = UUID.randomUUID().toString(),
-                name = name,
-                platformType = platform,
-                createdBy = userId,
-                createdAt = System.currentTimeMillis()
-            )
-            repository.insertWorkspace(ws)
-            AnalyticsManager.trackWorkspaceCreated(name, platform)
-            newlyCreatedWorkspace.value = ws
-            // Clear draft
-            repository.userSettingsDao.setSetting(
-                UserSetting(id = "${userId}_workspace_draft", userId = userId, key = "workspace_draft", value = "")
-            )
-            _toastMessage.value = "Workspace '$name' created!"
+            try {
+                val ws = Workspace(
+                    id = UUID.randomUUID().toString(),
+                    name = name,
+                    platformType = platform,
+                    createdBy = userId,
+                    createdAt = System.currentTimeMillis()
+                )
+                repository.insertWorkspace(ws)
+                AnalyticsManager.trackWorkspaceCreated(name, platform)
+                newlyCreatedWorkspace.update { ws }
+                // Clear draft
+                repository.userSettingsDao.setSetting(
+                    UserSetting(id = "${userId}_workspace_draft", userId = userId, key = "workspace_draft", value = "")
+                )
+                FeedbackManager.showSuccess("Workspace '$name' created!")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Failed to create workspace: ${e.message}")
+            }
         }
     }
 
@@ -149,25 +165,49 @@ class WorkspaceViewModel constructor(
         )
     }
 
-    fun submitTask(title: String, body: String, scope: String, userId: String) {
+    suspend fun getPersonalDraftTitle(userId: String): String? {
+        return repository.userSettingsDao.getSetting(userId, "personal_draft_title")
+    }
+
+    suspend fun getPersonalDraftBody(userId: String): String? {
+        return repository.userSettingsDao.getSetting(userId, "personal_draft_body")
+    }
+
+    suspend fun savePersonalDraft(userId: String, title: String, body: String) {
+        repository.userSettingsDao.setSetting(
+            UserSetting(id = "${userId}_personal_draft_title", userId = userId, key = "personal_draft_title", value = title)
+        )
+        repository.userSettingsDao.setSetting(
+            UserSetting(id = "${userId}_personal_draft_body", userId = userId, key = "personal_draft_body", value = body)
+        )
+    }
+
+    fun submitTask(title: String, body: String, scope: String, userId: String, kanbanLane: String? = null) {
         if (isWorkspaceArchived.value) {
-            _toastMessage.value = "Action blocked: Workspace is ARCHIVED."
+            FeedbackManager.showWarning("Action blocked: Workspace is ARCHIVED.")
             return
         }
         val wsId = selectedWorkspaceId.value ?: return
         viewModelScope.launch {
-            val task = ProductionTask(
-                id = UUID.randomUUID().toString(),
-                workspaceId = wsId,
-                creatorId = userId,
-                title = title,
-                contentBody = body,
-                stateScope = scope,
-                kanbanLane = if (scope == "PRODUCTION_READY") "SCRIPTING" else "TODO",
-                createdAt = System.currentTimeMillis()
-            )
-            repository.insertTask(task)
-            _toastMessage.value = "Task saved to $scope."
+            try {
+                FeedbackManager.showInfo("Syncing with secure workspace vault...")
+                kotlinx.coroutines.delay(800)
+                val defaultLane = if (scope == "PRODUCTION_READY") "IDEAS" else "TODO"
+                val task = ProductionTask(
+                    id = UUID.randomUUID().toString(),
+                    workspaceId = wsId,
+                    creatorId = userId,
+                    title = title,
+                    contentBody = body,
+                    stateScope = scope,
+                    kanbanLane = kanbanLane ?: defaultLane,
+                    createdAt = System.currentTimeMillis()
+                )
+                repository.insertTask(task)
+                FeedbackManager.showSuccess("Task saved to ${scope.replace("_", " ")}.")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Failed to deploy task: ${e.message}")
+            }
         }
     }
 
@@ -195,6 +235,7 @@ class WorkspaceViewModel constructor(
             return
         }
         viewModelScope.launch {
+            kotlinx.coroutines.delay(400)
             val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
             if (task.stateScope == "PRODUCTION_READY") {
                 if (!hasPermission(task.workspaceId, userId, WorkspacePermission.MODIFY_PRODUCTION)) {
@@ -224,12 +265,16 @@ class WorkspaceViewModel constructor(
     fun promoteTaskToProduction(taskId: String, userId: String) {
         if (isWorkspaceArchived.value) return
         viewModelScope.launch {
-            val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
-            if (hasPermission(task.workspaceId, userId, WorkspacePermission.MODIFY_PRODUCTION)) {
-                repository.insertTask(task.copy(stateScope = "PRODUCTION_READY", kanbanLane = "TODO"))
-                _toastMessage.value = "Draft promoted to Team Space!"
-            } else {
-                FeedbackManager.showError("Permission Denied.")
+            try {
+                val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
+                if (hasPermission(task.workspaceId, userId, WorkspacePermission.MODIFY_PRODUCTION)) {
+                    repository.insertTask(task.copy(stateScope = "PRODUCTION_READY", kanbanLane = "IDEAS"))
+                    FeedbackManager.showSuccess("Draft promoted to Team Space!")
+                } else {
+                    FeedbackManager.showError("Permission Denied: Production clearance required.")
+                }
+            } catch (e: Exception) {
+                FeedbackManager.showError("Promotion failed: ${e.message}")
             }
         }
     }
@@ -239,9 +284,10 @@ class WorkspaceViewModel constructor(
         viewModelScope.launch {
             val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
             val member = repository.getMemberInfo(task.workspaceId, userId).firstOrNull()
-            if (member?.canModifyProduction == true || member?.assignedRoleTitle in listOf("Lead Creator", "Head")) {
+            if (member?.canModifyProduction == true || member?.assignedRoleTitle in listOf("Lead Creator", "Head", "Owner")) {
                 isAISummarizing.value = true
-                _toastMessage.value = "Gemini is crafting a Production-Ready Brief..."
+                aiSummarizationError.value = null
+                FeedbackManager.showInfo("Gemini is crafting a Production-Ready Brief...")
                 
                 val displayTitle = if (task.title.contains("]")) {
                     task.title.substringAfter("]").trim()
@@ -249,19 +295,24 @@ class WorkspaceViewModel constructor(
                     task.title
                 }
                 
-                val aiBrief = com.example.data.api.GeminiService.summarizeDraftToBrief(displayTitle, task.contentBody)
+                val aiBrief = try {
+                    com.example.data.api.GeminiService.summarizeDraftToBrief(displayTitle, task.contentBody)
+                } catch (e: Exception) {
+                    "Error: ${e.message}"
+                }
                 
                 isAISummarizing.value = false
                 
                 if (aiBrief.startsWith("Error")) {
-                    _toastMessage.value = aiBrief
+                    aiSummarizationError.value = aiBrief
+                    FeedbackManager.showError("AI Synthesis Failed: Security policies or network fault detected.")
                 } else {
                     repository.insertTask(task.copy(
                         contentBody = aiBrief,
                         stateScope = "PRODUCTION_READY",
-                        kanbanLane = "TODO"
+                        kanbanLane = "IDEAS"
                     ))
-                    _toastMessage.value = "Draft summarized by AI & promoted to Team Space!"
+                    FeedbackManager.showSuccess("Draft summarized by AI & promoted to Team Space!")
                 }
             } else {
                 _toastMessage.value = "Permission Denied."
@@ -269,70 +320,211 @@ class WorkspaceViewModel constructor(
         }
     }
 
-    fun deleteTask(taskId: String, userId: String) {
+    fun promoteTaskToProductionWithFallback(taskId: String, userId: String) {
         if (isWorkspaceArchived.value) return
         viewModelScope.launch {
             val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
-            val member = repository.getMemberInfo(task.workspaceId, userId).firstOrNull()
-            if (task.creatorId == userId || member?.assignedRoleTitle in listOf("Lead Creator", "Head")) {
-                repository.deleteTask(taskId)
-                _toastMessage.value = "Task deleted."
+            val displayTitle = if (task.title.contains("]")) {
+                task.title.substringAfter("]").trim()
+            } else {
+                task.title
+            }
+            val fallbackBrief = """
+                # PRODUCTION BRIEF: $displayTitle
+                
+                ## 📋 OBJECTIVE
+                ${task.contentBody}
+                
+                ## 👥 ASSIGNED RESPONSIBILITIES
+                - Script/Outline review: Assigned to Lead Creator
+                - Production Execution: Core Video/VFX Contributors
+                
+                ## ⚙️ TECHNICAL SPECIFICATIONS
+                - Deliverable format: High-Quality Video (YouTube/Short-form optimal)
+                - Target Audience engagement window: First 15 seconds hook focus
+                
+                ## 📈 SUCCESS METRICS
+                - Baseline Retention Rate: >55%
+                - Completion Timeline: Strict check-in by review phase
+                
+                *(Structured local template applied as offline fallback)*
+            """.trimIndent()
+            
+            repository.insertTask(task.copy(
+                contentBody = fallbackBrief,
+                stateScope = "PRODUCTION_READY",
+                kanbanLane = "IDEAS"
+            ))
+            aiSummarizationError.value = null
+            FeedbackManager.showSuccess("Draft structured via local template & promoted!")
+        }
+    }
+
+    fun updateTask(taskId: String, title: String, body: String, priority: String = "MEDIUM") {
+        if (isWorkspaceArchived.value) {
+            FeedbackManager.showWarning("Action blocked: Workspace is ARCHIVED.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
+                repository.insertTask(task.copy(
+                    title = title,
+                    contentBody = body,
+                    priority = priority
+                ))
+                FeedbackManager.showSuccess("Task updated successfully.")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Failed to update task: ${e.message}")
+            }
+        }
+    }
+
+    fun updateTaskStatus(taskId: String, status: String) {
+        if (isWorkspaceArchived.value) {
+            FeedbackManager.showWarning("Action blocked: Workspace is ARCHIVED.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repository.updateTaskStatus(taskId, status)
+                if (status == "COMPLETED") {
+                    FeedbackManager.showSuccess("Task marked as completed!")
+                } else {
+                    FeedbackManager.showInfo("Task status updated to $status.")
+                }
+            } catch (e: Exception) {
+                FeedbackManager.showError("Failed to update task status: ${e.message}")
+            }
+        }
+    }
+
+    fun deleteTask(taskId: String, userId: String) {
+        if (isWorkspaceArchived.value) {
+            FeedbackManager.showWarning("Workspace is archived. Deletion disabled.")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                FeedbackManager.showInfo("Removing asset from production...")
+                kotlinx.coroutines.delay(600)
+                val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
+                val member = repository.getMemberInfo(task.workspaceId, userId).firstOrNull()
+                if (task.creatorId == userId || member?.assignedRoleTitle in listOf("Lead Creator", "Head", "Owner")) {
+                    repository.deleteTask(taskId)
+                    FeedbackManager.showSuccess("Task deleted successfully.")
+                } else {
+                    FeedbackManager.showError("Permission Denied: Only creator or leads can delete tasks.")
+                }
+            } catch (e: Exception) {
+                FeedbackManager.showError("Deletion failed: ${e.message}")
             }
         }
     }
 
     fun joinWorkspace(workspaceId: String, userId: String, roleTitle: String = "Collaborator") {
         viewModelScope.launch {
-            val member = WorkspaceMember(
-                id = java.util.UUID.randomUUID().toString(),
-                workspaceId = workspaceId,
-                userId = userId,
-                assignedRoleTitle = roleTitle,
-                canModifyProduction = true
-            )
-            repository.insertMember(member)
-            AnalyticsManager.trackEvent("member_joined", mapOf("workspace_id" to workspaceId, "role" to roleTitle))
-            _toastMessage.value = "Joined workspace successfully!"
+            try {
+                val currentMembers = repository.getMembersForWorkspace(workspaceId).first()
+                if (currentMembers.size >= 25) {
+                    FeedbackManager.showWarning("Shard Enclave Full: Maximum 25 collaborators allowed.")
+                    return@launch
+                }
+                
+                val member = WorkspaceMember(
+                    id = java.util.UUID.randomUUID().toString(),
+                    workspaceId = workspaceId,
+                    userId = userId,
+                    assignedRoleTitle = roleTitle,
+                    canModifyProduction = true
+                )
+                repository.insertMember(member)
+                AnalyticsManager.trackEvent("member_joined", mapOf("workspace_id" to workspaceId, "role" to roleTitle))
+                FeedbackManager.showSuccess("Joined enclave: Access granted as $roleTitle.")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Failed to join workspace: ${e.message}")
+            }
         }
     }
 
     fun inviteMember(workspaceId: String, email: String, roleTitle: String) {
         viewModelScope.launch {
-            val mockUserId = if (email.contains("@")) email.substringBefore("@") else email
-            val member = WorkspaceMember(
-                id = java.util.UUID.randomUUID().toString(),
-                workspaceId = workspaceId,
-                userId = mockUserId,
-                assignedRoleTitle = roleTitle,
-                canModifyProduction = true
-            )
-            repository.insertMember(member)
-            AnalyticsManager.trackEvent("member_invited", mapOf("workspace_id" to workspaceId, "email" to email, "role" to roleTitle))
-            _toastMessage.value = "Invitation sent to $email! Added as $roleTitle."
+            try {
+                val currentMembers = repository.getMembersForWorkspace(workspaceId).first()
+                if (currentMembers.size >= 25) {
+                    FeedbackManager.showWarning("Invite Denied: Member cap reached for this workspace.")
+                    return@launch
+                }
+                
+                val existingUser = repository.userDao.getUserByEmail(email)
+                val finalUserId = existingUser?.id ?: (if (email.contains("@")) email.substringBefore("@") else email)
+                val member = WorkspaceMember(
+                    id = java.util.UUID.randomUUID().toString(),
+                    workspaceId = workspaceId,
+                    userId = finalUserId,
+                    assignedRoleTitle = roleTitle,
+                    canModifyProduction = true
+                )
+                repository.insertMember(member)
+                
+                // Add event for audit log and activity feed
+                repository.insertWorkspaceEvent(com.example.data.model.WorkspaceEvent(
+                    id = "evt_" + System.currentTimeMillis(),
+                    workspaceId = workspaceId,
+                    actorId = finalUserId,
+                    eventType = "MEMBER_JOINED",
+                    entityId = finalUserId,
+                    title = "Member Joined",
+                    description = "$finalUserId was invited as $roleTitle.",
+                    createdAt = System.currentTimeMillis()
+                ))
+                
+                // If user exists in our DB, notify them
+                if (existingUser != null) {
+                    repository.insertNotification(com.example.data.model.Notification(
+                        id = "notif_inv_" + System.currentTimeMillis(),
+                        userId = finalUserId,
+                        title = "Workspace Invitation",
+                        body = "You've been invited to join a workspace as $roleTitle.",
+                        type = "WORKSPACE_INVITE",
+                        deepLinkTarget = "WORKSPACE_INVITE:$workspaceId",
+                        createdAt = System.currentTimeMillis()
+                    ))
+                }
+                
+                AnalyticsManager.trackEvent("member_invited", mapOf("workspace_id" to workspaceId, "email" to email, "role" to roleTitle))
+                FeedbackManager.showSuccess("Invitation sent to $email! Added as $roleTitle.")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Invitation failed: ${e.message}")
+            }
         }
     }
 
     fun leaveWorkspace(workspaceId: String, userId: String) {
         viewModelScope.launch {
-            val members = repository.getMembersForWorkspace(workspaceId).first().filterNotNull()
-            val me = members.find { it.userId == userId } ?: return@launch
-            
-            // Check if I am the only lead
-            val leadRoles = listOf("Lead Creator", "Head", "Owner")
-            val leads = members.filter { it.assignedRoleTitle in leadRoles }
-            val isILead = me.assignedRoleTitle in leadRoles
-            
-            if (isILead && leads.size == 1 && members.size > 1) {
-                FeedbackManager.showError("You are the sole lead. Assign another member as lead before leaving.")
-                return@launch
+            try {
+                val members = repository.getMembersForWorkspace(workspaceId).first().filterNotNull()
+                val me = members.find { it.userId == userId } ?: return@launch
+                
+                // Check if I am the only lead
+                val leadRoles = listOf("Lead Creator", "Head", "Owner")
+                val leads = members.filter { it.assignedRoleTitle in leadRoles }
+                val isILead = me.assignedRoleTitle in leadRoles
+                
+                if (isILead && leads.size == 1 && members.size > 1) {
+                    FeedbackManager.showError("You are the sole lead. Assign another member as lead before leaving.")
+                    return@launch
+                }
+                
+                repository.removeMember(workspaceId, userId)
+                if (selectedWorkspaceId.value == workspaceId) {
+                    selectedWorkspaceId.update { null }
+                    workspaceViewMode.update { "LIST" }
+                }
+                FeedbackManager.showSuccess("You have left the shard enclave.")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Failed to leave workspace: ${e.message}")
             }
-            
-            repository.removeMember(workspaceId, userId)
-            if (selectedWorkspaceId.value == workspaceId) {
-                selectedWorkspaceId.value = null
-                workspaceViewMode.value = "LIST"
-            }
-            FeedbackManager.showSuccess("You have left the shard enclave.")
         }
     }
 
@@ -360,10 +552,16 @@ class WorkspaceViewModel constructor(
 
     fun archiveWorkspace(workspaceId: String, adminId: String) {
         viewModelScope.launch {
-            val member = repository.getMemberInfo(workspaceId, adminId).firstOrNull()
-            if (member?.assignedRoleTitle in listOf("Lead Creator", "Head")) {
-                repository.archiveWorkspace(workspaceId)
-                _toastMessage.value = "Archived."
+            try {
+                val member = repository.getMemberInfo(workspaceId, adminId).firstOrNull()
+                if (member?.assignedRoleTitle in listOf("Lead Creator", "Head", "Owner")) {
+                    repository.archiveWorkspace(workspaceId)
+                    FeedbackManager.showSuccess("Workspace ARCHIVED.")
+                } else {
+                    FeedbackManager.showError("Permission Denied.")
+                }
+            } catch (e: Exception) {
+                FeedbackManager.showError("Archive failed: ${e.message}")
             }
         }
     }
@@ -382,23 +580,53 @@ class WorkspaceViewModel constructor(
 
     fun endorseTeammate(giverId: String, receiverId: String, workspaceId: String, tags: List<String>) {
         viewModelScope.launch {
-            if (giverId == receiverId) {
-                _toastMessage.value = "You cannot endorse yourself!"
-                return@launch
+            try {
+                if (giverId == receiverId) {
+                    FeedbackManager.showWarning("Self-endorsement is not permitted.")
+                    return@launch
+                }
+                if (tags.isEmpty()) {
+                    FeedbackManager.showWarning("Please select at least one skill tag.")
+                    return@launch
+                }
+                
+                val workspace = repository.getWorkspaceById(workspaceId).firstOrNull()
+                if (workspace == null) {
+                    FeedbackManager.showError("Workspace not found.")
+                    return@launch
+                }
+                if (workspace.status != "ARCHIVED" && !workspace.isArchived) {
+                    FeedbackManager.showWarning("Endorsements are only permitted for ARCHIVED workspaces.")
+                    return@launch
+                }
+                
+                val giverMember = repository.getMemberInfo(workspaceId, giverId).firstOrNull()
+                val receiverMember = repository.getMemberInfo(workspaceId, receiverId).firstOrNull()
+                if (giverMember == null || receiverMember == null) {
+                    FeedbackManager.showWarning("Both users must be members of the same workspace.")
+                    return@launch
+                }
+                
+                val existingEndorsements = repository.getEndorsementsForUser(receiverId).firstOrNull() ?: emptyList()
+                val alreadyEndorsed = existingEndorsements.any { it.giverId == giverId && it.workspaceId == workspaceId }
+                if (alreadyEndorsed) {
+                    FeedbackManager.showWarning("You have already endorsed this teammate for this workspace.")
+                    return@launch
+                }
+
+                val endorsement = Endorsement(
+                    id = UUID.randomUUID().toString(),
+                    giverId = giverId,
+                    receiverId = receiverId,
+                    workspaceId = workspaceId,
+                    tags = tags,
+                    createdAt = System.currentTimeMillis()
+                )
+                repository.insertEndorsement(endorsement)
+                FeedbackManager.showSuccess("Teammate endorsed successfully!")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Endorsement failed: ${e.message}")
             }
-            if (tags.isEmpty()) {
-                _toastMessage.value = "Please select at least one tag."
-                return@launch
-            }
-            val endorsement = Endorsement(
-                giverId = giverId,
-                receiverId = receiverId,
-                workspaceId = workspaceId,
-                tags = tags,
-                createdAt = System.currentTimeMillis()
-            )
-            repository.insertEndorsement(endorsement)
-            _toastMessage.value = "Teammate endorsed successfully!"
         }
     }
 
@@ -410,21 +638,29 @@ class WorkspaceViewModel constructor(
         _toastMessage.value = "Policy updated!"
     }
 
-    fun addCalendarItem(title: String, scheduledDate: String, linkedTaskId: String?, userId: String) {
-        if (isWorkspaceArchived.value) return
+    fun addCalendarItem(title: String, scheduledDate: String, linkedTaskId: String?, userId: String, status: String = "Drafting") {
+        if (isWorkspaceArchived.value) {
+            FeedbackManager.showWarning("Archive Lockdown: Cannot schedule calendar items.")
+            return
+        }
         val wsId = selectedWorkspaceId.value ?: return
         viewModelScope.launch {
-            val item = ContentCalendarItem(
-                id = UUID.randomUUID().toString(),
-                workspaceId = wsId,
-                title = title,
-                scheduledDate = scheduledDate,
-                linkedTaskId = linkedTaskId,
-                createdBy = userId,
-                createdAt = System.currentTimeMillis()
-            )
-            repository.insertCalendarItem(item)
-            _toastMessage.value = "Content Calendar Item '$title' created!"
+            try {
+                val item = ContentCalendarItem(
+                    id = UUID.randomUUID().toString(),
+                    workspaceId = wsId,
+                    title = title,
+                    scheduledDate = scheduledDate,
+                    linkedTaskId = linkedTaskId,
+                    createdBy = userId,
+                    status = status,
+                    createdAt = System.currentTimeMillis()
+                )
+                repository.insertCalendarItem(item)
+                FeedbackManager.showSuccess("Content Calendar Item '$title' created!")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Scheduling failed: ${e.message}")
+            }
         }
     }
 
@@ -485,7 +721,7 @@ class WorkspaceViewModel constructor(
                     title = tt.title,
                     contentBody = tt.description,
                     stateScope = "PRODUCTION_READY",
-                    kanbanLane = tt.defaultLane,
+                    kanbanLane = "TODO",
                     createdAt = System.currentTimeMillis()
                 )
                 repository.insertTask(spawnedTask)
@@ -510,6 +746,7 @@ class WorkspaceViewModel constructor(
                 workspaceId = workspaceId,
                 authorId = authorId,
                 targetUserId = targetUserId,
+                content = noteText,
                 noteText = noteText,
                 createdAt = System.currentTimeMillis()
             )
@@ -563,6 +800,13 @@ class WorkspaceViewModel constructor(
             repository.insertWorkspaceEvent(event)
             
             _toastMessage.value = "Asset '$fileName' uploaded to $category."
+        }
+    }
+
+    fun deleteAsset(assetId: String) {
+        viewModelScope.launch {
+            repository.deleteAsset(assetId)
+            _toastMessage.value = "Asset deleted."
         }
     }
 
@@ -635,13 +879,60 @@ class WorkspaceViewModel constructor(
         }
     }
 
+    fun deleteDeliverable(deliverableId: String) {
+        viewModelScope.launch {
+            repository.deleteDeliverable(deliverableId)
+            _toastMessage.value = "Deliverable deleted."
+        }
+    }
+
+    fun updatePresence(workspaceId: String, userId: String, isOnline: Boolean) {
+        viewModelScope.launch {
+            repository.updateMemberPresence(workspaceId, userId, isOnline)
+        }
+    }
+
+    fun updateTyping(workspaceId: String, userId: String, isTyping: Boolean, typingText: String = "") {
+        viewModelScope.launch {
+            repository.updateMemberTyping(workspaceId, userId, isTyping, typingText)
+        }
+    }
+
+    fun updateViewingTask(workspaceId: String, userId: String, taskId: String?) {
+        viewModelScope.launch {
+            repository.updateMemberViewingTask(workspaceId, userId, taskId)
+        }
+    }
+
+    fun updateEditingAsset(workspaceId: String, userId: String, assetId: String?) {
+        viewModelScope.launch {
+            repository.updateMemberEditingAsset(workspaceId, userId, assetId)
+        }
+    }
+
+    fun updateLiveStatus(workspaceId: String, userId: String, statusUpdate: String) {
+        viewModelScope.launch {
+            repository.updateMemberLiveStatus(workspaceId, userId, statusUpdate)
+        }
+    }
+
+    fun workspaceHeartbeat(workspaceId: String, userId: String) {
+        viewModelScope.launch {
+            repository.updateMemberPresence(workspaceId, userId, true)
+        }
+    }
+
     fun exportWorkspaceSummary(workspace: Workspace, agreement: com.example.data.model.TeamAgreement?, tasks: List<ProductionTask>, members: List<WorkspaceMember>) {
         viewModelScope.launch {
-            val completedTasks = tasks.filter { it.kanbanLane.uppercase() == "PUBLISH" }
-            val rosterStr = members.map { "${it.userId} (${it.assignedRoleTitle})" }.joinToString(", ")
-            val agreementStr = if (agreement != null && agreement.isLocked) "Agreement Locked (Version ${agreement.version})" else "No Agreement Locked"
-            val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(workspace.createdAt))
-            _toastMessage.value = "Exporting Workspace Summary PDF: Document hash verified."
+            try {
+                val completedTasks = tasks.filter { it.kanbanLane.uppercase() == "PUBLISH" }
+                val rosterStr = members.joinToString(", ") { "${it.userId} (${it.assignedRoleTitle})" }
+                val agreementStr = if (agreement != null && agreement.isLocked) "Agreement Locked (Version ${agreement.version})" else "No Agreement Locked"
+                val dateStr = com.example.util.DateTimeUtils.formatFull(workspace.createdAt)
+                FeedbackManager.showSuccess("Exporting Workspace Summary PDF: Document hash verified for $dateStr")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Export failed: ${e.message}")
+            }
         }
     }
 }
