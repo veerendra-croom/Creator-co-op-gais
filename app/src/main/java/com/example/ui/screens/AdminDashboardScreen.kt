@@ -1228,7 +1228,7 @@ fun AdminDashboardScreen(
                         }
                     }
 
-                    Divider(color = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 10.dp))
+                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 10.dp))
 
                     // 1. Reporter Info Section
                     Text("1. REPORTER", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -1370,7 +1370,7 @@ fun AdminDashboardScreen(
                         }
                     }
 
-                    Divider(color = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 10.dp))
+                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 10.dp))
 
                     // 5. Admin Notes / Resolution Input
                     Text("REQUIRED INTERNAL AUDIT NOTES", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)

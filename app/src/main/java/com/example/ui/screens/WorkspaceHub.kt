@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -246,13 +247,20 @@ fun WorkspaceDetailContainer(
         topBar = {
             Column(modifier = Modifier.background(SurfaceColor)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = {
-                        if (activeModule != "STATE") {
-                            workspaceViewModel.workspaceSubTab.value = "STATE"
-                        } else {
-                            onBack()
-                        }
-                    }) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
+                    IconButton(
+                        onClick = {
+                            if (activeModule != "STATE") {
+                                workspaceViewModel.workspaceSubTab.value = "STATE"
+                            } else {
+                                onBack()
+                            }
+                        },
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("workspace_hub_back_button")
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         if (workspace.isSponsored) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

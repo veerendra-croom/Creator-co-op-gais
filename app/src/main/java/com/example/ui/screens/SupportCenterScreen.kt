@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -123,6 +125,22 @@ fun SupportCenterScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Creator Support Hub", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                        Text("24/7 Creator Care & Platform SLA Shards", color = TextSecondary, fontSize = 11.sp)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceColor)
+            )
+        },
         containerColor = PrimaryBackground
     ) { paddingValues ->
         Column(
@@ -426,7 +444,7 @@ fun NewSupportTicketForm(
                     // Conditional Bug Telemetry Panel
                     if (selectedCategory == "Bug") {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Divider(color = ColorDivider)
+                        HorizontalDivider(color = ColorDivider)
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         Text(
@@ -565,6 +583,67 @@ fun NewSupportTicketForm(
         }
         
         item {
+            val uriHandler = LocalUriHandler.current
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "FOUNDER ESCALATION DESK",
+                            color = AccentBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "For urgent executive support or mediation, contact platform leadership directly:",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { uriHandler.openUri("mailto:veerendrabotla@gmail.com") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue),
+                            border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Botla Veerendra (Founder)", fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
+                        OutlinedButton(
+                            onClick = { uriHandler.openUri("mailto:praveenmacha777@gmail.com") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonEmerald),
+                            border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Macha Praveen (Co-Founder)", fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -615,7 +694,7 @@ fun UserTicketDetailDialog(
                     }
                 }
 
-                Divider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
 
                 LazyColumn(
                     modifier = Modifier.weight(1f),
@@ -1017,7 +1096,7 @@ fun TicketItemRow(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-            Divider(color = ColorDivider.copy(alpha = 0.5f))
+            HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(
@@ -1403,7 +1482,7 @@ fun AdminTicketDetailDialog(
                     }
                 }
 
-                Divider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
 
                 // Scrollable details content
                 LazyColumn(
@@ -1421,7 +1500,7 @@ fun AdminTicketDetailDialog(
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("Title: ${ticket.title}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 Text("Description: ${ticket.description}", color = TextSecondary, fontSize = 11.sp, lineHeight = 15.sp)
-                                Divider(color = ColorDivider.copy(alpha = 0.5f))
+                                HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
                                 Text("Filer: ${ticket.userDisplayName} (ID: ${ticket.userId})", color = TextMuted, fontSize = 11.sp)
                                 Text("Assigned Admin: ${ticket.assignedAdminName ?: "Unassigned"}", color = TextMuted, fontSize = 11.sp)
                             }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -97,8 +98,13 @@ fun DirectMessagesScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { selectedUser = null }) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "Close chat", tint = Color.White)
+                            IconButton(
+                                onClick = { selectedUser = null },
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("close_chat_button")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close chat", tint = Color.White)
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Box(
@@ -393,8 +399,13 @@ fun DirectMessagesScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .testTag("dm_directory_back_button")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                             }
                             Text("Direct Messages", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
                         }

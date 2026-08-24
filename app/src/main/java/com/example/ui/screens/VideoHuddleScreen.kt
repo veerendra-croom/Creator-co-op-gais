@@ -12,8 +12,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -132,8 +133,13 @@ fun VideoHuddleScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("huddle_lobby_back")) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Exit Lobby", tint = Color.White)
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("huddle_lobby_back")
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Exit Lobby", tint = Color.White)
                     }
                     Text(
                         "CO-OP HUDDLE DECK",
@@ -487,6 +493,9 @@ fun VideoHuddleScreen(
                         IconButton(
                             onClick = {
                                 micEnabled = !micEnabled
+                                if (!micEnabled) {
+                                    yourVoiceVolume = 0f
+                                }
                                 coroutineScope.launch {
                                     val log = AuditLog(
                                         id = UUID.randomUUID().toString(),

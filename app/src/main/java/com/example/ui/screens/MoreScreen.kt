@@ -46,17 +46,17 @@ fun MoreScreen(
     val hapticFeedbackEnabledState by globalViewModel.hapticFeedbackEnabled.collectAsState()
     var showLicenses by remember { mutableStateOf(false) }
 
+    val effectiveUid = remember(userId) { if (!userId.isNullOrBlank()) userId else "guest_user" }
+
     if (showLicenses) {
         LicensesDialog(onDismiss = { showLicenses = false })
     }
 
-    LaunchedEffect(userId) {
-        userId?.let {
-            globalViewModel.loadWeeklyDigestSetting(it)
-            globalViewModel.loadUiTextSizeSetting(it)
-            globalViewModel.loadSyncFrequencySetting(it)
-            globalViewModel.loadHapticFeedbackSetting(it)
-        }
+    LaunchedEffect(effectiveUid) {
+        globalViewModel.loadWeeklyDigestSetting(effectiveUid)
+        globalViewModel.loadUiTextSizeSetting(effectiveUid)
+        globalViewModel.loadSyncFrequencySetting(effectiveUid)
+        globalViewModel.loadHapticFeedbackSetting(effectiveUid)
     }
 
     val filteredItems = remember(featureFlags, currentRole) {
@@ -286,7 +286,10 @@ fun MoreScreen(
                                         }
 
                                         Button(
-                                            onClick = { globalViewModel.replayTour(uid, tour.tourId) },
+                                            onClick = {
+                                                globalViewModel.replayTour(uid, tour.tourId)
+                                                onNavigate(tour.targetTab)
+                                            },
                                             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                                             shape = RoundedCornerShape(8.dp),
                                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
@@ -452,7 +455,7 @@ fun MoreScreen(
                             checked = weeklyDigestEnabled,
                             enabled = isWeeklyDigestFlagEnabled,
                             onCheckedChange = { isChecked ->
-                                userId?.let { globalViewModel.setWeeklyDigestSetting(it, isChecked) }
+                                globalViewModel.setWeeklyDigestSetting(effectiveUid, isChecked)
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = PrimaryBackground,
@@ -511,7 +514,7 @@ fun MoreScreen(
                         Switch(
                             checked = hapticFeedbackEnabledState,
                             onCheckedChange = { isChecked ->
-                                userId?.let { globalViewModel.setHapticFeedbackSetting(it, isChecked) }
+                                globalViewModel.setHapticFeedbackSetting(effectiveUid, isChecked)
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = PrimaryBackground,
@@ -557,7 +560,7 @@ fun MoreScreen(
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { userId?.let { globalViewModel.setUiTextSizeSetting(it, size) } }
+                                        .clickable { globalViewModel.setUiTextSizeSetting(effectiveUid, size) }
                                         .testTag("text_size_$size"),
                                     color = if (isSelected) AccentBlue.copy(alpha = 0.2f) else SurfaceLightColor,
                                     shape = RoundedCornerShape(10.dp),
@@ -616,7 +619,7 @@ fun MoreScreen(
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { userId?.let { globalViewModel.setSyncFrequencySetting(it, freq) } }
+                                        .clickable { globalViewModel.setSyncFrequencySetting(effectiveUid, freq) }
                                         .testTag("sync_frequency_$freq"),
                                     color = if (isSelected) NeonEmerald.copy(alpha = 0.2f) else SurfaceLightColor,
                                     shape = RoundedCornerShape(10.dp),

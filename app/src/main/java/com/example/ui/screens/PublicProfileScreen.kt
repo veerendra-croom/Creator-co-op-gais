@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -97,8 +99,11 @@ fun PublicProfileScreen(
                 .padding(DS.Space12),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.testTag("public_profile_back_button")
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Spacer(modifier = Modifier.width(DS.Space8))
             Text(
@@ -830,7 +835,7 @@ fun PortfolioCaseStudyItem(title: String, desc: String, metrics: String) {
             Spacer(modifier = Modifier.height(DS.Space8))
             Text(desc, color = TextSecondary, fontSize = 12.sp, lineHeight = 16.sp)
             Spacer(modifier = Modifier.height(DS.Space8))
-            Divider(color = ColorDivider.copy(alpha = 0.5f))
+            HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(8.dp))
             Text(metrics, color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }

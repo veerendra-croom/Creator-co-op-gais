@@ -145,7 +145,7 @@ fun PlatformControlCenterScreen(
                                 onCheckedChange = { viewModel.updateMaintenanceMode(it) },
                                 tag = "toggle_maintenance"
                             )
-                            Divider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
+                            HorizontalDivider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
                             SettingToggleRow(
                                 title = "Beta Mode",
                                 description = "Enables beta cohort verification flags and unlocks candidate metrics portals.",
@@ -153,7 +153,7 @@ fun PlatformControlCenterScreen(
                                 onCheckedChange = { viewModel.updateBetaMode(it) },
                                 tag = "toggle_beta"
                             )
-                            Divider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
+                            HorizontalDivider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
                             SettingToggleRow(
                                 title = "Public Registration",
                                 description = "Allows new guest creators to establish co-op profiles without prior referrals.",
@@ -161,7 +161,7 @@ fun PlatformControlCenterScreen(
                                 onCheckedChange = { viewModel.updateRegistrationToggle(it) },
                                 tag = "toggle_registration"
                             )
-                            Divider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
+                            HorizontalDivider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
                             SettingToggleRow(
                                 title = "Invite-Only Code Restriction",
                                 description = "Enforces valid onboarding referral code check during registration.",
@@ -259,7 +259,7 @@ fun PlatformControlCenterScreen(
                                         }
                                     )
                                     if (index < featureFlags.size - 1) {
-                                        Divider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
+                                        HorizontalDivider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
                                     }
                                 }
                             }
@@ -408,7 +408,7 @@ fun FeatureFlagMatrixCard(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            Divider(color = ColorDivider, thickness = 0.5.dp)
+            HorizontalDivider(color = ColorDivider, thickness = 0.5.dp)
             Spacer(modifier = Modifier.height(10.dp))
 
             // Sub-Toggles: Organizers vs Participants

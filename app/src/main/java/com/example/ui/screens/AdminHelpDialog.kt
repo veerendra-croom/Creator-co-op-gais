@@ -243,7 +243,7 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                     }
                 }
 
-                Divider(color = ColorDivider, modifier = Modifier.fillMaxWidth())
+                HorizontalDivider(color = ColorDivider, modifier = Modifier.fillMaxWidth())
 
                 // Main Layout with vertical navigation and modular content pane
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -663,7 +663,7 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                     }
                 }
 
-                Divider(color = ColorDivider)
+                HorizontalDivider(color = ColorDivider)
 
                 // Footer Founders Credit Bar (CRITICAL REQUIREMENT)
                 Box(

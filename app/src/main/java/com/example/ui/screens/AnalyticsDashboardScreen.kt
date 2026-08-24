@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -27,6 +33,7 @@ fun AnalyticsDashboardScreen(
     analyticsViewModel: AnalyticsViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val userActivity by analyticsViewModel.userActivity.collectAsState()
     val funnelData by analyticsViewModel.funnelData.collectAsState()
     val pmfMetrics by analyticsViewModel.pmfMetrics.collectAsState()
@@ -34,6 +41,23 @@ fun AnalyticsDashboardScreen(
     val churnAlerts by analyticsViewModel.churnAlerts.collectAsState()
     val toastMessage by analyticsViewModel.toastMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val shareTelemetry = { format: String ->
+        val content = analyticsViewModel.getExportContent(format)
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Telemetry $format", content)
+        clipboard.setPrimaryClip(clip)
+
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TITLE, "Creator Co-Op Telemetry ($format)")
+            putExtra(Intent.EXTRA_TEXT, content)
+            type = if (format == "JSON") "application/json" else "text/csv"
+        }
+        val chooser = Intent.createChooser(sendIntent, "Export Analytics Telemetry ($format)")
+        context.startActivity(chooser)
+        analyticsViewModel.exportData(format)
+    }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
@@ -57,14 +81,28 @@ fun AnalyticsDashboardScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Cohort Performance & Revenue Telemetry",
-                    color = TextSecondary,
-                    fontSize = 11.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Column {
+                        Text("Analytics Telemetry", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                        Text(
+                            text = "Cohort Performance & Conversion Telemetry",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
                 
-                IconButton(onClick = { analyticsViewModel.exportData("CSV") }) {
-                    Icon(Icons.Default.Download, contentDescription = "Export Data", tint = AccentBlue)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(onClick = { shareTelemetry("CSV") }) {
+                        Icon(Icons.Default.Download, contentDescription = "Export CSV", tint = AccentBlue)
+                    }
+                    IconButton(onClick = { shareTelemetry("JSON") }) {
+                        Icon(Icons.Default.Share, contentDescription = "Export JSON", tint = NeonEmerald)
+                    }
                 }
             }
 
@@ -116,7 +154,7 @@ fun AnalyticsDashboardScreen(
                             Column(modifier = Modifier.padding(16.dp)) {
                                 userActivity.take(5).forEach { (userId, count) ->
                                     UserActivityRow(userId, count)
-                                    Divider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
+                                    HorizontalDivider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
                                 }
                             }
                         }

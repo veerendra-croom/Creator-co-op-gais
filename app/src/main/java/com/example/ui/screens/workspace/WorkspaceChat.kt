@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -431,8 +432,13 @@ fun WorkspaceChat(
                             .padding(horizontal = DS.Space12, vertical = DS.Space8),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { selectedDMContactId = null }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        IconButton(
+                            onClick = { selectedDMContactId = null },
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .testTag("ws_chat_dm_back_button")
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                         Spacer(modifier = Modifier.width(DS.Space4))
                         

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -263,7 +264,28 @@ fun BackupCenterScreen(
     }
 
     Scaffold(
-        containerColor = PrimaryBackground
+        containerColor = PrimaryBackground,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("State Backup & Recovery", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                        Text("Deterministic state snapshots & disaster recovery", color = TextSecondary, fontSize = 11.sp)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showHelpDialog = true }) {
+                        Icon(Icons.Default.HelpOutline, contentDescription = "Help Guide", tint = TextSecondary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground)
+            )
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier

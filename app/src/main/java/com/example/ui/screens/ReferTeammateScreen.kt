@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -125,6 +129,30 @@ fun ReferTeammateScreen(
                             color = TextSecondary
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        val refCode = userProfile.referralCode?.ifEmpty { "CODE" } ?: "CODE"
+                        val refUrl = "https://creatorcoop.com/join?ref=$refCode"
+                        
+                        val copyToClipboard = { textToCopy: String, label: String ->
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText(label, textToCopy)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "$label copied to clipboard!", Toast.LENGTH_SHORT).show()
+                        }
+
+                        val shareReferralPass = {
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TITLE, "Join Creator Co-Op")
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    "🚀 Join me on Creator Co-Op to collaborate on productions, split revenues fairly, and manage creative projects!\n\nUse my invite pass: $refCode\nJoin link: $refUrl"
+                                )
+                                type = "text/plain"
+                            }
+                            val shareIntent = Intent.createChooser(sendIntent, "Share Creator Co-Op Invite Pass")
+                            context.startActivity(shareIntent)
+                        }
+
                         Surface(
                             color = PrimaryBackground,
                             shape = RoundedCornerShape(8.dp),
@@ -133,10 +161,7 @@ fun ReferTeammateScreen(
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .clickable {
-                                        // Mock clipboard action
-                                        Toast.makeText(context, "Referral code copied!", Toast.LENGTH_SHORT).show()
-                                    }
+                                    .clickable { copyToClipboard(refCode, "Referral code") }
                                     .padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
@@ -148,12 +173,17 @@ fun ReferTeammateScreen(
                                     fontSize = 20.sp,
                                     modifier = Modifier.testTag("my_referral_code")
                                 )
-                                Icon(
-                                    imageVector = Icons.Default.Share,
-                                    contentDescription = "Share Code",
-                                    tint = AccentBlue,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                IconButton(
+                                    onClick = { shareReferralPass() },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share Code",
+                                        tint = AccentBlue,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -171,15 +201,13 @@ fun ReferTeammateScreen(
                                 .fillMaxWidth()
                                 .background(PrimaryBackground, RoundedCornerShape(8.dp))
                                 .border(BorderStroke(1.dp, ColorDivider), RoundedCornerShape(8.dp))
-                                .clickable {
-                                    Toast.makeText(context, "Referral link copied!", Toast.LENGTH_SHORT).show()
-                                }
+                                .clickable { copyToClipboard(refUrl, "Referral link") }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "https://creatorcoop.com/join?ref=${userProfile.referralCode ?: "CODE"}",
+                                text = refUrl,
                                 color = TextSecondary,
                                 fontSize = 12.sp,
                                 maxLines = 1,
@@ -194,6 +222,18 @@ fun ReferTeammateScreen(
                                 tint = AccentBlue,
                                 modifier = Modifier.size(16.dp)
                             )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Button(
+                            onClick = { shareReferralPass() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("SHARE INVITATION PASS", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -2623,8 +2624,13 @@ fun GlobalSyncTopBar(
                     .testTag("top_bar_sync_row")
             ) {
                 if (showBack) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("dashboard_top_bar_back_button")
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 }
                 Text(title, fontSize = 15.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -3155,7 +3161,7 @@ fun MaintenanceOverlay(
                         Text("Node Identifier", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text("COOP-US-WEST-1", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
                     }
-                    Divider(color = ColorDivider.copy(alpha = 0.5f))
+                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -3163,7 +3169,7 @@ fun MaintenanceOverlay(
                         Text("Ledger Integrity", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text("Synchronized (ReadOnly)", color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Black)
                     }
-                    Divider(color = ColorDivider.copy(alpha = 0.5f))
+                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween

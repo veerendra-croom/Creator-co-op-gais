@@ -1250,7 +1250,7 @@ fun CreatorHealthCard(
                 )
             }
 
-            Divider(color = ColorDivider.copy(alpha = 0.4f))
+            HorizontalDivider(color = ColorDivider.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(6.dp))
 
             // Status and interaction date
@@ -1407,7 +1407,7 @@ fun CreatorCrmDetailDialog(
                     }
                 }
 
-                Divider(color = ColorDivider)
+                HorizontalDivider(color = ColorDivider)
 
                 LazyColumn(
                     modifier = Modifier
@@ -1438,7 +1438,7 @@ fun CreatorCrmDetailDialog(
                                     }
                                 }
 
-                                Divider(color = ColorDivider.copy(alpha = 0.5f))
+                                HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
 
                                 Text("FOLLOW-UP PIPELINE STATUS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1575,7 +1575,7 @@ fun CreatorCrmDetailDialog(
                                     }
                                 }
 
-                                Divider(color = ColorDivider.copy(alpha = 0.5f))
+                                HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
 
                                 // Add checklist task input
                                 Row(
@@ -1664,7 +1664,7 @@ fun CreatorCrmDetailDialog(
                                 }
 
                                 if (historyList.isNotEmpty()) {
-                                    Divider(color = ColorDivider.copy(alpha = 0.5f))
+                                    HorizontalDivider(color = ColorDivider.copy(alpha = 0.5f))
                                     Text("PAST CONTACT TIMELINE", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     historyList.forEach { entry ->
                                         Row(
@@ -1790,7 +1790,7 @@ fun CohortRegistrationDialog(
                     }
                 }
 
-                Divider(color = ColorDivider)
+                HorizontalDivider(color = ColorDivider)
 
                 OutlinedTextField(
                     value = name,

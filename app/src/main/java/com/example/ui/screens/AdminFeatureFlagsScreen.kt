@@ -592,7 +592,7 @@ fun AdminFeatureFlagItem(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            Divider(color = ColorDivider, thickness = 0.5.dp)
+            HorizontalDivider(color = ColorDivider, thickness = 0.5.dp)
             Spacer(modifier = Modifier.height(10.dp))
 
             // Sub-Role Controls

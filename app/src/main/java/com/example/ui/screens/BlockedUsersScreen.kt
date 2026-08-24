@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +35,7 @@ fun BlockedUsersScreen(
     val application = LocalContext.current.applicationContext as com.example.CreatorCoopApp
     val repository = remember { application.container.repository }
     val currentUserId = userProfile?.id ?: "DemoUser"
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val creators by repository.getAllUsersFlow().collectAsState(initial = emptyList())
     var blockedIdsList by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -45,7 +47,7 @@ fun BlockedUsersScreen(
         blockedIdsList = if (rawValue.isBlank()) emptyList() else rawValue.split(",")
     }
 
-    val updateBlockedSetting = { newBlockedList: List<String> ->
+    val updateBlockedSetting = { newBlockedList: List<String>, feedback: String ->
         blockedIdsList = newBlockedList
         val csv = newBlockedList.joinToString(",")
         coroutineScope.launch {
@@ -57,6 +59,7 @@ fun BlockedUsersScreen(
                     value = csv
                 )
             )
+            snackbarHostState.showSnackbar(feedback)
         }
     }
 
@@ -82,7 +85,7 @@ fun BlockedUsersScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Text("Blocked Users Manager", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
         }
@@ -130,7 +133,7 @@ fun BlockedUsersScreen(
                         username = "@${user.username}",
                         onUnblock = {
                             val newList = blockedIdsList.toMutableList().apply { remove(user.id) }
-                            updateBlockedSetting(newList)
+                            updateBlockedSetting(newList, "Unblocked @${user.username}")
                         }
                     )
                 }
@@ -181,7 +184,7 @@ fun BlockedUsersScreen(
                             Button(
                                 onClick = {
                                     val newList = blockedIdsList.toMutableList().apply { add(user.id) }
-                                    updateBlockedSetting(newList)
+                                    updateBlockedSetting(newList, "Blocked @${user.username}")
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = AccentRed.copy(alpha = 0.2f), contentColor = AccentRed),
                                 border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.4f)),
@@ -196,6 +199,11 @@ fun BlockedUsersScreen(
                 }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
     }
 }
 

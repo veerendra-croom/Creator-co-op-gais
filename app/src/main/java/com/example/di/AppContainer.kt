@@ -16,7 +16,7 @@ class AppContainer(private val application: Application) {
             Room.databaseBuilder(application, AppDatabase::class.java, "creator_coop.db")
         }
         builder
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
     

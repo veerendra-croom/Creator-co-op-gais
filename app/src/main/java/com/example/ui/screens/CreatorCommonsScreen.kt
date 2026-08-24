@@ -861,14 +861,19 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
                         }
                     }
                         val context = androidx.compose.ui.platform.LocalContext.current
-                        TextButton(
+                        IconButton(
                             onClick = { 
-                                android.widget.Toast.makeText(context, "Syndicate Share: Spreading this idea across the co-op!", android.widget.Toast.LENGTH_SHORT).show()
+                                val sendIntent = android.content.Intent().apply {
+                                    action = android.content.Intent.ACTION_SEND
+                                    putExtra(android.content.Intent.EXTRA_TITLE, post.title)
+                                    putExtra(android.content.Intent.EXTRA_TEXT, "✨ ${post.title}\n\n${post.body}\n\nShared via Creator Co-Op (${post.spaceName})")
+                                    type = "text/plain"
+                                }
+                                val shareIntent = android.content.Intent.createChooser(sendIntent, "Share via Creator Co-Op")
+                                context.startActivity(shareIntent)
                             }
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.Share, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
-                            }
+                            Icon(Icons.Outlined.Share, contentDescription = "Share Post", tint = TextSecondary, modifier = Modifier.size(20.dp))
                         }
                 }
             }

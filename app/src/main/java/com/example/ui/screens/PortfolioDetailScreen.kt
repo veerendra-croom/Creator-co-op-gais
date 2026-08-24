@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,11 +35,15 @@ fun PortfolioDetailScreen(projectId: String, onBack: () -> Unit) {
         ) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.padding(16.dp).align(Alignment.TopStart)
+                modifier = Modifier
+                    .padding(16.dp)
+                    .align(Alignment.TopStart)
+                    .minimumInteractiveComponentSize()
+                    .testTag("portfolio_detail_back_button")
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
-            Icon(Icons.Default.PlayCircle, null, tint = AccentBlue, modifier = Modifier.size(64.dp).align(Alignment.Center))
+            Icon(Icons.Default.PlayCircle, contentDescription = "Play Project Video", tint = AccentBlue, modifier = Modifier.size(64.dp).align(Alignment.Center))
         }
 
         LazyColumn(

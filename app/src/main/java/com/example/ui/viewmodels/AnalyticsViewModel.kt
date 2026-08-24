@@ -85,9 +85,9 @@ class AnalyticsViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun resetToast() { _toastMessage.value = null }
 
-    fun exportData(format: String) {
+    fun getExportContent(format: String): String {
         val allEvents = AnalyticsManager.events.value
-        val content = if (format == "JSON") {
+        return if (format == "JSON") {
             "[" + allEvents.joinToString(",") { 
                 "{\"event\":\"${it.name}\",\"time\":${it.timestamp}}"
             } + "]"
@@ -96,10 +96,12 @@ class AnalyticsViewModel(private val repository: AppRepository) : ViewModel() {
                 "${it.name},${it.timestamp}"
             }
         }
-        // In a real app, write to File or use Share Sheet
-        // For MVP, we log it and notify the user
+    }
+
+    fun exportData(format: String) {
+        val content = getExportContent(format)
         android.util.Log.d("AnalyticsExport", content)
-        _toastMessage.value = "$format Exported to Logcat"
+        _toastMessage.value = "$format telemetry compiled (${AnalyticsManager.events.value.size} events)"
     }
 }
 

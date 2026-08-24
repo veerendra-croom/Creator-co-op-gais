@@ -1,11 +1,14 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SupervisorAccount
@@ -14,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,6 +25,7 @@ import com.example.ui.theme.*
 
 @Composable
 fun LegalScreen(onBack: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -32,7 +37,7 @@ fun LegalScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Spacer(modifier = Modifier.width(8.dp))
             Column {
@@ -266,6 +271,56 @@ fun LegalScreen(onBack: () -> Unit) {
                         "anonymized telemetry (device identifiers, general zip-level region) to customize non-intrusive ads. " +
                         "Please refer to Google's Ad Network Disclosures and Meta's Audience Network Privacy Disclosures."
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = ColorDivider)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Platform Governance & Founder Attribution
+                Text(
+                    "PLATFORM GOVERNANCE & FOUNDERS",
+                    color = AccentBlue,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Creator Co-Op is operated under executive direction of Botla Veerendra (Founder) and Macha Praveen (Co-Founder). For direct legal escalations, copyright notices, or policy clarifications, reach our founder desk:",
+                    color = TextSecondary,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { uriHandler.openUri("mailto:veerendrabotla@gmail.com") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue),
+                        border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Veerendra", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = { uriHandler.openUri("mailto:praveenmacha777@gmail.com") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonEmerald),
+                        border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Praveen", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }

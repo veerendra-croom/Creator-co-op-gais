@@ -171,7 +171,19 @@ class CreatorAppEndToEndTest {
                     isVerifiedPro = true
                 )
             )
+            repository.workspaceDao.insertWorkspace(
+                com.example.data.model.Workspace(
+                    id = "ws_youtube_main",
+                    name = "TechPulse Main Channel",
+                    platformType = "YOUTUBE",
+                    createdBy = "me",
+                    createdAt = System.currentTimeMillis()
+                )
+            )
             repository.setOnboardingChecklistDismissed("me", true)
+            com.example.ui.tour.GuidedTourRepository.ALL_TOURS.forEach { tour ->
+                repository.setTourStatus("me", tour.tourId, com.example.ui.tour.TourStatus.COMPLETED.name)
+            }
             repository.insertMember(
                 com.example.data.model.WorkspaceMember(
                     id = "test_membership_me",
@@ -199,15 +211,18 @@ class CreatorAppEndToEndTest {
         composeTestRule.waitForIdle()
 
         // Assert workspaces tab is open, find prepopulated project card and click it
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("TechPulse Main Channel").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onAllNodesWithText("TechPulse Main Channel").onFirst().assertExists()
         composeTestRule.onNodeWithText("YOUTUBE").assertExists()
         composeTestRule.onAllNodesWithText("TechPulse Main Channel").onFirst().performClick()
-
         composeTestRule.waitForIdle()
 
-        // Click TechPulse Main Channel again in the workspaces list to enter details
-        composeTestRule.onAllNodesWithText("TechPulse Main Channel").onFirst().performClick()
-        composeTestRule.waitForIdle()
+        // Wait for workspace details tabs to load asynchronously
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("My Drafts").fetchSemanticsNodes().isNotEmpty()
+        }
 
         // Verify the details screen elements (the detail view tabs) are visible with simple down-to-earth words
         composeTestRule.onNodeWithText("My Drafts").assertExists()

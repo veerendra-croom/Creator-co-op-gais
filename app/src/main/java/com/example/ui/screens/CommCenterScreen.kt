@@ -52,6 +52,27 @@ fun CommCenterScreen(
     }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Communications HQ", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                        Text("Broadcasts, direct channels & alerts", color = TextSecondary, fontSize = 11.sp)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showHelpDialog = true }) {
+                        Icon(Icons.Default.HelpOutline, contentDescription = "Help Guide", tint = TextSecondary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceColor)
+            )
+        },
         floatingActionButton = {
             if (selectedTab == 0) {
                 FloatingActionButton(

@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,147 +35,272 @@ fun TaskDetailsScreen(
     val application = LocalContext.current.applicationContext as CreatorCoopApp
     val repository = remember { application.container.repository }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     
     val taskFlow = remember(taskId) { repository.getTaskById(taskId) }
     val taskState by taskFlow.collectAsState(initial = null)
     val task = taskState
     
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    
     if (task == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().background(PrimaryBackground), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = NeonEmerald)
         }
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PrimaryBackground)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-            }
-            Text("Task-${task.id.take(6).uppercase()}", color = TextSecondary, fontSize = 14.sp)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    color = when (task.kanbanLane) {
-                        "COMPLETED" -> NeonEmerald.copy(alpha = 0.15f)
-                        "IN_PROGRESS" -> AccentBlue.copy(alpha = 0.15f)
-                        else -> AccentRed.copy(alpha = 0.15f)
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, when (task.kanbanLane) {
-                        "COMPLETED" -> NeonEmerald
-                        "IN_PROGRESS" -> AccentBlue
-                        else -> AccentRed
-                    })
-                ) {
-                    Text(
-                        text = task.kanbanLane.replace("_", " "),
-                        color = when (task.kanbanLane) {
-                            "COMPLETED" -> NeonEmerald
-                            "IN_PROGRESS" -> AccentBlue
-                            else -> AccentRed
-                        },
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-                IconButton(
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            containerColor = SurfaceColor,
+            title = { Text("Delete Task?", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text("This will permanently remove '${task.title}'. This action cannot be undone.", color = TextSecondary) },
+            confirmButton = {
+                Button(
                     onClick = {
+                        showDeleteConfirm = false
                         scope.launch {
                             repository.deleteTask(task.id)
                             onBack()
                         }
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete Task", tint = TextMuted)
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = TextSecondary)
                 }
             }
-        }
+        )
+    }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item {
-                Text(
-                    text = task.title,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White
-                )
+    if (showEditDialog) {
+        var editTitle by remember { mutableStateOf(task.title) }
+        var editDescription by remember { mutableStateOf(task.contentBody) }
+        var editPriority by remember { mutableStateOf(task.priority) }
+
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            containerColor = SurfaceColor,
+            title = { Text("Edit Task Details", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        label = { Text("Task Title") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = AccentBlue,
+                            unfocusedBorderColor = ColorDivider
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editDescription,
+                        onValueChange = { editDescription = it },
+                        label = { Text("Description") },
+                        minLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = AccentBlue,
+                            unfocusedBorderColor = ColorDivider
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("Priority", color = TextSecondary, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("LOW", "MEDIUM", "HIGH").forEach { p ->
+                            FilterChip(
+                                selected = editPriority == p,
+                                onClick = { editPriority = p },
+                                label = { Text(p, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                                    selectedLabelColor = AccentBlue
+                                )
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = task.copy(
+                            title = editTitle.trim().ifEmpty { task.title },
+                            contentBody = editDescription.trim(),
+                            priority = editPriority
+                        )
+                        scope.launch {
+                            repository.insertTask(updated)
+                            snackbarHostState.showSnackbar("Task details updated")
+                        }
+                        showEditDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                ) {
+                    Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
             }
-            
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TaskMetaBadge(icon = Icons.Default.Person, title = "Assignee", value = task.creatorId.take(12))
-                    TaskMetaBadge(
-                        icon = Icons.Default.CalendarToday, 
-                        title = "Due", 
-                        value = task.deadline?.let { SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(it)) } ?: "No due date"
+        )
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = PrimaryBackground
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                }
+                Text("Task-${task.id.take(6).uppercase()}", color = TextSecondary, fontSize = 14.sp)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Surface(
+                        color = when (task.kanbanLane) {
+                            "COMPLETED" -> NeonEmerald.copy(alpha = 0.15f)
+                            "IN_PROGRESS" -> AccentBlue.copy(alpha = 0.15f)
+                            else -> AccentRed.copy(alpha = 0.15f)
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, when (task.kanbanLane) {
+                            "COMPLETED" -> NeonEmerald
+                            "IN_PROGRESS" -> AccentBlue
+                            else -> AccentRed
+                        })
+                    ) {
+                        Text(
+                            text = task.kanbanLane.replace("_", " "),
+                            color = when (task.kanbanLane) {
+                                "COMPLETED" -> NeonEmerald
+                                "IN_PROGRESS" -> AccentBlue
+                                else -> AccentRed
+                            },
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    IconButton(onClick = { showEditDialog = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Task", tint = TextSecondary)
+                    }
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Task", tint = TextMuted)
+                    }
+                }
+            }
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.weight(1f)) {
+                item {
+                    Text(
+                        text = task.title,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
                     )
                 }
-            }
-
-            item {
-                Divider(color = ColorDivider)
-            }
-
-            item {
-                Text("DESCRIPTION", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = task.contentBody.ifBlank { "No description provided." },
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (task.kanbanLane != "COMPLETED") {
-                        Button(
-                            onClick = {
-                                scope.launch { repository.updateTaskStatus(taskId, "COMPLETED") }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Mark Complete", color = PrimaryBackground, fontWeight = FontWeight.Bold)
-                        }
+                
+                item {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        TaskMetaBadge(icon = Icons.Default.Person, title = "Assignee", value = task.creatorId.take(12))
+                        TaskMetaBadge(
+                            icon = Icons.Default.CalendarToday, 
+                            title = "Due", 
+                            value = task.deadline?.let { SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(it)) } ?: "No due date"
+                        )
+                        TaskMetaBadge(
+                            icon = Icons.Default.Flag,
+                            title = "Priority",
+                            value = task.priority
+                        )
                     }
-                    if (task.kanbanLane != "IN_PROGRESS" && task.kanbanLane != "COMPLETED") {
-                        Button(
-                            onClick = {
-                                scope.launch { repository.updateTaskStatus(taskId, "IN_PROGRESS") }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Start Work", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                item {
+                    HorizontalDivider(color = ColorDivider)
+                }
+
+                item {
+                    Text("DESCRIPTION", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = task.contentBody.ifBlank { "No description provided." },
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (task.kanbanLane != "COMPLETED") {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        repository.updateTaskStatus(taskId, "COMPLETED")
+                                        snackbarHostState.showSnackbar("Task marked as completed! (+2 Reputation)")
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Mark Complete", color = PrimaryBackground, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (task.kanbanLane != "IN_PROGRESS" && task.kanbanLane != "COMPLETED") {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        repository.updateTaskStatus(taskId, "IN_PROGRESS")
+                                        snackbarHostState.showSnackbar("Task moved to In Progress")
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Start Work", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
-            }
 
-            item {
-                Divider(color = ColorDivider, modifier = Modifier.padding(vertical = 16.dp))
-            }
+                item {
+                    HorizontalDivider(color = ColorDivider, modifier = Modifier.padding(vertical = 8.dp))
+                }
 
-            item {
-                Text("ACTIVITY", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                TaskActivityItem(author = "System", action = "created the task", time = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(task.createdAt)))
-                if (task.kanbanLane == "COMPLETED") {
-                    TaskActivityItem(author = "System", action = "marked task as completed", time = "Recently")
+                item {
+                    Text("ACTIVITY", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TaskActivityItem(author = "System", action = "created the task", time = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(task.createdAt)))
+                    if (task.kanbanLane == "COMPLETED") {
+                        TaskActivityItem(author = "System", action = "marked task as completed", time = "Recently")
+                    } else if (task.kanbanLane == "IN_PROGRESS") {
+                        TaskActivityItem(author = "System", action = "started work on task", time = "In progress")
+                    }
                 }
             }
         }
