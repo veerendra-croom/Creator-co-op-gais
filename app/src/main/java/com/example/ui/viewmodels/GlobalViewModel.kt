@@ -30,6 +30,17 @@ class GlobalViewModel constructor(
     val selectedWorkspaceId = MutableStateFlow<String?>(null)
     val selectedProjectId = MutableStateFlow<String?>(null)
 
+    private val _blockedUsers = MutableStateFlow<Set<String>>(emptySet())
+    val blockedUsers: StateFlow<Set<String>> = _blockedUsers.asStateFlow()
+
+    fun blockUser(userId: String) {
+        _blockedUsers.update { it + userId }
+    }
+
+    fun unblockUser(userId: String) {
+        _blockedUsers.update { it - userId }
+    }
+
     fun navigateToTaskDetails(taskId: String) {
         selectedTaskId.value = taskId
         navigateToTab("TASK_DETAILS")
@@ -52,6 +63,7 @@ class GlobalViewModel constructor(
 
     fun navigateToTab(tab: String) {
         if (currentTab.value != tab) {
+            tabBackStack.remove(tab)
             tabBackStack.add(currentTab.value)
             currentTab.value = tab
         }
@@ -65,13 +77,142 @@ class GlobalViewModel constructor(
         return false
     }
 
+    fun handleDeepLink(uri: android.net.Uri?) {
+        if (uri == null) return
+        val path = uri.path ?: ""
+        val host = uri.host ?: ""
+        val scheme = uri.scheme ?: ""
+
+        when {
+            // Profile link: https://creator-studio.app/u/{userId} or creatorstudio://user/{userId}
+            path.startsWith("/u/") -> {
+                val uid = path.removePrefix("/u/").trim().removeSuffix("/")
+                if (uid.isNotBlank()) {
+                    showSplash.value = false
+                    navigateToPublicProfile(uid)
+                    toastMessage.value = "Viewing Creator Profile ($uid)"
+                }
+            }
+            scheme == "creatorstudio" && (host == "user" || host == "u") -> {
+                val uid = path.trim('/').trim()
+                if (uid.isNotBlank()) {
+                    showSplash.value = false
+                    navigateToPublicProfile(uid)
+                    toastMessage.value = "Viewing Creator Profile ($uid)"
+                }
+            }
+            // Pitch link: https://creator-studio.app/pitch/{pitchId} or creatorstudio://pitch/{pitchId}
+            path.startsWith("/pitch/") -> {
+                showSplash.value = false
+                navigateToTab("SYNDICATE")
+                toastMessage.value = "Navigated to Syndicate Pitch Hub"
+            }
+            scheme == "creatorstudio" && host == "pitch" -> {
+                showSplash.value = false
+                navigateToTab("SYNDICATE")
+                toastMessage.value = "Navigated to Syndicate Pitch Hub"
+            }
+            // Role link: https://creator-studio.app/role/{roleId} or creatorstudio://role/{roleId}
+            path.startsWith("/role/") -> {
+                showSplash.value = false
+                navigateToTab("SYNDICATE")
+                toastMessage.value = "Viewing Open Co-Op Role"
+            }
+            scheme == "creatorstudio" && host == "role" -> {
+                showSplash.value = false
+                navigateToTab("SYNDICATE")
+                toastMessage.value = "Viewing Open Co-Op Role"
+            }
+            // Workspace link: https://creator-studio.app/workspace/{workspaceId}
+            path.startsWith("/workspace/") -> {
+                val wsId = path.removePrefix("/workspace/").trim().removeSuffix("/")
+                if (wsId.isNotBlank()) {
+                    showSplash.value = false
+                    navigateToWorkspaceSettings(wsId)
+                    toastMessage.value = "Connecting to Workspace Hub"
+                }
+            }
+            // Project link: https://creator-studio.app/project/{projectId}
+            path.startsWith("/project/") -> {
+                val projId = path.removePrefix("/project/").trim().removeSuffix("/")
+                if (projId.isNotBlank()) {
+                    showSplash.value = false
+                    navigateToPortfolioDetail(projId)
+                    toastMessage.value = "Opening Portfolio Project"
+                }
+            }
+            // Invite link: https://creator-studio.app/invite/{code}
+            path.startsWith("/invite/") -> {
+                showSplash.value = false
+                navigateToTab("WORKSPACES")
+                toastMessage.value = "Co-Op Invitation Link Activated"
+            }
+        }
+    }
+
     val showSplash = MutableStateFlow(true)
     val showOnboarding = MutableStateFlow(false)
     val showCelebration = MutableStateFlow(false)
     val syncState = MutableStateFlow<SyncState>(SyncState.Synced)
     val toastMessage = MutableStateFlow<String?>(null)
+
+    val tourManager = com.example.ui.tour.GuidedTourManager(repository, viewModelScope)
+
+    fun checkAndStartTour(userId: String, config: com.example.ui.tour.GuidedTourConfig) {
+        tourManager.checkAndStartTour(userId, config)
+    }
+
+    fun startTour(userId: String, config: com.example.ui.tour.GuidedTourConfig, forceReplay: Boolean = true) {
+        if (config.targetTab.isNotEmpty()) {
+            navigateToTab(config.targetTab)
+        }
+        tourManager.startTour(userId, config, forceReplay)
+    }
+
+    fun replayTour(userId: String, tourId: String) {
+        val config = com.example.ui.tour.GuidedTourRepository.getTourById(tourId)
+        if (config != null) {
+            startTour(userId, config, forceReplay = true)
+        }
+    }
+
+    fun nextTourStep(userId: String) {
+        tourManager.nextStep(userId)
+    }
+
+    fun previousTourStep() {
+        tourManager.previousStep()
+    }
+
+    fun skipTour(userId: String) {
+        tourManager.skipTour(userId)
+    }
+
+    fun completeTour(userId: String) {
+        tourManager.completeTour(userId)
+    }
+
+    fun resetAllTours(userId: String) {
+        tourManager.resetAllTours(userId)
+        toastMessage.value = "All guided tutorials reset! They will auto-trigger on screen visits."
+    }
     
     val themeMode = MutableStateFlow("SYSTEM") // SYSTEM, LIGHT, DARK
+    val demoSandboxMode = MutableStateFlow(true)
+
+    fun toggleDemoSandboxMode(enabled: Boolean) {
+        viewModelScope.launch {
+            demoSandboxMode.value = enabled
+            repository.setDemoSandboxPreference(enabled)
+            if (enabled) {
+                repository.prepopulateIfEmpty(forceSeedDemo = true)
+                toastMessage.value = "Demo sandbox data loaded."
+            } else {
+                repository.clearSandboxData()
+                toastMessage.value = "Switched to clean production database."
+            }
+        }
+    }
 
     val allAdPlacements = repository.allAdPlacements.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val globalSettings = repository.globalAdSettings.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -95,6 +236,32 @@ class GlobalViewModel constructor(
     val showWhatsNew = MutableStateFlow(false)
     val exportedData = MutableStateFlow<String?>(null)
 
+    fun submitReport(reporterId: String, targetType: String, targetId: String, reason: String, details: String) {
+        viewModelScope.launch {
+            val report = com.example.data.model.Report(
+                id = "rep_" + java.util.UUID.randomUUID().toString().take(8),
+                reporterId = reporterId,
+                targetType = targetType,
+                targetId = targetId,
+                reason = "$reason - $details".take(200),
+                status = "PENDING",
+                createdAt = System.currentTimeMillis()
+            )
+            repository.submitReport(report)
+            repository.insertAuditLog(com.example.data.model.AuditLog(
+                id = java.util.UUID.randomUUID().toString(),
+                adminId = reporterId,
+                adminName = "User",
+                actionTaken = "REPORT_SUBMITTED",
+                targetType = targetType,
+                targetId = targetId,
+                reason = "Report logged: $reason ($details)".take(200),
+                createdAt = System.currentTimeMillis()
+            ))
+            toastMessage.value = "Report submitted to Moderation Queue. Thank you for keeping the Co-Op safe!"
+        }
+    }
+
     fun isFeatureEnabled(key: String): Boolean {
         return featureFlags.value.find { it.flagKey == key }?.isEnabled ?: true
     }
@@ -114,6 +281,7 @@ class GlobalViewModel constructor(
 
     init {
         viewModelScope.launch {
+            demoSandboxMode.value = repository.getDemoSandboxPreference()
             syncState.value = SyncState.Syncing
             repository.prepopulateIfEmpty()
             try {
@@ -140,15 +308,23 @@ class GlobalViewModel constructor(
         }
     }
 
+    private var cachedUserFlow: Pair<Flow<String?>, StateFlow<UserProfile?>>? = null
+
     @OptIn(ExperimentalCoroutinesApi::class)
     fun observeUser(currentUserId: Flow<String?>): StateFlow<UserProfile?> {
-        return currentUserId.flatMapLatest { id ->
+        val cached = cachedUserFlow
+        if (cached != null && cached.first == currentUserId) {
+            return cached.second
+        }
+        val flow = currentUserId.flatMapLatest { id ->
             if (id == null) flowOf(null) else repository.userDao.getUserById(id)
         }.onEach { user ->
             user?.id?.let { uid ->
                 SupabaseRealtimeManager.subscribeToUserData(repository, viewModelScope, uid)
             }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        cachedUserFlow = Pair(currentUserId, flow)
+        return flow
     }
 
     val allWorkspaces = repository.allWorkspaces.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())

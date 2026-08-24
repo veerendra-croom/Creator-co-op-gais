@@ -576,33 +576,67 @@ fun SparklineGraph(points: List<Float>) {
     androidx.compose.foundation.Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
-            .background(PrimaryBackground.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .height(54.dp)
+            .background(PrimaryBackground.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+            .border(1.dp, ColorDivider.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
     ) {
         if (points.isEmpty()) return@Canvas
         val path = androidx.compose.ui.graphics.Path()
+        val fillPath = androidx.compose.ui.graphics.Path()
         val widthBetween = if (points.size > 1) size.width / (points.size - 1) else size.width
-        val maxHeight = size.height - 10.dp.toPx()
-        val minHeight = 5.dp.toPx()
+        val maxHeight = size.height - 12.dp.toPx()
+        val minHeight = 6.dp.toPx()
         
         points.forEachIndexed { idx, point ->
             val x = idx * widthBetween
             val y = size.height - (point / 100f * maxHeight) - minHeight
             if (idx == 0) {
                 path.moveTo(x, y)
+                fillPath.moveTo(x, size.height)
+                fillPath.lineTo(x, y)
             } else {
                 path.lineTo(x, y)
+                fillPath.lineTo(x, y)
+            }
+            if (idx == points.size - 1) {
+                fillPath.lineTo(x, size.height)
+                fillPath.close()
             }
         }
         
+        // Gradient fill for dark mode contrast
+        drawPath(
+            path = fillPath,
+            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                colors = listOf(AccentBlue.copy(alpha = 0.28f), Color.Transparent)
+            )
+        )
+
+        // Sharp luminous line
         drawPath(
             path = path,
             color = AccentBlue,
             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 2.dp.toPx(),
+                width = 2.5.dp.toPx(),
                 cap = androidx.compose.ui.graphics.StrokeCap.Round
             )
         )
+
+        // Glow endpoint
+        if (points.isNotEmpty()) {
+            val lastX = (points.size - 1) * widthBetween
+            val lastY = size.height - (points.last() / 100f * maxHeight) - minHeight
+            drawCircle(
+                color = AccentBlue.copy(alpha = 0.4f),
+                radius = 7.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(lastX, lastY)
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 3.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(lastX, lastY)
+            )
+        }
     }
 }
 
@@ -1441,6 +1475,8 @@ fun CreatorCrmDetailDialog(
                                         label = { Text("Logins", fontSize = 9.sp) },
                                         modifier = Modifier.weight(1f).testTag("input_logins"),
                                         colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
                                             focusedBorderColor = AccentBlue,
                                             unfocusedBorderColor = ColorDivider
                                         )
@@ -1451,6 +1487,8 @@ fun CreatorCrmDetailDialog(
                                         label = { Text("Tasks", fontSize = 9.sp) },
                                         modifier = Modifier.weight(1f).testTag("input_tasks"),
                                         colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
                                             focusedBorderColor = AccentBlue,
                                             unfocusedBorderColor = ColorDivider
                                         )
@@ -1464,6 +1502,8 @@ fun CreatorCrmDetailDialog(
                                         label = { Text("Contracts", fontSize = 9.sp) },
                                         modifier = Modifier.weight(1f).testTag("input_agreements"),
                                         colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
                                             focusedBorderColor = AccentBlue,
                                             unfocusedBorderColor = ColorDivider
                                         )
@@ -1474,6 +1514,8 @@ fun CreatorCrmDetailDialog(
                                         label = { Text("Referrals", fontSize = 9.sp) },
                                         modifier = Modifier.weight(1f).testTag("input_referrals"),
                                         colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
                                             focusedBorderColor = AccentBlue,
                                             unfocusedBorderColor = ColorDivider
                                         )
@@ -1491,6 +1533,8 @@ fun CreatorCrmDetailDialog(
                             label = { Text("Founder Internal Notes") },
                             modifier = Modifier.fillMaxWidth().testTag("input_notes"),
                             colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
                                 focusedBorderColor = AccentBlue,
                                 unfocusedBorderColor = ColorDivider
                             )
@@ -1545,6 +1589,8 @@ fun CreatorCrmDetailDialog(
                                         placeholder = { Text("New reminder task...", fontSize = 10.sp) },
                                         modifier = Modifier.weight(1f).testTag("input_new_task"),
                                         colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
                                             focusedBorderColor = AccentBlue,
                                             unfocusedBorderColor = ColorDivider
                                         )
@@ -1599,6 +1645,8 @@ fun CreatorCrmDetailDialog(
                                         placeholder = { Text("Interaction summary details...", fontSize = 10.sp) },
                                         modifier = Modifier.weight(1f).testTag("input_interaction_note"),
                                         colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = Color.White,
+                                            unfocusedTextColor = Color.White,
                                             focusedBorderColor = CrispAmber,
                                             unfocusedBorderColor = ColorDivider
                                         )
@@ -1749,7 +1797,7 @@ fun CohortRegistrationDialog(
                     onValueChange = { name = it },
                     label = { Text("Display Name") },
                     modifier = Modifier.fillMaxWidth().testTag("reg_input_name"),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue)
                 )
 
                 OutlinedTextField(
@@ -1757,7 +1805,7 @@ fun CohortRegistrationDialog(
                     onValueChange = { email = it },
                     label = { Text("Email Address") },
                     modifier = Modifier.fillMaxWidth().testTag("reg_input_email"),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue)
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1766,14 +1814,14 @@ fun CohortRegistrationDialog(
                         onValueChange = { logins = it },
                         label = { Text("Logins Count") },
                         modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue)
                     )
                     OutlinedTextField(
                         value = tasks,
                         onValueChange = { tasks = it },
                         label = { Text("Tasks Done") },
                         modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue)
                     )
                 }
 
@@ -1783,14 +1831,14 @@ fun CohortRegistrationDialog(
                         onValueChange = { agreements = it },
                         label = { Text("Agreements Signed") },
                         modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue)
                     )
                     OutlinedTextField(
                         value = referrals,
                         onValueChange = { referrals = it },
                         label = { Text("Referrals") },
                         modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue)
                     )
                 }
 
@@ -1799,7 +1847,7 @@ fun CohortRegistrationDialog(
                     onValueChange = { notes = it },
                     label = { Text("Operational Notes") },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue)
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue)
                 )
 
                 Button(

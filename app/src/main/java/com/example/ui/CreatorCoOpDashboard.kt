@@ -30,6 +30,9 @@ import com.example.ui.components.*
 import com.example.ui.screens.workspace.CreateWorkspaceScreen
 import com.example.ui.screens.*
 import com.example.ui.theme.*
+import com.example.ui.tour.GuidedTourOverlay
+import com.example.ui.tour.GuidedTourRepository
+import com.example.ui.tour.guidedTourTarget
 import com.example.ui.components.CreationSpeedDialFab
 import com.example.analytics.AnalyticsManager
 import kotlinx.coroutines.delay
@@ -66,6 +69,9 @@ fun CreatorCoOpDashboard(
         globalViewModel.observeUser(authViewModel.currentUserId) 
     }.collectAsState()
     val showOnboarding by globalViewModel.showOnboarding.collectAsState()
+    val activeTour by globalViewModel.tourManager.activeTour.collectAsState()
+    val currentTourStepIndex by globalViewModel.tourManager.currentStepIndex.collectAsState()
+    val tourTargetRects by globalViewModel.tourManager.registeredTargets.collectAsState()
     val showWhatsNew by globalViewModel.showWhatsNew.collectAsState()
     val changelogEntries by globalViewModel.changelogEntries.collectAsState()
     val showCelebration by globalViewModel.showCelebration.collectAsState()
@@ -73,16 +79,46 @@ fun CreatorCoOpDashboard(
     // Flag to ensure we only check once per session/user change
     var hasCheckedChecklist by rememberSaveable { mutableStateOf(false) }
     var lastCheckedUserId by rememberSaveable { mutableStateOf<String?>(null) }
+    var isCheckingOnboarding by remember { mutableStateOf(true) }
 
-    LaunchedEffect(user?.id) {
-        val uid = user?.id
+    LaunchedEffect(userId, user?.id) {
+        isCheckingOnboarding = true
+        if (userId == null) {
+            globalViewModel.currentTab.value = "HOME"
+        }
+        val uid = userId ?: user?.id
         if (uid != null && (uid != lastCheckedUserId || !hasCheckedChecklist)) {
             hasCheckedChecklist = true
             lastCheckedUserId = uid
-            if (!globalViewModel.getOnboardingChecklistDismissed(uid)) {
-                globalViewModel.showOnboarding.value = true
-            }
+            globalViewModel.tourManager.loadTourStatuses(uid)
+            globalViewModel.showOnboarding.value = false
             globalViewModel.checkWhatsNew(uid)
+        } else if (uid == null) {
+            globalViewModel.showOnboarding.value = false
+        }
+        isCheckingOnboarding = false
+    }
+
+    LaunchedEffect(currentTab, userId, user?.id, showOnboarding, isCheckingOnboarding) {
+        if (isCheckingOnboarding) return@LaunchedEffect
+        if (showOnboarding) return@LaunchedEffect
+        val uid = userId ?: user?.id
+        if (uid != null) {
+            val tourConfig = when(currentTab) {
+                "HOME" -> GuidedTourRepository.DASHBOARD_TOUR
+                "WORKSPACES" -> GuidedTourRepository.WORKSPACES_TOUR
+                "DISCOVERY", "SYNDICATE" -> GuidedTourRepository.DISCOVERY_TOUR
+                "COMMONS" -> GuidedTourRepository.COMMONS_TOUR
+                "PROFILE" -> GuidedTourRepository.PROFILE_TOUR
+                "SETTINGS" -> GuidedTourRepository.SETTINGS_TOUR
+                "CONTENT_PIPELINE" -> GuidedTourRepository.CONTENT_PIPELINE_TOUR
+                "COMM_CENTER" -> GuidedTourRepository.COMM_CENTER_TOUR
+                "FOUNDER_COMMAND" -> GuidedTourRepository.FOUNDER_COMMAND_TOUR
+                else -> null
+            }
+            if (tourConfig != null) {
+                globalViewModel.checkAndStartTour(uid, tourConfig)
+            }
         }
     }
     val syncState by globalViewModel.syncState.collectAsState()
@@ -91,7 +127,7 @@ fun CreatorCoOpDashboard(
     val platformSettings by globalViewModel.platformSettings.collectAsState()
     val isUnderMaintenance = platformSettings.maintenanceMode && !(user?.systemRole == "PLATFORM_ADMIN" || user?.systemRole == "ADMIN" || user?.globalRole == "ADMIN")
 
-    BackHandler(enabled = currentTab != "HOME" || (currentTab == "WORKSPACES" && workspaceViewModel.workspaceViewMode.value == "VIEW") || (currentTab == "SYNDICATE" && discoveryViewModel.selectedNicheFilter.value != "All")) {
+    BackHandler(enabled = currentTab != "HOME" || (currentTab == "WORKSPACES" && workspaceViewModel.workspaceViewMode.value == "VIEW") || ((currentTab == "DISCOVERY" || currentTab == "SYNDICATE") && discoveryViewModel.selectedNicheFilter.value != "All")) {
         val handledByScreen = when(currentTab) {
             "WORKSPACES" -> {
                 if (workspaceViewModel.workspaceViewMode.value == "VIEW") {
@@ -103,7 +139,7 @@ fun CreatorCoOpDashboard(
                     true
                 } else false
             }
-            "SYNDICATE" -> {
+            "DISCOVERY", "SYNDICATE" -> {
                 if (discoveryViewModel.selectedNicheFilter.value != "All") {
                     discoveryViewModel.selectedNicheFilter.value = "All"
                     true
@@ -170,8 +206,9 @@ fun CreatorCoOpDashboard(
         snackbarHost = { GlobalSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             if (currentTab != "CREATE_WORKSPACE" && !showOnboarding && !isWorkspaceDetail && !isUnderMaintenance) {
-                val isTopLevel = currentTab in listOf("HOME", "WORKSPACES", "NOTIFICATIONS", "PROFILE", "MORE")
+                val isTopLevel = currentTab in listOf("HOME", "WORKSPACES", "DISCOVERY", "COMMONS", "MORE")
                 val screenTitle = if (isTopLevel) "Creator Co-Op" else when (currentTab) {
+                    "PROFILE" -> "My Profile"
                     "DISCOVERY" -> "Discovery Hub"
                     "COMMONS" -> "Creator Commons"
                     "ADMIN" -> "Admin Console"
@@ -192,6 +229,7 @@ fun CreatorCoOpDashboard(
                     "COMMUNITY_GUIDELINES" -> "Community Guidelines"
                     "LEGAL" -> "Legal & Terms"
                     "SEARCH" -> "Global Search"
+                    "NOTIFICATIONS" -> "Notifications Center"
                     "CREATE_ROLE" -> "Post a Role"
                     "TASK_DETAILS" -> "Task Details"
                     "PUBLIC_PROFILE" -> "Public Profile"
@@ -207,6 +245,7 @@ fun CreatorCoOpDashboard(
                 Column {
                     GlobalSyncTopBar(
                         globalViewModel = globalViewModel,
+                        userId = userId,
                         showBack = !isTopLevel,
                         title = screenTitle,
                         onBack = {
@@ -299,34 +338,12 @@ fun CreatorCoOpDashboard(
                             unselectedTextColor = TextSecondary
                         )
                     )
-                    // Item 3: Notifications
+                    // Item 3: Discover
                     NavigationBarItem(
-                        selected = currentTab == "NOTIFICATIONS",
-                        onClick = { globalViewModel.navigateToTab("NOTIFICATIONS") },
-                        icon = {
-                            val notifications by if (userId != null) {
-                                globalViewModel.getNotificationsForUser(userId!!).collectAsState(initial = emptyList())
-                            } else {
-                                remember { mutableStateOf(emptyList<com.example.data.model.Notification>()) }
-                            }
-                            val unreadCount = notifications.count { !it.isRead }
-                            
-                            BadgedBox(
-                                badge = {
-                                    if (unreadCount > 0) {
-                                        Badge(
-                                            containerColor = AccentRed,
-                                            contentColor = Color.White
-                                        ) {
-                                            Text(unreadCount.toString())
-                                        }
-                                    }
-                                }
-                            ) {
-                                Icon(Icons.Default.Notifications, contentDescription = "Notifications")
-                            }
-                        },
-                        label = { Text("Notifications") },
+                        selected = currentTab == "DISCOVERY",
+                        onClick = { globalViewModel.navigateToTab("DISCOVERY") },
+                        icon = { Icon(Icons.Default.Explore, contentDescription = "Discover") },
+                        label = { Text("Discover") },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = AccentBlue,
                             selectedTextColor = AccentBlue,
@@ -335,12 +352,12 @@ fun CreatorCoOpDashboard(
                             unselectedTextColor = TextSecondary
                         )
                     )
-                    // Item 4: Profile
+                    // Item 4: Commons
                     NavigationBarItem(
-                        selected = currentTab == "PROFILE",
-                        onClick = { globalViewModel.navigateToTab("PROFILE") },
-                        icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-                        label = { Text("Profile") },
+                        selected = currentTab == "COMMONS",
+                        onClick = { globalViewModel.navigateToTab("COMMONS") },
+                        icon = { Icon(Icons.Default.Forum, contentDescription = "Commons") },
+                        label = { Text("Commons") },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = AccentBlue,
                             selectedTextColor = AccentBlue,
@@ -352,9 +369,9 @@ fun CreatorCoOpDashboard(
                     // Item 5: More
                     NavigationBarItem(
                         selected = currentTab == "MORE" || currentTab in listOf(
-                            "SEARCH", "DISCOVERY", "COMMONS", "ADMIN", "ANALYTICS", "CONTENT_PIPELINE",
+                            "PROFILE", "SEARCH", "ADMIN", "ANALYTICS", "CONTENT_PIPELINE",
                             "VIDEO_HUDDLE", "KNOWLEDGE_BASE", "PREMIUM_SUBSCRIPTION", "CONNECTION_REQUESTS",
-                            "BLOCKED_USERS", "SUPPORT_CENTER", "FOUNDER_CRM", "COMM_CENTER", "PLATFORM_CONTROL"
+                            "BLOCKED_USERS", "SUPPORT_CENTER", "FOUNDER_CRM", "COMM_CENTER", "PLATFORM_CONTROL", "FOUNDER_COMMAND"
                         ),
                         onClick = { globalViewModel.navigateToTab("MORE") },
                         icon = { Icon(Icons.Default.Menu, contentDescription = "More") },
@@ -413,12 +430,15 @@ fun CreatorCoOpDashboard(
                             chatViewModel = chatViewModel,
                             userId = userId ?: "",
                             userProfile = user,
+                            globalViewModel = globalViewModel,
                             onNavigateToCreate = { globalViewModel.navigateToTab("CREATE_WORKSPACE") },
                             onNavigateToDiscovery = { globalViewModel.navigateToTab("DISCOVERY") }
                         )
                         "CREATE_WORKSPACE" -> CreateWorkspaceScreen(
                             workspaceViewModel = workspaceViewModel,
                             userId = userId ?: "",
+                            userProfile = user,
+                            onNavigateToPro = { globalViewModel.navigateToTab("PREMIUM_SUBSCRIPTION") },
                             onBack = { globalViewModel.currentTab.value = "WORKSPACES" }
                         )
                         "DISCOVERY" -> SyndicateScreen(
@@ -446,11 +466,17 @@ fun CreatorCoOpDashboard(
                             globalViewModel = globalViewModel,
                             onNavigate = { globalViewModel.navigateToTab(it) }
                         )
-                        "ADMIN" -> AdminDashboardScreen(
-                            adminViewModel = adminViewModel,
-                            authViewModel = authViewModel,
-                            userProfile = user
-                        )
+                        "ADMIN" -> {
+                            if (user?.systemRole == "PLATFORM_ADMIN" || user?.globalRole == "ADMIN" || user?.systemRole == "ADMIN") {
+                                AdminDashboardScreen(
+                                    adminViewModel = adminViewModel,
+                                    authViewModel = authViewModel,
+                                    userProfile = user
+                                )
+                            } else {
+                                AccessDeniedScreen(onBack = { globalViewModel.navigateBack() })
+                            }
+                        }
                         "NOTIFICATIONS" -> NotificationsCenterScreen(globalViewModel = globalViewModel, workspaceViewModel = workspaceViewModel, userProfile = user)
                         "SEARCH" -> GlobalSearchScreen(globalViewModel = globalViewModel, workspaceViewModel = workspaceViewModel, userProfile = user)
                         "TASK_DETAILS" -> {
@@ -487,7 +513,7 @@ fun CreatorCoOpDashboard(
                             val projId = globalViewModel.selectedProjectId.collectAsState().value ?: "P123"
                             PortfolioDetailScreen(projectId = projId, onBack = { globalViewModel.navigateBack() })
                         }
-                        "REPORT_USER" -> ReportModerationScreen(onBack = { globalViewModel.navigateBack() })
+                        "REPORT_USER" -> ReportModerationScreen(globalViewModel = globalViewModel, currentUserId = userId ?: "guest", onBack = { globalViewModel.navigateBack() })
                         "BLOCKED_USERS" -> BlockedUsersScreen(onBack = { globalViewModel.navigateBack() }, globalViewModel = globalViewModel, userProfile = user)
                         "REFER_TEAMMATE" -> com.example.ui.screens.ReferTeammateScreen(userProfile = user, globalViewModel = globalViewModel, onBack = { globalViewModel.navigateBack() })
                         "WORKSPACE_INVITATION" -> com.example.ui.screens.workspace.WorkspaceInvitationScreen(globalViewModel = globalViewModel, workspaceViewModel = workspaceViewModel, onBack = { globalViewModel.navigateBack() })
@@ -501,12 +527,8 @@ fun CreatorCoOpDashboard(
                             userId = userId ?: "",
                             onBack = { globalViewModel.navigateBack() }
                         )
-                        "VIDEO_HUDDLE" -> VideoHuddleScreen(onBack = { globalViewModel.navigateBack() })
-                        "PREMIUM_SUBSCRIPTION" -> PremiumSubscriptionScreen(
-                            globalViewModel = globalViewModel,
-                            userProfile = user,
-                            onBack = { globalViewModel.navigateBack() }
-                        )
+                        "VIDEO_HUDDLE" -> com.example.ui.screens.VideoHuddleScreen(onBack = { globalViewModel.navigateBack() }, globalViewModel = globalViewModel)
+                        "PREMIUM_SUBSCRIPTION" -> com.example.ui.screens.PremiumSubscriptionScreen(globalViewModel = globalViewModel, userProfile = user, onBack = { globalViewModel.navigateBack() })
                         "SUPPORT_CENTER" -> SupportCenterScreen(
                             supportViewModel = supportViewModel,
                             userProfile = user,
@@ -590,18 +612,7 @@ fun CreatorCoOpDashboard(
         
         FeedbackOverlay()
         
-        if (showOnboarding) {
-            OnboardingScreen(
-                globalViewModel = globalViewModel,
-                onComplete = {
-                    val uid = user?.id
-                    if (uid != null) {
-                        globalViewModel.dismissOnboardingChecklist(uid)
-                    }
-                    globalViewModel.showOnboarding.value = false
-                }
-            )
-        }
+
 
         if (showWhatsNew && user != null && changelogEntries.isNotEmpty()) {
             WhatsNewDialog(
@@ -613,6 +624,19 @@ fun CreatorCoOpDashboard(
         if (showCelebration) {
             CelebrationOverlay(
                 onDismiss = { globalViewModel.showCelebration.value = false }
+            )
+        }
+
+        if (activeTour != null) {
+            val uid = userId ?: user?.id ?: "guest"
+            GuidedTourOverlay(
+                tourConfig = activeTour!!,
+                currentStepIndex = currentTourStepIndex,
+                targetRects = tourTargetRects,
+                onNext = { globalViewModel.nextTourStep(uid) },
+                onPrev = { globalViewModel.previousTourStep() },
+                onSkip = { globalViewModel.skipTour(uid) },
+                onDone = { globalViewModel.completeTour(uid) }
             )
         }
     }
@@ -787,10 +811,218 @@ fun SimpleMainHubScreen(
         }
 
         // ==========================================
+        // NEW: METRICS SPARKLINES CARD
+        // ==========================================
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .guidedTourTarget("dashboard_metrics_sparkline", globalViewModel.tourManager),
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, ColorDivider)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "COLLABORATION REAL-TIME LATENCY",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = AccentBlue,
+                                letterSpacing = 1.2.sp
+                            )
+                            Text(
+                                text = "24ms • OPTIMAL HEALTH",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.TrendingDown,
+                            contentDescription = "Trending Down (Optimal)",
+                            tint = NeonEmerald,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Live Sparkline Graph using Compose Canvas!
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                    ) {
+                        val width = size.width
+                        val height = size.height
+                        val points = listOf(
+                            0.2f, 0.4f, 0.3f, 0.6f, 0.45f, 0.8f, 0.5f, 0.35f, 0.25f, 0.15f, 0.12f
+                        )
+                        val stepX = width / (points.size - 1)
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(0f, height * (1f - points[0]))
+                            for (i in 1 until points.size) {
+                                lineTo(i * stepX, height * (1f - points[i]))
+                            }
+                        }
+                        
+                        // Draw sparkline stroke with NeonEmerald
+                        drawPath(
+                            path = path,
+                            color = NeonEmerald,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 3.dp.toPx(),
+                                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                join = androidx.compose.ui.graphics.StrokeJoin.Round
+                            )
+                        )
+                        
+                        // Draw transparent gradient under path
+                        val filledPath = androidx.compose.ui.graphics.Path().apply {
+                            addPath(path)
+                            lineTo(width, height)
+                            lineTo(0f, height)
+                            close()
+                        }
+                        drawPath(
+                            path = filledPath,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(NeonEmerald.copy(alpha = 0.25f), Color.Transparent),
+                                startY = 0f,
+                                endY = height
+                            )
+                        )
+                        
+                        // Draw pulse glow on the last point
+                        val lastPointX = width
+                        val lastPointY = height * (1f - points.last())
+                        drawCircle(
+                            color = NeonEmerald,
+                            radius = 6.dp.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(lastPointX, lastPointY)
+                        )
+                        drawCircle(
+                            color = NeonEmerald.copy(alpha = 0.4f),
+                            radius = 12.dp.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(lastPointX, lastPointY)
+                        )
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // FEATURE GUIDE & OPTIONS WALKTHROUGH BANNER
+        // ==========================================
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(BorderStroke(1.dp, Brush.horizontalGradient(listOf(AccentBlue.copy(alpha = 0.8f), NeonEmerald.copy(alpha = 0.8f)))), RoundedCornerShape(16.dp))
+                    .testTag("hub_feature_tour_banner"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = AccentBlue.copy(alpha = 0.2f),
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.MenuBook, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "FEATURE & OPTIONS GUIDE",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 11.sp,
+                                    color = AccentBlue,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "Interactive card explanation for every button & feature",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Learn what every option does, why it exists, and how to operate it step-by-step with live sandbox simulations.",
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val uid = userProfile?.id ?: "guest"
+                        Button(
+                            onClick = {
+                                globalViewModel.replayTour(uid, "dashboard_tour")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.weight(1f).testTag("hub_start_user_tour_button")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("USER TOUR", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                globalViewModel.replayTour(uid, "founder_command_tour")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.weight(1f).testTag("hub_start_admin_tour_button")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("ADMIN TOUR", color = Color.White, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
         // 2. DIRECT ACTIONS (Plain English / Highly Tappable)
         // ==========================================
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                modifier = Modifier.guidedTourTarget("dashboard_quick_actions", globalViewModel.tourManager),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 Text(
                     text = "QUICK ACTIONS",
                     color = TextSecondary,
@@ -2350,7 +2582,13 @@ fun SuspensionOverlay() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false, title: String = "Creator Co-Op", onBack: () -> Unit = {}) {
+fun GlobalSyncTopBar(
+    globalViewModel: GlobalViewModel, 
+    userId: String? = null,
+    showBack: Boolean = false, 
+    title: String = "Creator Co-Op", 
+    onBack: () -> Unit = {}
+) {
     val syncState by globalViewModel.syncState.collectAsState()
     var showSyncDialog by remember { mutableStateOf(false) }
     
@@ -2419,6 +2657,13 @@ fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false
             }
         },
         actions = {
+            val uid = userId ?: "guest"
+            IconButton(
+                onClick = { globalViewModel.replayTour(uid, "dashboard_tour") },
+                modifier = Modifier.testTag("top_bar_tour_button")
+            ) {
+                Icon(Icons.Default.HelpOutline, contentDescription = "Screen Guided Tour", tint = AccentBlue)
+            }
             IconButton(onClick = { globalViewModel.navigateToTab("SEARCH") }) {
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
             }
@@ -2426,7 +2671,28 @@ fun GlobalSyncTopBar(globalViewModel: GlobalViewModel, showBack: Boolean = false
                 Icon(Icons.Default.Mail, contentDescription = "Messages", tint = Color.White)
             }
             IconButton(onClick = { globalViewModel.navigateToTab("NOTIFICATIONS") }) {
-                Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                val notifications by if (userId != null) {
+                    globalViewModel.getNotificationsForUser(userId).collectAsState(initial = emptyList())
+                } else {
+                    remember { mutableStateOf(emptyList<com.example.data.model.Notification>()) }
+                }
+                val unreadCount = notifications.count { !it.isRead }
+                if (unreadCount > 0) {
+                    BadgedBox(
+                        badge = {
+                            Badge(
+                                containerColor = AccentRed,
+                                contentColor = Color.White
+                            ) {
+                                Text(unreadCount.toString())
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                    }
+                } else {
+                    Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)

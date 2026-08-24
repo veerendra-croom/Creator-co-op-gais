@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 import com.example.ui.components.*
+import com.example.ui.tour.guidedTourTarget
 import com.example.ui.viewmodels.AgreementViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.flowOf
@@ -35,7 +36,10 @@ fun AgreementVault(
     workspaceId: String,
     userId: String,
     isLead: Boolean = false,
-    onBack: () -> Unit
+    featureFlags: List<com.example.data.model.FeatureFlag> = emptyList(),
+    userRole: String = if (isLead) "ORGANIZER" else "PARTICIPANT",
+    onBack: () -> Unit,
+    globalViewModel: com.example.ui.viewmodels.GlobalViewModel? = null
 ) {
     val activeAgreement by viewModel.getActiveAgreement(workspaceId).collectAsState(initial = null)
     val acks by viewModel.getAcknowledgments(activeAgreement?.id).collectAsState(initial = emptyList())
@@ -79,6 +83,7 @@ fun AgreementVault(
             .fillMaxSize()
             .background(PrimaryBackground)
             .padding(DS.Space16)
+            .imePadding()
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(DS.Space16)
     ) {
@@ -141,7 +146,13 @@ fun AgreementVault(
         if (currentAgreement != null) {
             val sealHash = currentAgreement.contentText.hashCode().toString().take(8).uppercase()
             Row(
-                modifier = Modifier
+                modifier = if (globalViewModel != null) Modifier
+                    .fillMaxWidth()
+                    .background(AccentBlue.copy(alpha = 0.1f), DS.RadiusMedium)
+                    .border(1.dp, AccentBlue.copy(alpha = 0.25f), DS.RadiusMedium)
+                    .guidedTourTarget("agreements_compliance_seal", globalViewModel.tourManager)
+                    .padding(DS.Space12)
+                else Modifier
                     .fillMaxWidth()
                     .background(AccentBlue.copy(alpha = 0.1f), DS.RadiusMedium)
                     .border(1.dp, AccentBlue.copy(alpha = 0.25f), DS.RadiusMedium)
@@ -206,7 +217,7 @@ fun AgreementVault(
             val compliance = remember(revenue) { validateSplitSum(revenue) }
             
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = if (globalViewModel != null) Modifier.fillMaxWidth().guidedTourTarget("workspaces_agreements_escrow", globalViewModel.tourManager) else Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = if (compliance.isCompliant) SurfaceColor else AccentRed.copy(alpha = 0.05f)
                 ),
@@ -473,18 +484,25 @@ fun AgreementVault(
         }
 
         if (isLead && activeAgreement != null) {
-            Button(
-                onClick = { showEditDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
-                border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f)),
-                shape = DS.RadiusMedium
+            FeatureGate(
+                flagKey = "AGREEMENT_DRAFTING",
+                featureFlags = featureFlags,
+                userRole = userRole,
+                showBannerOnRestricted = false
             ) {
-                Icon(Icons.Default.Edit, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(DS.Space8))
-                Text("REVISE & VOID DRAFT SECURELY", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                Button(
+                    onClick = { showEditDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
+                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f)),
+                    shape = DS.RadiusMedium
+                ) {
+                    Icon(Icons.Default.Edit, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(DS.Space8))
+                    Text("REVISE & VOID DRAFT SECURELY", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -507,26 +525,36 @@ fun AgreementVault(
                     verticalArrangement = Arrangement.spacedBy(DS.Space12),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Amending clauses will clear ALL historical member co-op signatures and reset compliance states.",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = editedTermsText,
-                        onValueChange = { editedTermsText = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = AccentRed,
-                            unfocusedBorderColor = ColorDivider.copy(alpha = 0.5f),
-                            focusedContainerColor = PrimaryBackground,
-                            unfocusedContainerColor = PrimaryBackground
-                        )
-                    )
+                    FeatureGate(
+                        flagKey = "AGREEMENT_DRAFTING",
+                        featureFlags = featureFlags,
+                        userRole = userRole,
+                        showBannerOnRestricted = true,
+                        customRestrictedNotice = "Agreement drafting is currently restricted by platform administration."
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(DS.Space12)) {
+                            Text(
+                                text = "Amending clauses will clear ALL historical member co-op signatures and reset compliance states.",
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            OutlinedTextField(
+                                value = editedTermsText,
+                                onValueChange = { editedTermsText = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = AccentRed,
+                                    unfocusedBorderColor = ColorDivider.copy(alpha = 0.5f),
+                                    focusedContainerColor = PrimaryBackground,
+                                    unfocusedContainerColor = PrimaryBackground
+                                )
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {

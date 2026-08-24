@@ -283,6 +283,15 @@ class AdminViewModel constructor(
         }
     }
 
+    private suspend fun verifyAdminAccess(adminId: String): Boolean {
+        val admin = repository.getUserById(adminId).firstOrNull()
+        val hasAdminRole = admin?.systemRole == "PLATFORM_ADMIN" || admin?.systemRole == "ADMIN" || admin?.globalRole == "ADMIN"
+        if (!hasAdminRole) {
+            _toastMessage.value = "Unauthorized: Platform Admin privileges required."
+        }
+        return hasAdminRole
+    }
+
     fun resolveReportWithGovernanceAction(
         reportId: String,
         action: String, // "DISMISS", "WARNING", "TEMP_SUSPEND", "PERM_BAN", "FLAG_ACCOUNT"
@@ -290,6 +299,7 @@ class AdminViewModel constructor(
         adminId: String
     ) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             _isLoading.value = true
             try {
                 val report = repository.getReportById(reportId) ?: return@launch
@@ -400,19 +410,88 @@ class AdminViewModel constructor(
 
     fun toggleFeatureFlag(flag: com.example.data.model.FeatureFlag, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
+            val newOverride = !flag.globalOverrideEnabled
+            val isOverallActive = newOverride && (flag.organizerEnabled || flag.participantEnabled)
             val updated = flag.copy(
-                isEnabled = !flag.isEnabled,
+                globalOverrideEnabled = newOverride,
+                isEnabled = isOverallActive,
                 lastModifiedByAdminId = adminId,
                 lastModifiedAt = System.currentTimeMillis()
             )
             repository.updateFeatureFlag(updated, adminId, reason)
-            _toastMessage.value = "Flag '${flag.flagKey}' updated."
+            _toastMessage.value = "Flag '${flag.flagKey}' master switch updated."
+        }
+    }
+
+    fun updateFeatureFlagRbac(
+        flag: com.example.data.model.FeatureFlag,
+        organizerEnabled: Boolean,
+        participantEnabled: Boolean,
+        globalOverrideEnabled: Boolean,
+        adminId: String,
+        reason: String
+    ) {
+        viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
+            val isOverallActive = globalOverrideEnabled && (organizerEnabled || participantEnabled)
+            val updated = flag.copy(
+                organizerEnabled = organizerEnabled,
+                participantEnabled = participantEnabled,
+                globalOverrideEnabled = globalOverrideEnabled,
+                isEnabled = isOverallActive,
+                lastModifiedByAdminId = adminId,
+                lastModifiedAt = System.currentTimeMillis()
+            )
+            repository.updateFeatureFlag(updated, adminId, reason)
+            _toastMessage.value = "RBAC Policy for '${flag.flagKey}' updated."
+        }
+    }
+
+    fun applyFeatureFlagPresetProfile(presetKey: String, adminId: String, reason: String) {
+        viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
+            val currentFlags = featureFlags.value.ifEmpty { repository.getAllFeatureFlagsFlow().first() }
+            currentFlags.forEach { flag ->
+                val (newGlobal, newOrg, newPart) = when (presetKey) {
+                    "OPEN_BETA" -> Triple(true, true, true)
+                    "ORGANIZER_FIRST" -> {
+                        val isRestrictedForPart = flag.category == "GOVERNANCE" || 
+                            flag.flagKey in listOf("analytics_enabled", "founder_crm_enabled", "moderation_center_enabled", "AGREEMENT_DRAFTING")
+                        Triple(true, true, !isRestrictedForPart)
+                    }
+                    "RESTRICTED_MAINTENANCE" -> {
+                        val isHeavyCreation = flag.flagKey in listOf(
+                            "SYNDICATE_PITCH_CREATION", "AGREEMENT_DRAFTING", "COMMUNITY_FORUM_POSTING",
+                            "VOICE_HUDDLE_BETA", "FILE_UPLOADS", "huddles_enabled", "TASK_CREATION"
+                        )
+                        Triple(!isHeavyCreation, !isHeavyCreation, !isHeavyCreation)
+                    }
+                    "MEDIA_BANDWIDTH_FREEZE" -> {
+                        val isMediaHeavy = flag.flagKey in listOf("VOICE_HUDDLE_BETA", "FILE_UPLOADS", "huddles_enabled")
+                        if (isMediaHeavy) Triple(false, false, false) else Triple(flag.globalOverrideEnabled, flag.organizerEnabled, flag.participantEnabled)
+                    }
+                    else -> Triple(flag.globalOverrideEnabled, flag.organizerEnabled, flag.participantEnabled)
+                }
+                val isOverall = newGlobal && (newOrg || newPart)
+                val updated = flag.copy(
+                    globalOverrideEnabled = newGlobal,
+                    organizerEnabled = newOrg,
+                    participantEnabled = newPart,
+                    isEnabled = isOverall,
+                    lastModifiedByAdminId = adminId,
+                    lastModifiedAt = System.currentTimeMillis()
+                )
+                repository.updateFeatureFlag(updated, adminId, "Preset applied: $presetKey. Reason: $reason")
+            }
+            _toastMessage.value = "Applied preset profile: $presetKey"
         }
     }
 
     // --- NEW ADMIN ACTIONS ---
     fun suspendUser(userId: String, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.getAllUsersFlow().firstOrNull()?.find { it.id == userId }?.let { user ->
                 repository.updateUserProfile(user.copy(systemRole = "SUSPENDED"))
                 val log = UserAuditLog(
@@ -431,6 +510,7 @@ class AdminViewModel constructor(
 
     fun reactivateUser(userId: String, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.getAllUsersFlow().firstOrNull()?.find { it.id == userId }?.let { user ->
                 repository.updateUserProfile(user.copy(systemRole = "APP_USER"))
                 val log = UserAuditLog(
@@ -449,6 +529,7 @@ class AdminViewModel constructor(
 
     fun softDeleteUser(userId: String, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.getAllUsersFlow().firstOrNull()?.find { it.id == userId }?.let { user ->
                 repository.updateUserProfile(user.copy(systemRole = "SOFT_DELETED"))
                 val log = UserAuditLog(
@@ -467,6 +548,7 @@ class AdminViewModel constructor(
 
     fun restoreUser(userId: String, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.getAllUsersFlow().firstOrNull()?.find { it.id == userId }?.let { user ->
                 repository.updateUserProfile(user.copy(systemRole = "APP_USER"))
                 val log = UserAuditLog(
@@ -485,6 +567,7 @@ class AdminViewModel constructor(
 
     fun forceLogout(userId: String, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.getAllUsersFlow().firstOrNull()?.find { it.id == userId }?.let { user ->
                 repository.updateUserProfile(user.copy(deviceId = "logged_out"))
                 val log = UserAuditLog(
@@ -503,6 +586,7 @@ class AdminViewModel constructor(
 
     fun promoteVerificationLevel(userId: String, level: String, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.getAllUsersFlow().firstOrNull()?.find { it.id == userId }?.let { user ->
                 repository.updateUserProfile(user.copy(
                     verificationLevel = level,
@@ -524,6 +608,7 @@ class AdminViewModel constructor(
 
     fun assignTrustBadge(userId: String, badge: String, adminId: String, reason: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.getAllUsersFlow().firstOrNull()?.find { it.id == userId }?.let { user ->
                 repository.updateUserProfile(user.copy(reliabilityBadge = badge))
                 val log = UserAuditLog(
@@ -542,6 +627,7 @@ class AdminViewModel constructor(
 
     fun approveVerification(requestId: String, adminId: String, notes: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.updateVerificationRequest(requestId, "APPROVED", notes, adminId)
             val request = repository.getVerificationRequestById(requestId)
             if (request != null) {
@@ -561,6 +647,7 @@ class AdminViewModel constructor(
 
     fun rejectVerification(requestId: String, adminId: String, notes: String) {
         viewModelScope.launch {
+            if (!verifyAdminAccess(adminId)) return@launch
             repository.updateVerificationRequest(requestId, "REJECTED", notes, adminId)
             val request = repository.getVerificationRequestById(requestId)
             if (request != null) {

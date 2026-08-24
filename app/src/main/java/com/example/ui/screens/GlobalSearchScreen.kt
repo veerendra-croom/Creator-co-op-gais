@@ -68,6 +68,7 @@ fun GlobalSearchScreen(
 
     val currentUserId = userProfile?.id ?: "DemoUser"
     val savedSearchesFromDb by globalViewModel.getSavedSearchesForUser(currentUserId).collectAsState(initial = emptyList())
+    val blockedUserIds by globalViewModel.blockedUsers.collectAsState(initial = emptySet())
 
     // Live Database Flows collected as States
     val users by repository.getAllUsersFlow().collectAsState(initial = emptyList())
@@ -133,12 +134,14 @@ fun GlobalSearchScreen(
 
     // Reactive Advanced Search Engine mapping ALL tables
     val searchResults = remember(
-        searchQuery, users, workspaces, tasks, assets, comments,
+        searchQuery, blockedUserIds, users, workspaces, tasks, assets, comments,
         deliverables, agreements, members, notifications, tickets, reports, projects
     ) {
         if (searchQuery.isBlank()) return@remember emptyList<SearchResult>()
 
         val results = mutableListOf<SearchResult>()
+        val filteredUsers = users.filter { it.id !in blockedUserIds }
+        val filteredTasks = tasks.filter { it.creatorId !in blockedUserIds }
 
         // 1. Search Tasks
         tasks.forEach { task ->

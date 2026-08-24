@@ -523,118 +523,132 @@ fun WorkspaceChat(
 
         HorizontalDivider(color = ColorDivider.copy(alpha = 0.3f))
 
-        // Message input tray
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(SurfaceColor)
-                .padding(horizontal = DS.Space16, vertical = DS.Space12)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Add attachment button
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(DS.RadiusMedium)
-                        .background(ColorDivider.copy(alpha = 0.3f))
-                        .clickable { /* Attachment actions */ },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Attachment",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+        // Message input tray with FeatureGate
+        FeatureGate(
+            flagKey = "COMMUNITY_FORUM_POSTING",
+            userRole = userProfile?.systemRole ?: "CREATOR",
+            repository = chatViewModel.repository,
+            fallback = {
+                Box(modifier = Modifier.padding(DS.Space12)) {
+                    FeatureRestrictedBanner(
+                        featureTitle = "Workspace Messaging & Channels",
+                        restrictedMessage = "Workspace communication is currently restricted by platform governance."
                     )
                 }
-                
-                Spacer(modifier = Modifier.width(DS.Space12))
-                
-                // Text Field Box
-                OutlinedTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    placeholder = {
-                        Text(
-                            text = if (selectedDMContactId != null) "Send direct message..." else "Message #$activeChannel...",
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium
+            }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceColor)
+                    .padding(horizontal = DS.Space16, vertical = DS.Space12)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Add attachment button
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(DS.RadiusMedium)
+                            .background(ColorDivider.copy(alpha = 0.3f))
+                            .clickable { /* Attachment actions */ },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Attachment",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = DS.RadiusMedium,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = AccentBlue,
-                        unfocusedBorderColor = ColorDivider.copy(alpha = 0.5f),
-                        focusedContainerColor = PrimaryBackground,
-                        unfocusedContainerColor = PrimaryBackground
-                    ),
-                    maxLines = 4
-                )
-                
-                Spacer(modifier = Modifier.width(DS.Space12))
-                
-                // Send action button
-                IconButton(
-                    onClick = {
-                        if (messageText.isNotBlank()) {
-                            val userMsg = messageText
-                            if (selectedDMContactId != null) {
-                                val contactId = selectedDMContactId!!
-                                chatViewModel.sendDirectMessage(workspaceId, contactId, userMsg, userId, userProfile)
-
-                                // Auto bot response simulation
-                                coroutineScope.launch {
-                                    kotlinx.coroutines.delay(1200)
-                                    val replyText = when (contactId) {
-                                        "coop_bot" -> {
-                                            when {
-                                                userMsg.contains("help", ignoreCase = true) || userMsg.contains("status", ignoreCase = true) -> 
-                                                    "I have completed a fresh compliance check on the '$workspaceId' workspace shard. Status is active and all IP splits conform to standard media structures."
-                                                userMsg.contains("agreement", ignoreCase = true) || userMsg.contains("contract", ignoreCase = true) -> 
-                                                    "All current members have signed off. P2P splits are securely anchored and ready for payout triggers."
-                                                else -> "Acknowledged. I am continuously auditing this co-op workspace for milestone splits, SLA responses, and active compliance metrics."
-                                            }
-                                        }
-                                        "alex" -> "Awesome! Let's finalize the storyboard and schedule a rapid huddle. I can deliver the edits right after we lock down the pacing."
-                                        "maya" -> "Just finished rendering the VFX sequence in Blender. Let me know if you need any adjustments to the camera bloom or neon lighting!"
-                                        "thomas" -> "Finalizing the ambient backing tracks now. The soundscape matches our futuristic theme perfectly."
-                                        else -> "Thanks for reaching out! Let's discuss details in the general chat channel."
-                                    }
-                                    val currentContact = dmContacts.find { it.id == contactId }
-                                    val botMsg = com.example.data.model.Message(
-                                        id = java.util.UUID.randomUUID().toString(),
-                                        workspaceId = workspaceId,
-                                        senderId = contactId,
-                                        recipientId = userId,
-                                        senderName = currentContact?.name ?: contactId,
-                                        senderRole = currentContact?.role ?: "MEMBER",
-                                        messageBody = replyText,
-                                        timestamp = System.currentTimeMillis()
-                                    )
-                                    chatViewModel.insertSystemMessage(botMsg)
-                                }
-                            } else {
-                                // Default DB Workspace Chat send
-                                chatViewModel.sendMessage(workspaceId, userMsg, userId, userProfile)
-                            }
-                            messageText = ""
-                        }
-                    },
-                    enabled = messageText.isNotBlank(),
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(DS.RadiusMedium)
-                        .background(if (messageText.isNotBlank()) AccentBlue else ColorDivider.copy(alpha = 0.3f))
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send Message",
-                        tint = if (messageText.isNotBlank()) Color.White else TextSecondary,
-                        modifier = Modifier.size(16.dp)
+                    }
+                    
+                    Spacer(modifier = Modifier.width(DS.Space12))
+                    
+                    // Text Field Box
+                    OutlinedTextField(
+                        value = messageText,
+                        onValueChange = { messageText = it },
+                        placeholder = {
+                            Text(
+                                text = if (selectedDMContactId != null) "Send direct message..." else "Message #$activeChannel...",
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = DS.RadiusMedium,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = AccentBlue,
+                            unfocusedBorderColor = ColorDivider.copy(alpha = 0.5f),
+                            focusedContainerColor = PrimaryBackground,
+                            unfocusedContainerColor = PrimaryBackground
+                        ),
+                        maxLines = 4
                     )
+                    
+                    Spacer(modifier = Modifier.width(DS.Space12))
+                    
+                    // Send action button
+                    IconButton(
+                        onClick = {
+                            if (messageText.isNotBlank()) {
+                                val userMsg = messageText
+                                if (selectedDMContactId != null) {
+                                    val contactId = selectedDMContactId!!
+                                    chatViewModel.sendDirectMessage(workspaceId, contactId, userMsg, userId, userProfile)
+
+                                    // Auto bot response simulation
+                                    coroutineScope.launch {
+                                        kotlinx.coroutines.delay(1200)
+                                        val replyText = when (contactId) {
+                                            "coop_bot" -> {
+                                                when {
+                                                    userMsg.contains("help", ignoreCase = true) || userMsg.contains("status", ignoreCase = true) -> 
+                                                        "I have completed a fresh compliance check on the '$workspaceId' workspace shard. Status is active and all IP splits conform to standard media structures."
+                                                    userMsg.contains("agreement", ignoreCase = true) || userMsg.contains("contract", ignoreCase = true) -> 
+                                                        "All current members have signed off. P2P splits are securely anchored and ready for payout triggers."
+                                                    else -> "Acknowledged. I am continuously auditing this co-op workspace for milestone splits, SLA responses, and active compliance metrics."
+                                                }
+                                            }
+                                            "alex" -> "Awesome! Let's finalize the storyboard and schedule a rapid huddle. I can deliver the edits right after we lock down the pacing."
+                                            "maya" -> "Just finished rendering the VFX sequence in Blender. Let me know if you need any adjustments to the camera bloom or neon lighting!"
+                                            "thomas" -> "Finalizing the ambient backing tracks now. The soundscape matches our futuristic theme perfectly."
+                                            else -> "Thanks for reaching out! Let's discuss details in the general chat channel."
+                                        }
+                                        val currentContact = dmContacts.find { it.id == contactId }
+                                        val botMsg = com.example.data.model.Message(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            workspaceId = workspaceId,
+                                            senderId = contactId,
+                                            recipientId = userId,
+                                            senderName = currentContact?.name ?: contactId,
+                                            senderRole = currentContact?.role ?: "MEMBER",
+                                            messageBody = replyText,
+                                            timestamp = System.currentTimeMillis()
+                                        )
+                                        chatViewModel.insertSystemMessage(botMsg)
+                                    }
+                                } else {
+                                    // Default DB Workspace Chat send
+                                    chatViewModel.sendMessage(workspaceId, userMsg, userId, userProfile)
+                                }
+                                messageText = ""
+                            }
+                        },
+                        enabled = messageText.isNotBlank(),
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(DS.RadiusMedium)
+                            .background(if (messageText.isNotBlank()) AccentBlue else ColorDivider.copy(alpha = 0.3f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send Message",
+                            tint = if (messageText.isNotBlank()) Color.White else TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -505,6 +506,7 @@ fun ProfileTextField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
+            textStyle = TextStyle(color = Color.White),
             modifier = Modifier.fillMaxWidth().testTag(tag),
             leadingIcon = { Icon(icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp)) },
             colors = OutlinedTextFieldDefaults.colors(

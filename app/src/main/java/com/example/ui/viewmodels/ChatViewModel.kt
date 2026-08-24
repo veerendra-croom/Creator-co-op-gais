@@ -14,7 +14,7 @@ import java.util.UUID
 
 
 class ChatViewModel constructor(
-    private val repository: AppRepository
+    val repository: AppRepository
 ) : ViewModel() {
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -50,10 +50,14 @@ class ChatViewModel constructor(
 
     fun sendDirectMessage(workspaceId: String, recipientId: String, text: String, senderId: String, user: UserProfile?) {
         if (text.isBlank()) return
+        val targetWsId = if (workspaceId.isBlank() || workspaceId == "dm_general") {
+            "dm_${listOf(senderId, recipientId).sorted().joinToString("_")}"
+        } else workspaceId
+
         viewModelScope.launch {
             val msg = Message(
                 id = UUID.randomUUID().toString(),
-                workspaceId = workspaceId,
+                workspaceId = targetWsId,
                 senderId = senderId,
                 recipientId = recipientId,
                 senderName = user?.displayName ?: "You",
@@ -90,7 +94,7 @@ class ChatViewModel constructor(
     val creatorsFlow: Flow<List<UserProfile>> = repository.getAllUsersFlow()
 
     fun getDMsForUser(userId: String): Flow<List<Message>> {
-        return repository.getDMsForWorkspace("DM_WORKSPACE", userId)
+        return repository.getAllDMsForUser(userId)
     }
 
     fun deleteMessage(messageId: String) {

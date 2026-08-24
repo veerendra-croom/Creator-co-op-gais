@@ -404,20 +404,37 @@ fun AdminAuditScreen(
                 }
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                Row {
+                    TextButton(
+                        onClick = {
+                            val sendIntent = android.content.Intent().apply {
+                                action = android.content.Intent.ACTION_SEND
+                                putExtra(android.content.Intent.EXTRA_TEXT, exportDataString)
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Creator Co-Op Audit Ledger Export ($exportFormat)")
+                                type = "text/plain"
+                            }
+                            val shareIntent = android.content.Intent.createChooser(sendIntent, "Export Audit Ledger")
+                            context.startActivity(shareIntent)
+                            showExportDialog = false
+                            com.example.ui.feedback.FeedbackManager.showSuccess("Audit Ledger $exportFormat exported.")
                         }
-                        // Simulate export or copy to clipboard
-                        val clipboardManager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("Creator Co-op Audit Ledger", exportDataString)
-                        clipboardManager.setPrimaryClip(clip)
-                        showExportDialog = false
-                        com.example.ui.feedback.FeedbackManager.showSuccess("Audit Ledger $exportFormat data copied to secure clipboard.")
+                    ) {
+                        Text("SHARE / EXPORT", fontWeight = FontWeight.Bold, color = NeonEmerald)
                     }
-                ) {
-                    Text("COPY DATA", fontWeight = FontWeight.Black, color = AccentBlue)
+                    TextButton(
+                        onClick = {
+                            if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                            val clipboardManager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Creator Co-op Audit Ledger", exportDataString)
+                            clipboardManager.setPrimaryClip(clip)
+                            showExportDialog = false
+                            com.example.ui.feedback.FeedbackManager.showSuccess("Audit Ledger $exportFormat data copied to secure clipboard.")
+                        }
+                    ) {
+                        Text("COPY DATA", fontWeight = FontWeight.Black, color = AccentBlue)
+                    }
                 }
             },
             dismissButton = {

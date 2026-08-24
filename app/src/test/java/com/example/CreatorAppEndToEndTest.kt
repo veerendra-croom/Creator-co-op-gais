@@ -36,7 +36,6 @@ class CreatorAppEndToEndTest {
     private lateinit var feedViewModel: com.example.ui.viewmodels.CommunityFeedViewModel
     private lateinit var discoveryViewModel: com.example.ui.viewmodels.DiscoveryViewModel
     private lateinit var adminViewModel: com.example.ui.viewmodels.AdminViewModel
-    private lateinit var adManagementViewModel: com.example.ui.viewmodels.AdManagementViewModel
 
     @Before
     fun setup() {
@@ -53,7 +52,6 @@ class CreatorAppEndToEndTest {
         feedViewModel = factory.create(com.example.ui.viewmodels.CommunityFeedViewModel::class.java)
         discoveryViewModel = factory.create(com.example.ui.viewmodels.DiscoveryViewModel::class.java)
         adminViewModel = factory.create(com.example.ui.viewmodels.AdminViewModel::class.java)
-        adManagementViewModel = factory.create(com.example.ui.viewmodels.AdManagementViewModel::class.java)
 
         kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -111,7 +109,6 @@ class CreatorAppEndToEndTest {
                     globalViewModel = globalViewModel,
                     authViewModel = authViewModel,
                     adminViewModel = adminViewModel,
-                    adManagementViewModel = adManagementViewModel,
                     userProfile = userProfile
                 )
             }

@@ -127,6 +127,8 @@ class WorkspaceViewModel constructor(
     fun selectWorkspace(ws: Workspace?) {
         selectedWorkspaceId.update { ws?.id }
         workspaceViewMode.update { if (ws == null) "LIST" else "VIEW" }
+        productionStateScope.update { "PRODUCTION_READY" }
+        workspaceSubTab.update { "STATE" }
     }
 
     val newlyCreatedWorkspace = MutableStateFlow<Workspace?>(null)
@@ -212,17 +214,37 @@ class WorkspaceViewModel constructor(
     }
 
     fun hasPermission(workspaceId: String, userId: String, permission: WorkspacePermission): Boolean {
-        val members = activeWorkspaceMembers.value
-        val me = members.find { it.userId == userId } ?: return false
-        val role = me.assignedRoleTitle
-        
-        return when (permission) {
-            WorkspacePermission.MODIFY_PRODUCTION -> me.canModifyProduction || role in listOf("Lead Creator", "Head", "Owner")
-            WorkspacePermission.MANAGE_MEMBERS -> role in listOf("Lead Creator", "Head", "Owner")
-            WorkspacePermission.ARCHIVE_WORKSPACE -> role in listOf("Lead Creator", "Owner")
-            WorkspacePermission.EDIT_AGREEMENT -> role in listOf("Lead Creator", "Owner")
-            WorkspacePermission.VIEW_DISPUTES -> true // All can view, but maybe only leads see names?
+        val members = activeWorkspaceMembers.value.ifEmpty {
+            try {
+                kotlinx.coroutines.runBlocking {
+                    repository.getMembersForWorkspace(workspaceId).firstOrNull() ?: emptyList()
+                }
+            } catch (e: Exception) {
+                emptyList()
+            }
         }
+        val me = members.find { it.userId == userId }
+        if (me != null) {
+            val role = me.assignedRoleTitle
+            return when (permission) {
+                WorkspacePermission.MODIFY_PRODUCTION -> me.canModifyProduction || role in listOf("Lead Creator", "Head", "Owner")
+                WorkspacePermission.MANAGE_MEMBERS -> role in listOf("Lead Creator", "Head", "Owner")
+                WorkspacePermission.ARCHIVE_WORKSPACE -> role in listOf("Lead Creator", "Owner")
+                WorkspacePermission.EDIT_AGREEMENT -> role in listOf("Lead Creator", "Owner")
+                WorkspacePermission.VIEW_DISPUTES -> true
+            }
+        }
+        val currentWs = selectedWorkspace.value ?: try {
+            kotlinx.coroutines.runBlocking {
+                repository.getWorkspaceById(workspaceId).firstOrNull()
+            }
+        } catch (e: Exception) {
+            null
+        }
+        if (currentWs?.id == workspaceId && currentWs.createdBy == userId) {
+            return true
+        }
+        return false
     }
 
     enum class WorkspacePermission {
@@ -244,11 +266,46 @@ class WorkspaceViewModel constructor(
                 }
             }
             val previousLane = task.kanbanLane
-            repository.insertTask(task.copy(kanbanLane = newLane))
+            repository.updateTaskStatus(taskId, newLane)
             
             val isDone = newLane.uppercase() == "DONE" || newLane.uppercase() == "PUBLISH"
             if (isDone) {
                 AnalyticsManager.trackTaskCompleted(taskId, System.currentTimeMillis() - task.createdAt)
+                
+                // Dispatch notification to workspace owner
+                val ws = repository.getWorkspaceById(task.workspaceId).firstOrNull()
+                ws?.let { workspace ->
+                    repository.insertNotification(com.example.data.model.Notification(
+                        id = UUID.randomUUID().toString(),
+                        userId = workspace.createdBy,
+                        title = "Task Completed: ${task.title}",
+                        body = "Task '${task.title}' was marked $newLane in workspace '${workspace.name}'.",
+                        type = "TASK_COMPLETED",
+                        createdAt = System.currentTimeMillis()
+                    ))
+
+                    // Post system message in workspace chat
+                    repository.insertMessage(com.example.data.model.Message(
+                        id = UUID.randomUUID().toString(),
+                        workspaceId = workspace.id,
+                        senderId = "system",
+                        senderName = "Pipeline Bot",
+                        messageBody = "Milestone Reached: Task '${task.title}' moved to $newLane!",
+                        timestamp = System.currentTimeMillis()
+                    ))
+                }
+
+                // Log audit entry
+                repository.insertAuditLog(com.example.data.model.AuditLog(
+                    id = UUID.randomUUID().toString(),
+                    adminId = userId,
+                    adminName = "Creator",
+                    actionTaken = "TASK_COMPLETED",
+                    targetType = "PRODUCTION_TASK",
+                    targetId = taskId,
+                    reason = "Task '${task.title}' moved to lane $newLane.",
+                    createdAt = System.currentTimeMillis()
+                ))
             }
             val msgText = if (isDone) "Task anchored to DONE status." else "Task moved to $newLane"
             
@@ -324,6 +381,13 @@ class WorkspaceViewModel constructor(
         if (isWorkspaceArchived.value) return
         viewModelScope.launch {
             val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
+            val member = repository.getMemberInfo(task.workspaceId, userId).firstOrNull()
+            val user = repository.getUserById(userId).firstOrNull()
+            val isAdmin = user?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || user?.globalRole == "ADMIN"
+            if (member == null && !isAdmin) {
+                FeedbackManager.showError("Access Denied: You are not a member of this workspace.")
+                return@launch
+            }
             val displayTitle = if (task.title.contains("]")) {
                 task.title.substringAfter("]").trim()
             } else {
@@ -360,7 +424,7 @@ class WorkspaceViewModel constructor(
         }
     }
 
-    fun updateTask(taskId: String, title: String, body: String, priority: String = "MEDIUM") {
+    fun updateTask(taskId: String, title: String, body: String, priority: String = "MEDIUM", userId: String? = null) {
         if (isWorkspaceArchived.value) {
             FeedbackManager.showWarning("Action blocked: Workspace is ARCHIVED.")
             return
@@ -368,6 +432,15 @@ class WorkspaceViewModel constructor(
         viewModelScope.launch {
             try {
                 val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
+                if (userId != null) {
+                    val member = repository.getMemberInfo(task.workspaceId, userId).firstOrNull()
+                    val user = repository.getUserById(userId).firstOrNull()
+                    val isAdmin = user?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || user?.globalRole == "ADMIN"
+                    if (member == null && !isAdmin) {
+                        FeedbackManager.showError("Access Denied: You are not a member of this workspace.")
+                        return@launch
+                    }
+                }
                 repository.insertTask(task.copy(
                     title = title,
                     contentBody = body,
@@ -380,13 +453,23 @@ class WorkspaceViewModel constructor(
         }
     }
 
-    fun updateTaskStatus(taskId: String, status: String) {
+    fun updateTaskStatus(taskId: String, status: String, userId: String? = null) {
         if (isWorkspaceArchived.value) {
             FeedbackManager.showWarning("Action blocked: Workspace is ARCHIVED.")
             return
         }
         viewModelScope.launch {
             try {
+                if (userId != null) {
+                    val task = repository.getTaskById(taskId).firstOrNull() ?: return@launch
+                    val member = repository.getMemberInfo(task.workspaceId, userId).firstOrNull()
+                    val user = repository.getUserById(userId).firstOrNull()
+                    val isAdmin = user?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || user?.globalRole == "ADMIN"
+                    if (member == null && !isAdmin) {
+                        FeedbackManager.showError("Access Denied: You are not a member of this workspace.")
+                        return@launch
+                    }
+                }
                 repository.updateTaskStatus(taskId, status)
                 if (status == "COMPLETED") {
                     FeedbackManager.showSuccess("Task marked as completed!")
@@ -447,9 +530,19 @@ class WorkspaceViewModel constructor(
         }
     }
 
-    fun inviteMember(workspaceId: String, email: String, roleTitle: String) {
+    fun inviteMember(workspaceId: String, email: String, roleTitle: String, inviterUserId: String? = null) {
         viewModelScope.launch {
             try {
+                if (inviterUserId != null) {
+                    val inviterMember = repository.getMemberInfo(workspaceId, inviterUserId).firstOrNull()
+                    val inviterUser = repository.getUserById(inviterUserId).firstOrNull()
+                    val isGlobalAdmin = inviterUser?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || inviterUser?.globalRole == "ADMIN"
+                    val isLead = inviterMember?.assignedRoleTitle in listOf("Lead Creator", "Head", "Owner")
+                    if (!isGlobalAdmin && !isLead && inviterMember == null) {
+                        FeedbackManager.showError("Permission Denied: Only workspace members/leads can invite members.")
+                        return@launch
+                    }
+                }
                 val currentMembers = repository.getMembersForWorkspace(workspaceId).first()
                 if (currentMembers.size >= 25) {
                     FeedbackManager.showWarning("Invite Denied: Member cap reached for this workspace.")
@@ -631,11 +724,28 @@ class WorkspaceViewModel constructor(
     }
 
     fun getWorkspacePolicy(workspaceId: String) = _workspacePolicies.value[workspaceId] ?: WorkspacePolicyConfig()
-    fun updateWorkspacePolicy(workspaceId: String, config: WorkspacePolicyConfig) {
-        val current = _workspacePolicies.value.toMutableMap()
-        current[workspaceId] = config
-        _workspacePolicies.value = current
-        _toastMessage.value = "Policy updated!"
+    fun updateWorkspacePolicy(workspaceId: String, config: WorkspacePolicyConfig, userId: String? = null) {
+        if (userId != null) {
+            viewModelScope.launch {
+                val member = repository.getMemberInfo(workspaceId, userId).firstOrNull()
+                val user = repository.getUserById(userId).firstOrNull()
+                val isLead = member?.assignedRoleTitle in listOf("Lead Creator", "Head", "Owner")
+                val isAdmin = user?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || user?.globalRole == "ADMIN"
+                if (!isLead && !isAdmin) {
+                    FeedbackManager.showError("Permission Denied: Only leads or admins can update workspace policies.")
+                    return@launch
+                }
+                val current = _workspacePolicies.value.toMutableMap()
+                current[workspaceId] = config
+                _workspacePolicies.value = current
+                _toastMessage.value = "Policy updated!"
+            }
+        } else {
+            val current = _workspacePolicies.value.toMutableMap()
+            current[workspaceId] = config
+            _workspacePolicies.value = current
+            _toastMessage.value = "Policy updated!"
+        }
     }
 
     fun addCalendarItem(title: String, scheduledDate: String, linkedTaskId: String?, userId: String, status: String = "Drafting") {
@@ -713,16 +823,16 @@ class WorkspaceViewModel constructor(
             } catch (e: Exception) {
                 emptyList<TemplateTask>()
             }
-            templateTasks.forEach { tt ->
+            templateTasks.forEachIndexed { index, tt ->
                 val spawnedTask = ProductionTask(
-                    id = UUID.randomUUID().toString(),
+                    id = UUID.randomUUID().toString() + "_" + System.nanoTime() + "_$index",
                     workspaceId = wsId,
                     creatorId = userId,
                     title = tt.title,
                     contentBody = tt.description,
                     stateScope = "PRODUCTION_READY",
-                    kanbanLane = "TODO",
-                    createdAt = System.currentTimeMillis()
+                    kanbanLane = tt.defaultLane.ifBlank { "TODO" },
+                    createdAt = System.currentTimeMillis() + index
                 )
                 repository.insertTask(spawnedTask)
             }

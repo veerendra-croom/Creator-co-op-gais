@@ -36,6 +36,7 @@ fun WorkspaceHub(
     chatViewModel: ChatViewModel,
     userId: String,
     userProfile: UserProfile?,
+    globalViewModel: GlobalViewModel? = null,
     onNavigateToCreate: () -> Unit = {},
     onNavigateToDiscovery: () -> Unit = {}
 ) {
@@ -58,6 +59,7 @@ fun WorkspaceHub(
             chatViewModel = chatViewModel,
             userId = userId,
             userProfile = userProfile,
+            globalViewModel = globalViewModel,
             onBack = { workspaceViewModel.selectWorkspace(null) }
         )
     }
@@ -214,6 +216,7 @@ fun WorkspaceDetailContainer(
     chatViewModel: ChatViewModel,
     userId: String,
     userProfile: UserProfile?,
+    globalViewModel: GlobalViewModel? = null,
     onBack: () -> Unit
 ) {
     LaunchedEffect(userId) {
@@ -344,13 +347,33 @@ fun WorkspaceDetailContainer(
                         onGoToAgreement = { workspaceViewModel.workspaceSubTab.value = "AGREEMENT" },
                         onGoToTasks = { workspaceViewModel.workspaceSubTab.value = "PRODUCTION" },
                         onGoToChat = { workspaceViewModel.workspaceSubTab.value = "CHAT" },
-                        onGoToTeam = { workspaceViewModel.workspaceSubTab.value = "TEAM" }
+                        onGoToTeam = { workspaceViewModel.workspaceSubTab.value = "TEAM" },
+                        globalViewModel = globalViewModel
                     )
                     "SANDBOX" -> PersonalSpaceScreen(workspaceViewModel, workspace.id, userId)
-                    "PRODUCTION" -> TeamSpaceScreen(workspaceViewModel, workspace.id, userId, isAgreementLocked, onGoToAgreement = { workspaceViewModel.workspaceSubTab.value = "AGREEMENT" })
+                    "PRODUCTION" -> TeamSpaceScreen(
+                        viewModel = workspaceViewModel,
+                        workspaceId = workspace.id,
+                        userId = userId,
+                        isAgreementActive = isAgreementLocked,
+                        onGoToAgreement = { workspaceViewModel.workspaceSubTab.value = "AGREEMENT" },
+                        globalViewModel = globalViewModel
+                    )
                     "CHAT" -> WorkspaceChat(chatViewModel, workspace.id, userId, userProfile, isAgreementLocked)
                     "TEAM" -> WorkspaceMembers(workspaceViewModel, workspace.id, workspace, userId)
-                    "AGREEMENT" -> AgreementVault(agreementViewModel, workspace.id, userId, isLead = isLead, onBack = { workspaceViewModel.workspaceSubTab.value = "STATE" })
+                    "AGREEMENT" -> {
+                        val flags by workspaceViewModel.featureFlags.collectAsState()
+                        AgreementVault(
+                            viewModel = agreementViewModel,
+                            workspaceId = workspace.id,
+                            userId = userId,
+                            isLead = isLead,
+                            featureFlags = flags,
+                            userRole = if (isLead) "ORGANIZER" else (userProfile?.systemRole ?: "PARTICIPANT"),
+                            onBack = { workspaceViewModel.workspaceSubTab.value = "STATE" },
+                            globalViewModel = globalViewModel
+                        )
+                    }
                 }
             }
         }

@@ -7,12 +7,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.WorkspaceViewModel
+import com.example.data.model.Workspace
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalAnimationApi::class)
@@ -32,16 +36,24 @@ import kotlinx.coroutines.launch
 fun CreateWorkspaceScreen(
     workspaceViewModel: WorkspaceViewModel,
     userId: String,
+    userProfile: com.example.data.model.UserProfile? = null,
+    onNavigateToPro: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val workspaces: List<Workspace> by workspaceViewModel.workspaces.collectAsState(initial = emptyList())
+    val userWorkspacesCount = remember(workspaces, userId) {
+        workspaces.count { it.createdBy == userId }
+    }
+    val isPro = userProfile?.isVerifiedPro ?: false
+    val isLimitReached = !isPro && userWorkspacesCount >= 2
     
     // States for Form
-    var step by remember { mutableStateOf(1) } // 1: Core Details, 2: Aesthetics & Description, 3: Success
-    var name by remember { mutableStateOf("") }
-    var selectedPlatform by remember { mutableStateOf("YOUTUBE") }
-    var pitch by remember { mutableStateOf("") }
-    var selectedAccent by remember { mutableStateOf("BLUE") } // BLUE, EMERALD, AMBER, RED
+    var step by rememberSaveable { mutableStateOf(1) } // 1: Core Details, 2: Aesthetics & Description, 3: Success
+    var name by rememberSaveable { mutableStateOf("") }
+    var selectedPlatform by rememberSaveable { mutableStateOf("YOUTUBE") }
+    var pitch by rememberSaveable { mutableStateOf("") }
+    var selectedAccent by rememberSaveable { mutableStateOf("BLUE") } // BLUE, EMERALD, AMBER, RED
     
     // Validation state
     var nameError by remember { mutableStateOf<String?>(null) }
@@ -220,12 +232,44 @@ fun CreateWorkspaceScreen(
             ) { currentStep ->
                 when (currentStep) {
                     1 -> {
+                        val step1Scroll = rememberScrollState()
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .imePadding()
+                                .verticalScroll(step1Scroll),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             // Large Header
                             Column {
+                                if (isLimitReached) {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                                        border = BorderStroke(1.dp, CrispAmber),
+                                        shape = RoundedCornerShape(16.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Star, null, tint = CrispAmber, modifier = Modifier.size(24.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text("Free Workspace Limit (2 Max)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                                Text("Upgrade to Verified Pro for unlimited workspaces & zero ads.", color = TextSecondary, fontSize = 11.sp)
+                                            }
+                                            Button(
+                                                onClick = onNavigateToPro,
+                                                colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                                                shape = RoundedCornerShape(10.dp)
+                                            ) {
+                                                Text("Upgrade", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Text(
                                     text = "ESTABLISH YOUR CO-OP",
                                     color = AccentBlue,
@@ -398,8 +442,12 @@ fun CreateWorkspaceScreen(
                     }
 
                     2 -> {
+                        val step2Scroll = rememberScrollState()
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .imePadding()
+                                .verticalScroll(step2Scroll),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             // Large Header
@@ -546,9 +594,13 @@ fun CreateWorkspaceScreen(
 
                                 Button(
                                     onClick = {
-                                        saveDraft()
-                                        workspaceViewModel.createWorkspace(name, selectedPlatform, userId)
-                                        step = 3
+                                        if (isLimitReached) {
+                                            onNavigateToPro()
+                                        } else {
+                                            saveDraft()
+                                            workspaceViewModel.createWorkspace(name, selectedPlatform, userId)
+                                            step = 3
+                                        }
                                     },
                                     modifier = Modifier
                                         .weight(1f)

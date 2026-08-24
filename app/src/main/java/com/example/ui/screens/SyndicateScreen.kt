@@ -16,7 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import com.example.util.CustomTabsHelper
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +38,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.example.ui.theme.*
+import com.example.ui.tour.guidedTourTarget
 import com.example.ui.viewmodels.*
 import com.example.ui.components.*
 import com.example.data.model.ProjectProposal
@@ -101,7 +105,7 @@ fun SyndicateScreen(
                         onClick = { showPostDialog = true },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                         shape = DS.RadiusMedium,
-                        modifier = Modifier.height(40.dp).testTag("post_proposal_button")
+                        modifier = Modifier.height(40.dp).testTag("post_proposal_button").guidedTourTarget("matchmaker_pitch_fab", globalViewModel.tourManager)
                     ) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(DS.Space4))
@@ -205,7 +209,7 @@ fun SyndicateScreen(
                 options = niches,
                 selectedOption = activeFilter,
                 onOptionSelected = { discoveryViewModel.selectedNicheFilter.value = it },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().guidedTourTarget("matchmaker_pitch_filters", globalViewModel.tourManager)
             )
 
             Spacer(modifier = Modifier.height(DS.Space12))
@@ -574,6 +578,8 @@ fun SyndicateScreen(
     if (showPostDialog) {
         CreateProposalDialog(
             onDismiss = { showPostDialog = false },
+            featureFlags = featureFlags,
+            userRole = userProfile?.systemRole ?: "PARTICIPANT",
             onSubmit = { title, niche, brief ->
                 discoveryViewModel.submitProjectProposal(
                     title = title,
@@ -591,6 +597,8 @@ fun SyndicateScreen(
         SubmitPitchDialog(
             project = selectedPitchProject!!,
             onDismiss = { selectedPitchProject = null },
+            featureFlags = featureFlags,
+            userRole = userProfile?.systemRole ?: "PARTICIPANT",
             onSubmit = { cover, portfolio ->
                 discoveryViewModel.submitTalentPitch(
                     projectId = selectedPitchProject!!.id, 
@@ -932,6 +940,7 @@ fun PitchProposalRow(
     globalViewModel: GlobalViewModel,
     onEvaluate: () -> Unit
 ) {
+    val context = LocalContext.current
     val senderProfile by remember(pitch.senderId) { globalViewModel.getUserById(pitch.senderId) }.collectAsState(initial = null)
     Card(
         modifier = Modifier
@@ -1033,7 +1042,9 @@ fun PitchProposalRow(
                     fontSize = 11.sp,
                     color = AccentBlue,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { /* action */ }
+                    modifier = Modifier.clickable { 
+                        CustomTabsHelper.openUrl(context, pitch.portfolioUrl)
+                    }
                 )
 
                 Button(
@@ -1073,6 +1084,7 @@ fun RecruitDeskDialog(
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
+    val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Dossier", "Interview Chat")
     var showDeclineConfirm by remember { mutableStateOf(false) }
@@ -1212,7 +1224,7 @@ fun RecruitDeskDialog(
                                     colors = CardDefaults.cardColors(containerColor = SurfaceColor),
                                     border = BorderStroke(1.dp, ColorDivider),
                                     shape = RoundedCornerShape(16.dp),
-                                    onClick = { /* open link */ }
+                                    onClick = { CustomTabsHelper.openUrl(context, pitch.portfolioUrl) }
                                 ) {
                                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.Link, null, tint = AccentBlue)
@@ -1338,7 +1350,9 @@ fun RecruitDeskDialog(
 @Composable
 fun CreateProposalDialog(
     onDismiss: () -> Unit,
-    onSubmit: (String, String, String) -> Unit
+    onSubmit: (String, String, String) -> Unit,
+    featureFlags: List<com.example.data.model.FeatureFlag> = emptyList(),
+    userRole: String = "PARTICIPANT"
 ) {
     var title by remember { mutableStateOf("") }
     var niche by remember { mutableStateOf("Tech") }
@@ -1366,57 +1380,81 @@ fun CreateProposalDialog(
                     fontWeight = FontWeight.Bold
                 )
 
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Project Title") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("proposal_title_input")
-                )
-
-                // Niche Options Row
-                Text("Select Channel Niche:", style = MaterialTheme.typography.labelSmall)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                FeatureGate(
+                    flagKey = "SYNDICATE_PITCH_CREATION",
+                    featureFlags = featureFlags,
+                    userRole = userRole,
+                    showBannerOnRestricted = true,
+                    customRestrictedNotice = "Project proposal and pitch creation is temporarily restricted by platform administration."
                 ) {
-                    nichesList.forEach { n ->
-                        val selected = niche == n
-                        OutlinedButton(
-                            onClick = { niche = n },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
-                            )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = title,
+                            onValueChange = { title = it },
+                            label = { Text("Project Title") },
+                            textStyle = TextStyle(color = Color.White),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AccentBlue,
+                                unfocusedBorderColor = ColorDivider
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("proposal_title_input")
+                        )
+
+                        // Niche Options Row
+                        Text("Select Channel Niche:", style = MaterialTheme.typography.labelSmall)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(n, fontSize = 12.sp)
+                            nichesList.forEach { n ->
+                                val selected = niche == n
+                                OutlinedButton(
+                                    onClick = { niche = n },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
+                                    )
+                                ) {
+                                    Text(n, fontSize = 12.sp)
+                                }
+                            }
                         }
-                    }
-                }
 
-                OutlinedTextField(
-                    value = brief,
-                    onValueChange = { brief = it },
-                    label = { Text("Collaboration Brief") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .testTag("proposal_brief_input")
-                )
+                        OutlinedTextField(
+                            value = brief,
+                            onValueChange = { brief = it },
+                            label = { Text("Collaboration Brief") },
+                            textStyle = TextStyle(color = Color.White),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AccentBlue,
+                                unfocusedBorderColor = ColorDivider
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .testTag("proposal_brief_input")
+                        )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(
-                        onClick = { onSubmit(title, niche, brief) },
-                        enabled = title.isNotBlank() && brief.isNotBlank(),
-                        modifier = Modifier.testTag("proposal_submit_button")
-                    ) {
-                        Text("Post Proposal")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = onDismiss) { Text("Cancel") }
+                            Button(
+                                onClick = { onSubmit(title, niche, brief) },
+                                enabled = title.isNotBlank() && brief.isNotBlank(),
+                                modifier = Modifier.testTag("proposal_submit_button")
+                            ) {
+                                Text("Post Proposal")
+                            }
+                        }
                     }
                 }
             }
@@ -1428,7 +1466,9 @@ fun CreateProposalDialog(
 fun SubmitPitchDialog(
     project: ProjectProposal,
     onDismiss: () -> Unit,
-    onSubmit: (String, String) -> Unit
+    onSubmit: (String, String) -> Unit,
+    featureFlags: List<com.example.data.model.FeatureFlag> = emptyList(),
+    userRole: String = "PARTICIPANT"
 ) {
     var cover by remember { mutableStateOf("") }
     var portfolio by remember { mutableStateOf("") }
@@ -1461,36 +1501,60 @@ fun SubmitPitchDialog(
                     fontWeight = FontWeight.Bold
                 )
 
-                OutlinedTextField(
-                    value = cover,
-                    onValueChange = { cover = it },
-                    label = { Text("Your Pitch / Cover Message") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                        .testTag("pitch_cover_input")
-                )
-
-                OutlinedTextField(
-                    value = portfolio,
-                    onValueChange = { portfolio = it },
-                    label = { Text("Portfolio Link (URL)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("pitch_portfolio_input")
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                FeatureGate(
+                    flagKey = "SYNDICATE_PITCH_CREATION",
+                    featureFlags = featureFlags,
+                    userRole = userRole,
+                    showBannerOnRestricted = true,
+                    customRestrictedNotice = "Pitch submissions for syndicate openings are temporarily restricted by platform administration."
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(
-                        onClick = { onSubmit(cover, portfolio) },
-                        enabled = cover.isNotBlank() && portfolio.isNotBlank(),
-                        modifier = Modifier.testTag("pitch_submit_button")
-                    ) {
-                        Text("Send Pitch")
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = cover,
+                            onValueChange = { cover = it },
+                            label = { Text("Your Pitch / Cover Message") },
+                            textStyle = TextStyle(color = Color.White),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AccentBlue,
+                                unfocusedBorderColor = ColorDivider
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .testTag("pitch_cover_input")
+                        )
+
+                        OutlinedTextField(
+                            value = portfolio,
+                            onValueChange = { portfolio = it },
+                            label = { Text("Portfolio Link (URL)") },
+                            textStyle = TextStyle(color = Color.White),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AccentBlue,
+                                unfocusedBorderColor = ColorDivider
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("pitch_portfolio_input")
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = onDismiss) { Text("Cancel") }
+                            Button(
+                                onClick = { onSubmit(cover, portfolio) },
+                                enabled = cover.isNotBlank() && portfolio.isNotBlank(),
+                                modifier = Modifier.testTag("pitch_submit_button")
+                            ) {
+                                Text("Send Pitch")
+                            }
+                        }
                     }
                 }
             }
@@ -1778,36 +1842,33 @@ fun MySavedSearchesDialog(
                             
                             // Concentric Radar Rings
                             drawCircle(
-                                color = CrispAmber.copy(alpha = 0.1f),
+                                color = CrispAmber.copy(alpha = 0.3f),
                                 radius = radius,
-                                center = center,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
                             )
                             drawCircle(
-                                color = CrispAmber.copy(alpha = 0.05f),
+                                color = CrispAmber.copy(alpha = 0.2f),
                                 radius = radius * 0.6f,
-                                center = center,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2.dp.toPx())
                             )
                             drawCircle(
-                                color = CrispAmber.copy(alpha = 0.02f),
+                                color = CrispAmber.copy(alpha = 0.15f),
                                 radius = radius * 0.3f,
-                                center = center,
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
                             )
                             
                             // Crosshairs
                             drawLine(
-                                color = ColorDivider,
+                                color = ColorDivider.copy(alpha = 0.9f),
                                 start = androidx.compose.ui.geometry.Offset(center.x - radius, center.y),
                                 end = androidx.compose.ui.geometry.Offset(center.x + radius, center.y),
-                                strokeWidth = 1.dp.toPx()
+                                strokeWidth = 1.2.dp.toPx()
                             )
                             drawLine(
-                                color = ColorDivider,
+                                color = ColorDivider.copy(alpha = 0.9f),
                                 start = androidx.compose.ui.geometry.Offset(center.x, center.y - radius),
                                 end = androidx.compose.ui.geometry.Offset(center.x, center.y + radius),
-                                strokeWidth = 1.dp.toPx()
+                                strokeWidth = 1.2.dp.toPx()
                             )
                             
                             // Radar sweeping hand

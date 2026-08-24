@@ -111,9 +111,12 @@ fun CreatorCommonsScreen(
             // Onboarding Checklist
             if (userProfile != null && !isChecklistDismissed) {
                 item {
-                    val isProfileCompleted = userProfile.displayName.isNotEmpty() && 
-                                             userProfile.primarySpecialty.isNotEmpty() && 
-                                             userProfile.bio.isNotEmpty()
+                    val isEmailConfirmed = true
+                    val isProfileCompleted = userProfile.displayName.isNotBlank() && 
+                                             userProfile.primarySpecialty.isNotBlank() && 
+                                             userProfile.bio.isNotBlank()
+                    val completedCount = (if (isEmailConfirmed) 1 else 0) + (if (isProfileCompleted) 1 else 0) + (if (hasAppliedReferral) 1 else 0)
+                    val progressFraction = completedCount / 3f
                     val onboardingFinished = isProfileCompleted && hasAppliedReferral
                     
                     Card(
@@ -134,12 +137,19 @@ fun CreatorCommonsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.AssignmentTurnedIn, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Onboarding Checklist",
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 16.sp,
-                                        color = Color.White
-                                    )
+                                    Column {
+                                        Text(
+                                            text = "Onboarding Checklist",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 15.sp,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "$completedCount of 3 tasks completed",
+                                            fontSize = 11.sp,
+                                            color = TextSecondary
+                                        )
+                                    }
                                 }
                                 if (onboardingFinished) {
                                     IconButton(
@@ -154,20 +164,37 @@ fun CreatorCommonsScreen(
                                 }
                             }
                             
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Animated Setup Progress
+                            LinearProgressIndicator(
+                                progress = { progressFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = if (onboardingFinished) ColorSuccess else AccentBlue,
+                                trackColor = SurfaceLightColor
+                            )
+                            
+                            Spacer(modifier = Modifier.height(14.dp))
                             
                             OnboardingChecklistItem(
                                 title = "Confirm Email",
-                                description = "Verify your email address connection.",
-                                isChecked = true
+                                description = "Email connection active.",
+                                isChecked = true,
+                                actionLabel = null,
+                                onAction = {}
                             )
                             
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             OnboardingChecklistItem(
                                 title = "Complete Profile",
-                                description = "Add your display name, bio, and main specialty in your Dashboard.",
-                                isChecked = isProfileCompleted
+                                description = "Add your display name, bio, and main specialty in Dashboard.",
+                                isChecked = isProfileCompleted,
+                                actionLabel = if (!isProfileCompleted) "EDIT" else null,
+                                onAction = { globalViewModel.navigateToTab("PROFILE") }
                             )
                             
                             Spacer(modifier = Modifier.height(8.dp))
@@ -175,7 +202,9 @@ fun CreatorCommonsScreen(
                             OnboardingChecklistItem(
                                 title = "Apply Referral Code",
                                 description = "Enter a friend's referral code in your Dashboard.",
-                                isChecked = hasAppliedReferral
+                                isChecked = hasAppliedReferral,
+                                actionLabel = if (!hasAppliedReferral) "APPLY" else null,
+                                onAction = { globalViewModel.navigateToTab("PROFILE") }
                             )
                             
                             if (onboardingFinished) {
@@ -364,9 +393,13 @@ fun CreatorCommonsScreen(
         )
     }
 
+    val featureFlags by globalViewModel.featureFlags.collectAsState(initial = emptyList())
+
     if (showCreatePostDialog) {
         CreatePostDialog(
             onDismiss = { showCreatePostDialog = false },
+            featureFlags = featureFlags,
+            userRole = userProfile?.systemRole ?: "PARTICIPANT",
             onPost = { title, body ->
                 feedViewModel.submitPost(title, body, if (selectedSpace == "All") "General" else selectedSpace, userProfile)
                 showCreatePostDialog = false
@@ -548,7 +581,12 @@ fun PostDetailDialog(
 }
 
 @Composable
-fun CreatePostDialog(onDismiss: () -> Unit, onPost: (String, String) -> Unit) {
+fun CreatePostDialog(
+    onDismiss: () -> Unit,
+    onPost: (String, String) -> Unit,
+    featureFlags: List<com.example.data.model.FeatureFlag> = emptyList(),
+    userRole: String = "PARTICIPANT"
+) {
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
 
@@ -575,41 +613,51 @@ fun CreatePostDialog(onDismiss: () -> Unit, onPost: (String, String) -> Unit) {
         },
         text = {
             Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                Spacer(modifier = Modifier.height(20.dp))
-                TextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    placeholder = { Text("Catchy Title", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = AccentBlue
-                    ),
-                    textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
-                )
-                
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = ColorDivider)
-                
-                TextField(
-                    value = body,
-                    onValueChange = { body = it },
-                    placeholder = { Text("What's on the workbench?", fontSize = 16.sp) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = AccentBlue
-                    )
-                )
+                com.example.ui.components.FeatureGate(
+                    flagKey = "COMMUNITY_FORUM_POSTING",
+                    featureFlags = featureFlags,
+                    userRole = userRole,
+                    showBannerOnRestricted = true,
+                    customRestrictedNotice = "Forum posting and publishing is temporarily restricted by platform administration."
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(20.dp))
+                        TextField(
+                            value = title,
+                            onValueChange = { title = it },
+                            placeholder = { Text("Catchy Title", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = AccentBlue
+                            ),
+                            textStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold)
+                        )
+                        
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = ColorDivider)
+                        
+                        TextField(
+                            value = body,
+                            onValueChange = { body = it },
+                            placeholder = { Text("What's on the workbench?", fontSize = 16.sp) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                cursorColor = AccentBlue
+                            )
+                        )
+                    }
+                }
             }
         },
         confirmButton = {}
@@ -832,32 +880,59 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
 fun OnboardingChecklistItem(
     title: String,
     description: String,
-    isChecked: Boolean
+    isChecked: Boolean,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {}
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Icon(
-            imageVector = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-            contentDescription = if (isChecked) "Completed" else "Incomplete",
-            tint = if (isChecked) ColorSuccess else TextSecondary,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                color = if (isChecked) TextSecondary else Color.White,
-                fontSize = 14.sp,
-                style = TextStyle(textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None)
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (isChecked) "Completed" else "Incomplete",
+                tint = if (isChecked) ColorSuccess else TextSecondary,
+                modifier = Modifier.size(22.dp)
             )
-            Text(
-                text = description,
-                color = TextSecondary,
-                fontSize = 11.sp
-            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isChecked) TextSecondary else Color.White,
+                    fontSize = 13.sp,
+                    style = TextStyle(textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None)
+                )
+                Text(
+                    text = description,
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        if (!isChecked && actionLabel != null) {
+            Button(
+                onClick = onAction,
+                colors = ButtonDefaults.buttonColors(containerColor = SurfaceLightColor),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier.height(30.dp)
+            ) {
+                Text(
+                    text = actionLabel,
+                    color = AccentBlue,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp
+                )
+            }
         }
     }
 }

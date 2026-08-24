@@ -22,6 +22,9 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: UserProfile)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUsers(users: List<UserProfile>)
+
     @Query("DELETE FROM users WHERE id = :userId")
     suspend fun deleteUserById(userId: String)
 }
@@ -67,6 +70,12 @@ interface PostDao {
     @Query("DELETE FROM posts WHERE id = :id")
     suspend fun deletePost(id: String)
 
+    @Query("UPDATE posts SET commentCount = (SELECT COUNT(*) FROM comments WHERE postId = :postId) WHERE id = :postId")
+    suspend fun refreshPostCommentCount(postId: String)
+
+    @Query("UPDATE posts SET upvotes = :upvotes, downvotes = :downvotes, userVote = :userVote WHERE id = :id")
+    suspend fun updatePostVotes(id: String, upvotes: Int, downvotes: Int, userVote: String)
+
     @Query("UPDATE posts SET authorName = 'Deleted User', authorRole = 'Former Member', authorAvatarUrl = '' WHERE authorId = :userId")
     suspend fun anonymizePosts(userId: String)
 }
@@ -82,8 +91,14 @@ interface CommentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComment(comment: Comment)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertComments(comments: List<Comment>)
+
     @Query("DELETE FROM comments WHERE id = :id")
     suspend fun deleteComment(id: String)
+
+    @Query("DELETE FROM comments WHERE postId = :postId")
+    suspend fun deleteCommentsForPost(postId: String)
 
     @Query("SELECT * FROM comments WHERE id = :id")
     suspend fun getCommentById(id: String): Comment?
@@ -136,6 +151,9 @@ interface WorkspaceMemberDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMember(member: WorkspaceMember)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMembers(members: List<WorkspaceMember>)
+
     @Query("DELETE FROM workspace_members WHERE workspaceId = :workspaceId AND userId = :userId")
     suspend fun deleteMember(workspaceId: String, userId: String)
 
@@ -184,6 +202,9 @@ interface ProductionTaskDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: ProductionTask)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTasks(tasks: List<ProductionTask>)
+
     @Query("DELETE FROM production_tasks WHERE id = :id")
     suspend fun deleteTaskById(id: String)
 
@@ -201,6 +222,9 @@ interface ProductionTaskDao {
     @Query("SELECT * FROM production_tasks ORDER BY createdAt DESC")
     fun getAllProductionTasks(): Flow<List<ProductionTask>>
 
+    @Query("UPDATE production_tasks SET kanbanLane = :newLane WHERE id = :id")
+    suspend fun updateTaskLane(id: String, newLane: String)
+
     @Query("UPDATE production_tasks SET creatorId = 'deleted_user' WHERE creatorId = :userId AND stateScope = 'PRODUCTION_READY'")
     suspend fun anonymizeProductionTasks(userId: String)
 }
@@ -213,8 +237,14 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE workspaceId = :workspaceId AND (senderId = :myId OR recipientId = :myId) ORDER BY timestamp ASC")
     fun getDMsForWorkspace(workspaceId: String, myId: String): Flow<List<Message>>
 
+    @Query("SELECT * FROM messages WHERE (recipientId IS NOT NULL OR workspaceId = 'DM_WORKSPACE' OR workspaceId LIKE 'dm_%') AND (senderId = :myId OR recipientId = :myId) ORDER BY timestamp ASC")
+    fun getAllDMsForUser(myId: String): Flow<List<Message>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: Message)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessages(messages: List<Message>)
 
     @Query("DELETE FROM messages WHERE id = :id")
     suspend fun deleteMessage(id: String)
@@ -244,7 +274,13 @@ interface AgreementDao {
     suspend fun insertAgreement(agreement: TeamAgreement)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAgreements(agreements: List<TeamAgreement>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAcknowledgment(acknowledgment: AgreementAcknowledgment)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAcknowledgments(acknowledgments: List<AgreementAcknowledgment>)
 
     @Query("SELECT * FROM agreement_acknowledgments WHERE agreementId = :agreementId")
     fun getAcknowledgmentsFlow(agreementId: String): Flow<List<AgreementAcknowledgment>>
@@ -322,6 +358,12 @@ interface TalentPitchDao {
 
     @Query("UPDATE talent_pitches SET status = :status WHERE id = :id")
     suspend fun updatePitchStatus(id: String, status: String)
+
+    @Query("UPDATE talent_pitches SET status = 'DECLINED' WHERE projectId = :projectId AND id != :acceptedPitchId AND status = 'PENDING'")
+    suspend fun declineOtherPitchesForProject(projectId: String, acceptedPitchId: String)
+
+    @Query("DELETE FROM talent_pitches WHERE projectId = :projectId")
+    suspend fun deletePitchesForProject(projectId: String)
 }
 
 @Dao
@@ -334,6 +376,9 @@ interface ReportDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReport(report: Report)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReports(reports: List<Report>)
 
     @Query("UPDATE reports SET status = :status WHERE id = :reportId")
     suspend fun updateReportStatus(reportId: String, status: String)
@@ -352,6 +397,9 @@ interface AuditLogDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(log: AuditLog)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLogs(logs: List<AuditLog>)
 }
 
 @Dao
@@ -400,6 +448,12 @@ interface AdDao {
 interface UserSettingsDao {
     @Query("SELECT value FROM user_settings_table WHERE userId = :userId AND key = :key LIMIT 1")
     suspend fun getSetting(userId: String, key: String): String?
+
+    @Query("SELECT * FROM user_settings_table WHERE userId = :userId AND key LIKE 'tour_%'")
+    fun getTourSettingsFlow(userId: String): Flow<List<UserSetting>>
+
+    @Query("DELETE FROM user_settings_table WHERE userId = :userId AND key LIKE 'tour_%'")
+    suspend fun clearTourSettings(userId: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun setSetting(setting: UserSetting)

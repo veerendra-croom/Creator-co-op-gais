@@ -79,10 +79,91 @@ class PlatformControlViewModel(private val repository: AppRepository) : ViewMode
             val existing = repository.getFeatureFlag(key)
             val updated = existing?.copy(
                 isEnabled = enabled,
+                globalOverrideEnabled = enabled,
                 lastModifiedAt = System.currentTimeMillis()
-            ) ?: FeatureFlag(flagKey = key, isEnabled = enabled, lastModifiedAt = System.currentTimeMillis())
+            ) ?: FeatureFlag(
+                flagKey = key,
+                isEnabled = enabled,
+                globalOverrideEnabled = enabled,
+                lastModifiedAt = System.currentTimeMillis()
+            )
             repository.insertFeatureFlag(updated)
             _toastMessage.value = "Feature Flag '$key' set to ${if (enabled) "ENABLED" else "DISABLED"}."
+        }
+    }
+
+    fun updateFeatureFlagRbac(
+        key: String,
+        organizerEnabled: Boolean,
+        participantEnabled: Boolean,
+        globalOverrideEnabled: Boolean,
+        adminId: String = "admin_master",
+        reason: String = "Admin console RBAC update"
+    ) {
+        viewModelScope.launch {
+            val existing = repository.getFeatureFlag(key)
+            val isOverallActive = globalOverrideEnabled && (organizerEnabled || participantEnabled)
+            val updated = existing?.copy(
+                organizerEnabled = organizerEnabled,
+                participantEnabled = participantEnabled,
+                globalOverrideEnabled = globalOverrideEnabled,
+                isEnabled = isOverallActive,
+                lastModifiedByAdminId = adminId,
+                lastModifiedAt = System.currentTimeMillis()
+            ) ?: FeatureFlag(
+                flagKey = key,
+                organizerEnabled = organizerEnabled,
+                participantEnabled = participantEnabled,
+                globalOverrideEnabled = globalOverrideEnabled,
+                isEnabled = isOverallActive,
+                lastModifiedByAdminId = adminId,
+                lastModifiedAt = System.currentTimeMillis()
+            )
+            repository.updateFeatureFlag(updated, adminId, reason)
+            _toastMessage.value = "RBAC policy for '$key' updated successfully."
+        }
+    }
+
+    fun applyFeatureFlagPresetProfile(
+        presetKey: String,
+        adminId: String = "admin_master",
+        reason: String = "Admin preset applied"
+    ) {
+        viewModelScope.launch {
+            val currentFlags = featureFlags.value.ifEmpty { repository.getAllFeatureFlagsFlow().first() }
+            currentFlags.forEach { flag ->
+                val (newGlobal, newOrg, newPart) = when (presetKey) {
+                    "OPEN_BETA" -> Triple(true, true, true)
+                    "ORGANIZER_FIRST" -> {
+                        val isRestrictedForPart = flag.category == "GOVERNANCE" || 
+                            flag.flagKey in listOf("analytics_enabled", "founder_crm_enabled", "moderation_center_enabled", "AGREEMENT_DRAFTING")
+                        Triple(true, true, !isRestrictedForPart)
+                    }
+                    "RESTRICTED_MAINTENANCE" -> {
+                        val isHeavyCreation = flag.flagKey in listOf(
+                            "SYNDICATE_PITCH_CREATION", "AGREEMENT_DRAFTING", "COMMUNITY_FORUM_POSTING",
+                            "VOICE_HUDDLE_BETA", "FILE_UPLOADS", "huddles_enabled", "TASK_CREATION"
+                        )
+                        Triple(!isHeavyCreation, !isHeavyCreation, !isHeavyCreation)
+                    }
+                    "MEDIA_BANDWIDTH_FREEZE" -> {
+                        val isMediaHeavy = flag.flagKey in listOf("VOICE_HUDDLE_BETA", "FILE_UPLOADS", "huddles_enabled")
+                        if (isMediaHeavy) Triple(false, false, false) else Triple(flag.globalOverrideEnabled, flag.organizerEnabled, flag.participantEnabled)
+                    }
+                    else -> Triple(flag.globalOverrideEnabled, flag.organizerEnabled, flag.participantEnabled)
+                }
+                val isOverall = newGlobal && (newOrg || newPart)
+                val updated = flag.copy(
+                    globalOverrideEnabled = newGlobal,
+                    organizerEnabled = newOrg,
+                    participantEnabled = newPart,
+                    isEnabled = isOverall,
+                    lastModifiedByAdminId = adminId,
+                    lastModifiedAt = System.currentTimeMillis()
+                )
+                repository.updateFeatureFlag(updated, adminId, "Preset applied: $presetKey. Reason: $reason")
+            }
+            _toastMessage.value = "Applied preset profile: $presetKey"
         }
     }
 

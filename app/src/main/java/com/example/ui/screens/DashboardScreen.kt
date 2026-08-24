@@ -23,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import com.example.util.CustomTabsHelper
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +43,7 @@ import com.example.data.model.SyncState
 import com.example.data.model.Workspace
 import com.example.ui.theme.*
 import com.example.ui.components.*
+import com.example.ui.tour.guidedTourTarget
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.builtins.serializer
@@ -339,6 +342,7 @@ fun DashboardScreen(
                 }
             }
         } else {
+            val context = LocalContext.current
             val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
             var isHandshaking by remember { mutableStateOf(false) }
             val handshakeLogs = remember { mutableStateListOf<String>() }
@@ -434,7 +438,9 @@ fun DashboardScreen(
                 // --- CARD 1: THE HERO PROFILE CARD ---
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .guidedTourTarget("dashboard_header", globalViewModel.tourManager),
                         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
                         shape = RoundedCornerShape(20.dp),
                         border = BorderStroke(1.dp, ColorDivider)
@@ -559,7 +565,9 @@ fun DashboardScreen(
                 // --- CARD 2: REPUTATION & REAL-TIME TELEMETRY ---
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .guidedTourTarget("dashboard_karma_gauge", globalViewModel.tourManager),
                         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
                         shape = RoundedCornerShape(20.dp),
                         border = BorderStroke(1.dp, ColorDivider)
@@ -736,7 +744,11 @@ fun DashboardScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = SurfaceLightColor),
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.dp, ColorDivider),
-                                modifier = Modifier.bounceScale().fillMaxWidth().height(36.dp)
+                                modifier = Modifier
+                                    .bounceScale()
+                                    .fillMaxWidth()
+                                    .height(36.dp)
+                                    .guidedTourTarget("dashboard_setup_checklist", globalViewModel.tourManager)
                             ) {
                                 Icon(Icons.Default.Shield, null, tint = AccentBlue, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -816,7 +828,7 @@ fun DashboardScreen(
                                                 .background(SurfaceLightColor.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
                                                 .border(1.dp, ColorDivider, RoundedCornerShape(10.dp))
                                                 .clickable { 
-                                                    try { uriHandler.openUri(link) } catch (e: Exception) { }
+                                                    CustomTabsHelper.openUrl(context, link)
                                                 }
                                                 .padding(12.dp)
                                         ) {

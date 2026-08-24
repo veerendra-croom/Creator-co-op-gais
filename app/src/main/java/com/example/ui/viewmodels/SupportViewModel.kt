@@ -248,6 +248,29 @@ class SupportViewModel(private val repository: AppRepository) : ViewModel() {
                 resolvedAt = resolvedAt
             )
             repository.insertSupportTicket(updated)
+
+            // Notify user
+            repository.insertNotification(com.example.data.model.Notification(
+                id = UUID.randomUUID().toString(),
+                userId = ticket.userId,
+                title = "Support Ticket Update: ${ticket.subject}",
+                body = "Your support ticket #${ticket.id.take(8)} status is now: $status.",
+                type = "TICKET_UPDATE",
+                createdAt = System.currentTimeMillis()
+            ))
+
+            // Audit Log
+            repository.insertAuditLog(com.example.data.model.AuditLog(
+                id = UUID.randomUUID().toString(),
+                adminId = "support_team",
+                adminName = "Support Team",
+                actionTaken = "TICKET_RESOLVED",
+                targetType = "SUPPORT_TICKET",
+                targetId = ticketId,
+                reason = "Ticket status transitioned to $status.",
+                createdAt = System.currentTimeMillis()
+            ))
+
             _toastMessage.value = "Ticket status updated to $status."
         }
     }

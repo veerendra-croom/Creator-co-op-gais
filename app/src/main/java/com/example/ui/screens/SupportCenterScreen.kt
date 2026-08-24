@@ -484,7 +484,7 @@ fun NewSupportTicketForm(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(90.dp),
-                            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp),
+                            textStyle = androidx.compose.ui.text.TextStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 10.sp, color = Color.White),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = CrispAmber,
                                 unfocusedBorderColor = ColorDivider,

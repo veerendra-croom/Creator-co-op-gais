@@ -82,9 +82,21 @@ class AgreementViewModel constructor(
     }
 
     fun acknowledgeAgreement(agreementId: String, contentHash: String, userId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val agreement = repository.getAgreementById(agreementId) ?: repository.getLatestAgreement(agreementId).firstOrNull()
+            if (agreement == null) {
+                _toastMessage.value = "Error: Agreement record not found."
+                return@launch
+            }
+            if (agreement.contentText.hashCode().toString() != contentHash && contentHash != "HASH_ERR" && contentHash.isNotBlank()) {
+                // Check if terms changed
+                _toastMessage.value = "Signature Rejected: Agreement terms were updated. Please review the latest version."
+                return@launch
+            }
+
+            val ackId = "${agreementId}_${userId}"
             val ack = AgreementAcknowledgment(
-                id = UUID.randomUUID().toString(),
+                id = ackId,
                 agreementId = agreementId,
                 userId = userId,
                 acknowledgmentHash = contentHash,
@@ -92,24 +104,48 @@ class AgreementViewModel constructor(
             )
             repository.insertAcknowledgment(ack)
             
-            // Notify Workspace Lead
-            val agreement = repository.getAgreementById(agreementId)
-            agreement?.let { ag ->
+            // Write Audit Log
+            repository.insertAuditLog(com.example.data.model.AuditLog(
+                id = UUID.randomUUID().toString(),
+                adminId = userId,
+                adminName = "Creator",
+                actionTaken = "AGREEMENT_SIGNED",
+                targetType = "AGREEMENT",
+                targetId = agreementId,
+                reason = "User '$userId' digitally signed agreement hash '$contentHash'.",
+                createdAt = System.currentTimeMillis()
+            ))
+
+            // Notify Workspace Lead & Workspace Members
+            agreement.let { ag ->
                 val workspace = repository.getWorkspaceById(ag.workspaceId).firstOrNull()
                 workspace?.let { ws ->
                     repository.insertNotification(com.example.data.model.Notification(
                         id = UUID.randomUUID().toString(),
                         userId = ws.createdBy,
-                        title = "Agreement Signed",
-                        body = "A team member has acknowledged the latest Team Agreement.",
+                        title = "Agreement Signed by ${userId.take(8)}",
+                        body = "Team agreement '${ag.title}' has been digitally signed.",
                         type = "AGREEMENT_SIGNED",
                         createdAt = System.currentTimeMillis()
+                    ))
+
+                    // Auto-lock agreement and post message in workspace chat
+                    val updatedAgreement = ag.copy(isLocked = true)
+                    repository.createAgreement(updatedAgreement)
+
+                    repository.insertMessage(com.example.data.model.Message(
+                        id = UUID.randomUUID().toString(),
+                        workspaceId = ws.id,
+                        senderId = "system",
+                        senderName = "Vault Bot",
+                        messageBody = "Agreement '${ag.title}' was signed & executed by ${userId.take(8)}. Terms are now active.",
+                        timestamp = System.currentTimeMillis()
                     ))
                 }
             }
 
             AnalyticsManager.trackAgreementSigned(agreementId)
-            _toastMessage.value = "Agreement signed."
+            _toastMessage.value = "Agreement signed & logged in system audit vault."
         }
     }
 

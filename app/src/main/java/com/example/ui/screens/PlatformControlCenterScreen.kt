@@ -202,6 +202,42 @@ fun PlatformControlCenterScreen(
                         border = BorderStroke(1.dp, SurfaceLightColor)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "DYNAMIC FEATURE MATRIX",
+                                        color = TextPrimary,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Text(
+                                        text = "Granular role-based switchboard (Organizer vs. Participant)",
+                                        color = TextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .background(AccentBlue.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "${featureFlags.size} FLAGS LIVE",
+                                        color = AccentBlue,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+
                             if (featureFlags.isEmpty()) {
                                 Text(
                                     text = "No feature flags are currently configured.",
@@ -211,9 +247,16 @@ fun PlatformControlCenterScreen(
                                 )
                             } else {
                                 featureFlags.forEachIndexed { index, flag ->
-                                    FeatureFlagRow(
+                                    FeatureFlagMatrixCard(
                                         flag = flag,
-                                        onToggle = { enabled -> viewModel.toggleFeatureFlag(flag.flagKey, enabled) }
+                                        onUpdateRbac = { org, part, global ->
+                                            viewModel.updateFeatureFlagRbac(
+                                                key = flag.flagKey,
+                                                organizerEnabled = org,
+                                                participantEnabled = part,
+                                                globalOverrideEnabled = global
+                                            )
+                                        }
                                     )
                                     if (index < featureFlags.size - 1) {
                                         Divider(color = SurfaceLightColor, modifier = Modifier.padding(vertical = 12.dp))
@@ -284,68 +327,183 @@ fun SettingToggleRow(
 }
 
 @Composable
-fun FeatureFlagRow(
+fun FeatureFlagMatrixCard(
     flag: FeatureFlag,
-    onToggle: (Boolean) -> Unit
+    onUpdateRbac: (organizer: Boolean, participant: Boolean, globalOverride: Boolean) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("feature_flag_matrix_${flag.flagKey}"),
+        colors = CardDefaults.cardColors(containerColor = PrimaryBackground),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, ColorDivider)
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = flag.flagKey,
-                    color = CrispAmber,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (flag.isEnabled) NeonEmerald.copy(alpha = 0.15f) else TextMuted.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(4.dp)
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header: Flag Key + Category + Master Killswitch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = flag.flagKey,
+                            color = AccentBlue,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    if (flag.globalOverrideEnabled) NeonEmerald.copy(alpha = 0.15f) else ColorError.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (flag.globalOverrideEnabled) "ACTIVE" else "KILLED",
+                                color = if (flag.globalOverrideEnabled) NeonEmerald else ColorError,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                    if (!flag.description.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = flag.description,
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+
+                // Global Override Toggle
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = if (flag.isEnabled) "ACTIVE" else "DISABLED",
-                        color = if (flag.isEnabled) NeonEmerald else TextSecondary,
+                        text = "MASTER",
+                        color = TextSecondary,
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Black
+                        fontWeight = FontWeight.Bold
+                    )
+                    Switch(
+                        checked = flag.globalOverrideEnabled,
+                        onCheckedChange = { newGlobal ->
+                            onUpdateRbac(flag.organizerEnabled, flag.participantEnabled, newGlobal)
+                        },
+                        modifier = Modifier.testTag("toggle_global_${flag.flagKey}"),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = NeonEmerald,
+                            uncheckedThumbColor = Color.LightGray,
+                            uncheckedTrackColor = SurfaceLightColor
+                        )
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = flag.description ?: "",
-                color = TextPrimary,
-                fontSize = 12.sp,
-                lineHeight = 16.sp
-            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Divider(color = ColorDivider, thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Sub-Toggles: Organizers vs Participants
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Organizer Permission Switch
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(SurfaceColor, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ORGANIZERS",
+                            color = CrispAmber,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = if (flag.organizerEnabled && flag.globalOverrideEnabled) "ENABLED" else "DISABLED",
+                            color = if (flag.organizerEnabled && flag.globalOverrideEnabled) NeonEmerald else TextSecondary,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Switch(
+                        checked = flag.organizerEnabled,
+                        enabled = flag.globalOverrideEnabled,
+                        onCheckedChange = { newOrg ->
+                            onUpdateRbac(newOrg, flag.participantEnabled, flag.globalOverrideEnabled)
+                        },
+                        modifier = Modifier.testTag("toggle_organizer_${flag.flagKey}"),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = CrispAmber,
+                            uncheckedThumbColor = Color.LightGray,
+                            uncheckedTrackColor = SurfaceLightColor
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                // Participant Permission Switch
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(SurfaceColor, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "PARTICIPANTS",
+                            color = AccentBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = if (flag.participantEnabled && flag.globalOverrideEnabled) "ENABLED" else "DISABLED",
+                            color = if (flag.participantEnabled && flag.globalOverrideEnabled) NeonEmerald else TextSecondary,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Switch(
+                        checked = flag.participantEnabled,
+                        enabled = flag.globalOverrideEnabled,
+                        onCheckedChange = { newPart ->
+                            onUpdateRbac(flag.organizerEnabled, newPart, flag.globalOverrideEnabled)
+                        },
+                        modifier = Modifier.testTag("toggle_participant_${flag.flagKey}"),
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AccentBlue,
+                            uncheckedThumbColor = Color.LightGray,
+                            uncheckedTrackColor = SurfaceLightColor
+                        )
+                    )
+                }
+            }
+
             if (flag.lastModifiedAt > 0) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Last sync interval: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(flag.lastModifiedAt))}",
+                    text = "Audit: ${flag.lastModifiedByAdminId.ifBlank { "admin_console" }} • ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(flag.lastModifiedAt))}",
                     color = TextSecondary,
-                    fontSize = 10.sp
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }
-        Switch(
-            checked = flag.isEnabled,
-            onCheckedChange = onToggle,
-            modifier = Modifier.testTag("toggle_flag_${flag.flagKey}"),
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = CrispAmber,
-                uncheckedThumbColor = Color.LightGray,
-                uncheckedTrackColor = SurfaceLightColor
-            )
-        )
     }
 }
 
@@ -762,7 +920,7 @@ fun DynamicContentManagementView(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Slide Title") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -770,7 +928,7 @@ fun DynamicContentManagementView(
                         value = description,
                         onValueChange = { description = it },
                         label = { Text("Slide Description") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3
                     )
@@ -779,7 +937,7 @@ fun DynamicContentManagementView(
                         value = stepIndex,
                         onValueChange = { stepIndex = it },
                         label = { Text("Step Order Index (0, 1, 2...)") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -787,7 +945,7 @@ fun DynamicContentManagementView(
                         value = iconName,
                         onValueChange = { iconName = it },
                         label = { Text("Vector Graphic Tag (e.g. Star, Hub)") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -839,7 +997,7 @@ fun DynamicContentManagementView(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Campaign Header") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -847,7 +1005,7 @@ fun DynamicContentManagementView(
                         value = greeting,
                         onValueChange = { greeting = it },
                         label = { Text("Body Greeting / Alert text") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3
                     )
@@ -856,7 +1014,7 @@ fun DynamicContentManagementView(
                         value = bannerImageUrl,
                         onValueChange = { bannerImageUrl = it },
                         label = { Text("Unsplash Decorative Banner Image URL") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -916,7 +1074,7 @@ fun DynamicContentManagementView(
                         value = screenName,
                         onValueChange = { screenName = it },
                         label = { Text("Screen Identity (e.g. Commons, Portfolios)") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -924,7 +1082,7 @@ fun DynamicContentManagementView(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Placeholder Heading Text") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -932,7 +1090,7 @@ fun DynamicContentManagementView(
                         value = suggestion,
                         onValueChange = { suggestion = it },
                         label = { Text("Action Hint / Suggested next step") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3
                     )
@@ -941,7 +1099,7 @@ fun DynamicContentManagementView(
                         value = imageTag,
                         onValueChange = { imageTag = it },
                         label = { Text("Decorative Asset Name") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -991,7 +1149,7 @@ fun DynamicContentManagementView(
                         value = topicKey,
                         onValueChange = { topicKey = it },
                         label = { Text("Topic Header (e.g. Smart Splits)") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -999,7 +1157,7 @@ fun DynamicContentManagementView(
                         value = textContent,
                         onValueChange = { textContent = it },
                         label = { Text("Help / Instructional content description") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 4
                     )
@@ -1008,7 +1166,7 @@ fun DynamicContentManagementView(
                         value = category,
                         onValueChange = { category = it },
                         label = { Text("Manual Category (e.g. Syndicates, Security)") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentBlue, focusedLabelColor = AccentBlue),
                         modifier = Modifier.fillMaxWidth()
                     )
 

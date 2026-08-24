@@ -129,6 +129,8 @@ fun ReferFriendDialog(
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
                         focusedBorderColor = AccentBlue,
                         unfocusedBorderColor = ColorDivider
                     )

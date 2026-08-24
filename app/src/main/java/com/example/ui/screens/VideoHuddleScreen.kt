@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.CreatorCoopApp
 import com.example.ui.theme.*
+import com.example.ui.tour.guidedTourTarget
 import com.example.data.model.AuditLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -36,7 +37,10 @@ import java.util.*
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun VideoHuddleScreen(onBack: () -> Unit) {
+fun VideoHuddleScreen(
+    onBack: () -> Unit,
+    globalViewModel: com.example.ui.viewmodels.GlobalViewModel? = null
+) {
     val context = LocalContext.current
     val application = context.applicationContext as CreatorCoopApp
     val repository = remember { application.container.repository }
@@ -259,6 +263,9 @@ fun VideoHuddleScreen(onBack: () -> Unit) {
                 }
 
                 // Invitation list and join controls
+                val featureFlags by repository.getAllFeatureFlagsFlow().collectAsState(initial = emptyList())
+                val userRole = userProfile?.systemRole ?: "PARTICIPANT"
+
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -271,34 +278,42 @@ fun VideoHuddleScreen(onBack: () -> Unit) {
                         fontWeight = FontWeight.Medium
                     )
 
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                // Insert audit log of joining
-                                val log = AuditLog(
-                                    id = UUID.randomUUID().toString(),
-                                    adminId = userProfile?.id ?: "me",
-                                    adminName = userProfile?.displayName ?: "Creator",
-                                    actionTaken = "HUDDLE_SESSION_JOINED",
-                                    targetType = "VIDEO_HUDDLE",
-                                    targetId = "huddle_room",
-                                    reason = "Entered active huddle with team. Video: $cameraEnabled, Audio: $micEnabled",
-                                    createdAt = System.currentTimeMillis()
-                                )
-                                repository.insertAuditLog(log)
-                                isJoined = true
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .testTag("enter_huddle_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                        shape = RoundedCornerShape(16.dp)
+                    com.example.ui.components.FeatureGate(
+                        flagKey = "VOICE_HUDDLE_BETA",
+                        featureFlags = featureFlags,
+                        userRole = userRole,
+                        showBannerOnRestricted = true,
+                        customRestrictedNotice = "Real-time Video Huddle is currently restricted for your tier by Platform Administration."
                     ) {
-                        Icon(Icons.Default.VideoCall, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("ENTER HUDDLE ROOM", fontWeight = FontWeight.Black, fontSize = 15.sp)
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    // Insert audit log of joining
+                                    val log = AuditLog(
+                                        id = UUID.randomUUID().toString(),
+                                        adminId = userProfile?.id ?: "me",
+                                        adminName = userProfile?.displayName ?: "Creator",
+                                        actionTaken = "HUDDLE_SESSION_JOINED",
+                                        targetType = "VIDEO_HUDDLE",
+                                        targetId = "huddle_room",
+                                        reason = "Entered active huddle with team. Video: $cameraEnabled, Audio: $micEnabled",
+                                        createdAt = System.currentTimeMillis()
+                                    )
+                                    repository.insertAuditLog(log)
+                                    isJoined = true
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .testTag("enter_huddle_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Icon(Icons.Default.VideoCall, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ENTER HUDDLE ROOM", fontWeight = FontWeight.Black, fontSize = 15.sp)
+                        }
                     }
                 }
             }
@@ -350,7 +365,11 @@ fun VideoHuddleScreen(onBack: () -> Unit) {
 
                 // 2x2 Grid of Participants
                 Column(
-                    modifier = Modifier
+                    modifier = if (globalViewModel != null) Modifier
+                        .weight(1f)
+                        .guidedTourTarget("video_huddle_spatial_video", globalViewModel.tourManager)
+                        .padding(horizontal = 12.dp)
+                    else Modifier
                         .weight(1f)
                         .padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -446,7 +465,11 @@ fun VideoHuddleScreen(onBack: () -> Unit) {
 
                 // bottom controller board
                 Surface(
-                    modifier = Modifier
+                    modifier = if (globalViewModel != null) Modifier
+                        .fillMaxWidth()
+                        .guidedTourTarget("video_huddle_collaborator_controls", globalViewModel.tourManager)
+                        .padding(16.dp)
+                    else Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
                     color = PrimaryBackground.copy(alpha = 0.9f),

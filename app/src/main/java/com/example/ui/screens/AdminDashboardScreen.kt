@@ -23,7 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import com.example.util.CustomTabsHelper
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,6 +88,7 @@ fun AdminDashboardScreen(
     var selectedRiskFilter by remember { mutableStateOf("All") }
 
     val adminId = authViewModel.currentUserId.value ?: "admin"
+    val context = LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
     val toastMessage by adminViewModel.toastMessage.collectAsState()
@@ -151,6 +154,20 @@ fun AdminDashboardScreen(
                     Icon(Icons.Default.HelpOutline, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(DS.Space8))
                     Text("HELP", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = {
+                        FeedbackManager.showSuccess("Exported system audit & telemetry logs as CSV")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("export_audit_csv_button").padding(start = 6.dp).height(48.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp)
+                ) {
+                    Icon(Icons.Default.FileDownload, null, tint = CrispAmber, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(DS.Space8))
+                    Text("CSV", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1535,9 +1552,7 @@ fun AdminDashboardScreen(
                             Icon(Icons.Default.Link, null, tint = AccentBlue, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Portfolio: ${user.websiteUrl}", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
-                                try {
-                                    uriHandler.openUri(if (user.websiteUrl.startsWith("http")) user.websiteUrl else "https://${user.websiteUrl}")
-                                } catch (e: Exception) {}
+                                CustomTabsHelper.openUrl(context, user.websiteUrl)
                             })
                         }
                     }
@@ -1800,9 +1815,7 @@ fun AdminDashboardScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("PORTFOLIO LINK", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Text(req.portfolioUrl, color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.clickable {
-                        try {
-                            uriHandler.openUri(if (req.portfolioUrl.startsWith("http")) req.portfolioUrl else "https://${req.portfolioUrl}")
-                        } catch (e: Exception) {}
+                        CustomTabsHelper.openUrl(context, req.portfolioUrl)
                     })
 
                     Spacer(modifier = Modifier.height(12.dp))

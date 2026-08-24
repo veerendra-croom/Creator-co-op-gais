@@ -1,12 +1,15 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,34 +34,35 @@ import kotlinx.coroutines.launch
 @Composable
 fun OnboardingScreen(
     globalViewModel: com.example.ui.viewmodels.GlobalViewModel,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    onLaunchDemo: (() -> Unit)? = null
 ) {
     val dbSlides by globalViewModel.onboardingSlides.collectAsState()
     val scope = rememberCoroutineScope()
 
     val onboardingPages = remember(dbSlides) {
+        val colorPalette = listOf(AccentBlue, CrispAmber, NeonEmerald, AccentRed, Color(0xFF8B5CF6))
+        val imagePalette = listOf(
+            com.example.R.drawable.onboarding_collaboration_1782754946609,
+            com.example.R.drawable.onboarding_security_1782754961964,
+            com.example.R.drawable.onboarding_reputation_1782754975727,
+            com.example.R.drawable.img_hero_banner
+        )
+
         if (dbSlides.isNotEmpty()) {
-            dbSlides.sortedBy { it.stepIndex }.map { slide ->
+            dbSlides.sortedBy { it.stepIndex }.mapIndexed { idx, slide ->
                 val icon = when (slide.iconName) {
                     "Hub" -> Icons.Default.Share
-                    "Handshake" -> Icons.Default.Verified
+                    "Handshake" -> Icons.Default.Handshake
                     "Groups" -> Icons.Default.Groups
                     "Gavel" -> Icons.Default.Gavel
                     "Verified" -> Icons.Default.Verified
+                    "Rocket" -> Icons.Default.RocketLaunch
+                    "Security" -> Icons.Default.Security
                     else -> Icons.Default.Star
                 }
-                val color = when (slide.stepIndex) {
-                    0 -> AccentBlue
-                    1 -> CrispAmber
-                    2 -> NeonEmerald
-                    else -> AccentRed
-                }
-                val imageRes = when (slide.stepIndex) {
-                    0 -> com.example.R.drawable.onboarding_collaboration_1782754946609
-                    1 -> com.example.R.drawable.onboarding_security_1782754961964
-                    2 -> com.example.R.drawable.onboarding_reputation_1782754975727
-                    else -> com.example.R.drawable.img_hero_banner
-                }
+                val color = colorPalette[idx % colorPalette.size]
+                val imageRes = imagePalette[idx % imagePalette.size]
                 OnboardingPage(
                     title = slide.title,
                     description = slide.description,
@@ -70,7 +75,7 @@ fun OnboardingScreen(
             listOf(
                 OnboardingPage(
                     title = "Welcome to the Co-Op",
-                    description = "The first premium B2B SaaS platform designed specifically for the Creator Economy.",
+                    description = "The first premium decentralized platform designed specifically for the Creator Economy.",
                     icon = Icons.Default.Groups,
                     color = AccentBlue,
                     imageRes = com.example.R.drawable.onboarding_collaboration_1782754946609
@@ -91,7 +96,7 @@ fun OnboardingScreen(
                 ),
                 OnboardingPage(
                     title = "Ready to Build?",
-                    description = "Establish your first workspace node and start collaborating with the elite 1% of creators.\n\nCreated by Founder Botla Veerendra & Co-Founder Macha Praveen.",
+                    description = "Establish your first workspace node and start collaborating with the elite creators.\n\nExecutive Attribution: Botla Veerendra (Founder) & Macha Praveen (Co-Founder).",
                     icon = Icons.Default.Star,
                     color = AccentRed,
                     imageRes = com.example.R.drawable.img_hero_banner
@@ -104,11 +109,86 @@ fun OnboardingScreen(
 
     Scaffold(
         containerColor = PrimaryBackground,
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Step Counter Pill
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = SurfaceColor,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ColorDivider)
+                ) {
+                    Text(
+                        text = "STEP ${pagerState.currentPage + 1} OF ${onboardingPages.size}",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Demo Mode Quick Action Button
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = NeonEmerald.copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, NeonEmerald),
+                        modifier = Modifier
+                            .clickable {
+                                if (onLaunchDemo != null) {
+                                    onLaunchDemo()
+                                } else {
+                                    onComplete()
+                                    globalViewModel.replayTour("guest", "dashboard_tour")
+                                }
+                            }
+                            .testTag("onboarding_top_demo_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Demo", tint = NeonEmerald, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "DEMO",
+                                color = NeonEmerald,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    // Skip Button
+                    TextButton(
+                        onClick = onComplete,
+                        modifier = Modifier.testTag("onboarding_skip_button")
+                    ) {
+                        Text(
+                            text = "SKIP",
+                            color = AccentBlue,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+            }
+        },
         bottomBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Page Indicator
@@ -119,43 +199,103 @@ fun OnboardingScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     repeat(onboardingPages.size) { iteration ->
-                        val color = if (pagerState.currentPage == iteration) AccentBlue else SurfaceLightColor
+                        val isSelected = pagerState.currentPage == iteration
+                        val color = if (isSelected) AccentBlue else SurfaceLightColor
+                        val width = if (isSelected) 24.dp else 8.dp
                         Box(
                             modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .clip(CircleShape)
+                                .padding(horizontal = 3.dp)
+                                .clip(RoundedCornerShape(4.dp))
                                 .background(color)
-                                .size(8.dp)
+                                .size(width = width, height = 8.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                Button(
-                    onClick = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (pagerState.currentPage > 0) {
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("onboarding_back_button"),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ColorDivider),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("BACK", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            if (pagerState.currentPage < onboardingPages.size - 1) {
+                                scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                            } else {
+                                onComplete()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(if (pagerState.currentPage > 0) 2f else 1f)
+                            .height(48.dp)
+                            .testTag("onboarding_continue_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            text = if (pagerState.currentPage < onboardingPages.size - 1) "CONTINUE" else "GET STARTED",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            letterSpacing = 1.sp
+                        )
                         if (pagerState.currentPage < onboardingPages.size - 1) {
-                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Prominent Live Demo Launcher from bottom bar
+                OutlinedButton(
+                    onClick = {
+                        if (onLaunchDemo != null) {
+                            onLaunchDemo()
                         } else {
                             onComplete()
+                            globalViewModel.replayTour("guest", "dashboard_tour")
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                    shape = RoundedCornerShape(16.dp)
+                        .height(42.dp)
+                        .testTag("onboarding_launch_tour_button"),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
+                    Icon(Icons.Default.Explore, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (pagerState.currentPage < onboardingPages.size - 1) "CONTINUE" else "GET STARTED",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        letterSpacing = 1.sp
+                        text = "🚀 Launch Full Platform Interactive Demo",
+                        color = NeonEmerald,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 11.5.sp
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Created by Founder Botla Veerendra & Co-Founder Macha Praveen", color = TextSecondary, fontSize = 10.sp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text("Created by Founder Botla Veerendra & Co-Founder Macha Praveen", color = TextSecondary, fontSize = 9.sp)
             }
         }
     ) { padding ->
@@ -176,6 +316,7 @@ fun OnboardingPageView(page: OnboardingPage) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

@@ -44,8 +44,21 @@ class FounderCrmViewModel(private val repository: AppRepository) : ViewModel() {
         _toastMessage.value = null
     }
 
+    fun isExecutiveAuthorized(userId: String, email: String? = null): Boolean {
+        val idLower = userId.lowercase()
+        val mailLower = (email ?: "").lowercase()
+        return idLower.contains("veerendra") || idLower.contains("praveen") ||
+               idLower.contains("botla") || idLower.contains("macha") ||
+               idLower.contains("founder") || idLower.contains("admin") ||
+               mailLower == "veerendrabotla@gmail.com" || mailLower == "praveenmacha777@gmail.com"
+    }
+
     // Interactive Admin Action Panel handlers
-    fun resolveSupportTicket(ticketId: String, status: String) {
+    fun resolveSupportTicket(ticketId: String, status: String, operatorId: String = "founder_admin") {
+        if (!isExecutiveAuthorized(operatorId)) {
+            _toastMessage.value = "Access Denied: Executive credentials required."
+            return
+        }
         viewModelScope.launch {
             val ticket = repository.getSupportTicketById(ticketId) ?: return@launch
             val updated = ticket.copy(status = status, resolvedAt = System.currentTimeMillis())
@@ -54,16 +67,24 @@ class FounderCrmViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    fun resolveReport(reportId: String, status: String) {
+    fun resolveReport(reportId: String, status: String, operatorId: String = "founder_admin") {
+        if (!isExecutiveAuthorized(operatorId)) {
+            _toastMessage.value = "Access Denied: Executive credentials required."
+            return
+        }
         viewModelScope.launch {
             repository.updateReportStatus(reportId, status)
             _toastMessage.value = "Governance Report set to $status"
         }
     }
 
-    fun approveOrRejectVerification(requestId: String, status: String, notes: String) {
+    fun approveOrRejectVerification(requestId: String, status: String, notes: String, operatorId: String = "founder_admin") {
+        if (!isExecutiveAuthorized(operatorId)) {
+            _toastMessage.value = "Access Denied: Executive credentials required."
+            return
+        }
         viewModelScope.launch {
-            repository.updateVerificationRequest(requestId, status, notes, "founder_admin")
+            repository.updateVerificationRequest(requestId, status, notes, operatorId)
             _toastMessage.value = "Verification request is now $status!"
         }
     }

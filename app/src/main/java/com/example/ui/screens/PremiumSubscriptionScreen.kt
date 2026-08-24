@@ -332,23 +332,69 @@ fun PremiumSubscriptionScreen(
                 }
             }
 
+            // Feature Comparison Table Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, ColorDivider)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "FREE VS. CREATOR PRO COMPARISON",
+                            color = AccentBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+
+                        // Comparison Header
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF171D28), shape = RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Capability / Feature", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
+                            Text("Free Plan", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                            Text("Verified Pro", color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.weight(1.2f))
+                        }
+
+                        // Comparison Items
+                        ComparisonRow("Team Workspaces", "Max 2", "Unlimited")
+                        ComparisonRow("Agreement Vault Contracts", "Max 5", "Unlimited")
+                        ComparisonRow("Workspace Seats / Roles", "Up to 5", "Unlimited + Custom RBAC")
+                        ComparisonRow("Syndicate Pitches", "3 / Month", "Unlimited + Priority Pitch")
+                        ComparisonRow("Platform Banners", "Ads Included", "100% Ad-Free")
+                        ComparisonRow("Trust & Search Rank", "Standard Badge", "Verified Pro + Top Rank")
+                        ComparisonRow("Audit Logs & Export", "Local Only", "Full Export + No Watermark")
+                    }
+                }
+            }
+
             // Benefits checklist section (remains relevant for both subscribed and unsubscribed users)
             item {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "VERIFIED PRO MEMBERSHIP INCLUDES",
+                    text = "VERIFIED PRO MEMBERSHIP HIGHLIGHTS",
                     color = TextSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
 
             item { BenefitRow("Priority open roles placement in discovery feeds") }
             item { BenefitRow("Zero third-party or platform-sponsored ads") }
-            item { BenefitRow("Exclusive badge and trust rank multiplier") }
-            item { BenefitRow("Advanced portfolio analytics and views tracker") }
+            item { BenefitRow("Exclusive badge and trust rank multiplier (+15 points)") }
+            item { BenefitRow("Unlimited Active Contracts & Equity Split Calculators") }
             item { BenefitRow("Unlimited Active Syndicates and Workspace Channels") }
 
             if (isPro) {
@@ -383,5 +429,20 @@ fun BenefitRow(title: String) {
     ) {
         Icon(Icons.Default.CheckCircle, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
         Text(title, color = Color.White, fontSize = 14.sp)
+    }
+}
+
+@Composable
+fun ComparisonRow(feature: String, freeVal: String, proVal: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(feature, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.5f))
+        Text(freeVal, color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+        Text(proVal, color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End, modifier = Modifier.weight(1.2f))
     }
 }

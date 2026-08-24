@@ -22,6 +22,12 @@ class DiscoveryViewModel constructor(
     val pitchAttemptCount = MutableStateFlow(0)
     val securityState = MutableStateFlow<SecurityState>(SecurityState.Idle)
 
+    private val _isSubmittingProposal = MutableStateFlow(false)
+    val isSubmittingProposal: StateFlow<Boolean> = _isSubmittingProposal.asStateFlow()
+
+    private val _isSubmittingPitch = MutableStateFlow(false)
+    val isSubmittingPitch: StateFlow<Boolean> = _isSubmittingPitch.asStateFlow()
+
     private val _recruitmentAuditing = MutableStateFlow<Map<String, RecruitmentAuditingConfig>>(emptyMap())
     val recruitmentAuditing: StateFlow<Map<String, RecruitmentAuditingConfig>> = _recruitmentAuditing.asStateFlow()
 
@@ -55,7 +61,7 @@ class DiscoveryViewModel constructor(
         }
     }
 
-    fun submitProjectProposal(title: String, niche: String, brief: String, user: UserProfile?, userId: String, isBoosted: Boolean = false) {
+    fun submitProjectProposal(title: String, niche: String, brief: String, user: UserProfile?, userId: String, isBoosted: Boolean = false, onComplete: (() -> Unit)? = null) {
         if (user == null || userId != user.id) {
             _toastMessage.value = "Identity verification failed. Please re-login."
             return
@@ -64,23 +70,37 @@ class DiscoveryViewModel constructor(
             _toastMessage.value = "Only verified Creators can post production collaboration listings."
             return
         }
+        if (_isSubmittingProposal.value) return
+        _isSubmittingProposal.value = true
+        val canBoost = isBoosted && (user.isVerifiedPro || user.globalRole == "ADMIN" || user.systemRole == "ADMIN")
         viewModelScope.launch {
-            val proposal = ProjectProposal(
-                id = "proj_" + UUID.randomUUID().toString().take(8),
-                title = title,
-                niche = niche,
-                brief = brief,
-                authorId = userId,
-                authorName = user.displayName,
-                boostedUntil = if (isBoosted) System.currentTimeMillis() + (48 * 60 * 60 * 1000) else 0,
-                createdAt = System.currentTimeMillis()
-            )
-            repository.insertProjectProposal(proposal)
-            _toastMessage.value = if (isBoosted) "Project proposal posted and boosted successfully!" else "Project proposal posted successfully!"
+            try {
+                val proposal = ProjectProposal(
+                    id = "proj_" + UUID.randomUUID().toString().take(8),
+                    title = title,
+                    niche = niche,
+                    brief = brief,
+                    authorId = userId,
+                    authorName = user.displayName,
+                    boostedUntil = if (canBoost) System.currentTimeMillis() + (48 * 60 * 60 * 1000) else 0,
+                    createdAt = System.currentTimeMillis()
+                )
+                repository.insertProjectProposal(proposal)
+                _toastMessage.value = when {
+                    canBoost -> "Project proposal posted and boosted successfully!"
+                    isBoosted -> "Project proposal posted. (Verified Pro required for boosted ranking)."
+                    else -> "Project proposal posted successfully!"
+                }
+                onComplete?.invoke()
+            } catch (e: Exception) {
+                _toastMessage.value = "Failed to post proposal: ${e.message}"
+            } finally {
+                _isSubmittingProposal.value = false
+            }
         }
     }
 
-    fun submitTalentPitch(projectId: String, coverMessage: String, portfolioUrl: String, user: UserProfile?, userId: String) {
+    fun submitTalentPitch(projectId: String, coverMessage: String, portfolioUrl: String, user: UserProfile?, userId: String, onComplete: (() -> Unit)? = null) {
         if (user == null || userId != user.id) {
             _toastMessage.value = "Identity verification failed."
             return
@@ -97,33 +117,44 @@ class DiscoveryViewModel constructor(
             _toastMessage.value = "Platform rate limit exceeded: Too many proposal attempts."
             return
         }
+
+        if (_isSubmittingPitch.value) return
+        _isSubmittingPitch.value = true
+
         viewModelScope.launch {
-            pitchAttemptCount.value = attempts + 1
-            val pitch = TalentPitch(
-                id = UUID.randomUUID().toString(),
-                projectId = projectId,
-                senderId = userId,
-                senderName = user.displayName,
-                senderSpecialty = user.primarySpecialty,
-                coverMessage = coverMessage,
-                portfolioUrl = portfolioUrl,
-                createdAt = System.currentTimeMillis()
-            )
-            repository.insertTalentPitch(pitch)
-
-            // Notify Project Author
-            repository.getProjectProposalById(projectId).firstOrNull()?.let { project ->
-                repository.insertNotification(Notification(
+            try {
+                pitchAttemptCount.value = attempts + 1
+                val pitch = TalentPitch(
                     id = UUID.randomUUID().toString(),
-                    userId = project.authorId,
-                    title = "New Syndicate Pitch",
-                    body = "${user.displayName} has pitched for '${project.title}' as a ${user.primarySpecialty}.",
-                    type = "PITCH_RECEIVED",
+                    projectId = projectId,
+                    senderId = userId,
+                    senderName = user.displayName,
+                    senderSpecialty = user.primarySpecialty,
+                    coverMessage = coverMessage,
+                    portfolioUrl = portfolioUrl,
                     createdAt = System.currentTimeMillis()
-                ))
-            }
+                )
+                repository.insertTalentPitch(pitch)
 
-            _toastMessage.value = "Pitch submitted successfully! Attempts: ${attempts + 1}/3"
+                // Notify Project Author
+                repository.getProjectProposalById(projectId).firstOrNull()?.let { project ->
+                    repository.insertNotification(Notification(
+                        id = UUID.randomUUID().toString(),
+                        userId = project.authorId,
+                        title = "New Syndicate Pitch",
+                        body = "${user.displayName} has pitched for '${project.title}' as a ${user.primarySpecialty}.",
+                        type = "PITCH_RECEIVED",
+                        createdAt = System.currentTimeMillis()
+                    ))
+                }
+
+                _toastMessage.value = "Pitch submitted successfully! Attempts: ${attempts + 1}/3"
+                onComplete?.invoke()
+            } catch (e: Exception) {
+                _toastMessage.value = "Failed to submit pitch: ${e.message}"
+            } finally {
+                _isSubmittingPitch.value = false
+            }
         }
     }
 
@@ -162,18 +193,60 @@ class DiscoveryViewModel constructor(
                 timestamp = System.currentTimeMillis()
             ))
 
+            // Auto-generate Draft Team Agreement in AgreementVault for the new Workspace
+            val agreementId = "agr_" + UUID.randomUUID().toString().take(8)
+            val draftAgreement = com.example.data.model.TeamAgreement(
+                id = agreementId,
+                workspaceId = wsId,
+                title = "Co-Creation & Revenue Share Agreement - ${project.title}",
+                content = "Automated Draft Agreement generated upon pitch acceptance.\n\nLead Creator: ${project.authorName}\nCollaborator: ${pitch.senderName} (${pitch.senderSpecialty})\n\nTerms: Equal 50/50 split of digital revenue generated from ${project.title}. Rights retained co-equally.",
+                contentText = "Draft Agreement generated upon pitch acceptance for ${project.title}.",
+                authorName = "Co-Op Governance Bot",
+                version = 1,
+                isLocked = false,
+                createdAt = System.currentTimeMillis()
+            )
+            repository.createAgreement(draftAgreement)
+
+            // Initialize initial milestone escrow deliverable
+            val escrowDeliverable = com.example.data.model.Deliverable(
+                id = "escrow_" + UUID.randomUUID().toString().take(8),
+                workspaceId = wsId,
+                taskId = "milestone_1",
+                submitterId = pitch.senderId,
+                assetId = "",
+                status = "ESCROW_LOCKED",
+                versionNotes = "Milestone Escrow locked upon pitch acceptance for '${project.title}'. Active contract initialized.",
+                createdAt = System.currentTimeMillis()
+            )
+            repository.insertDeliverable(escrowDeliverable)
+
+            // Audit Log Record
+            repository.insertAuditLog(com.example.data.model.AuditLog(
+                id = UUID.randomUUID().toString(),
+                adminId = userId,
+                adminName = "System",
+                actionTaken = "MATCH_CONFIRMED",
+                targetType = "WORKSPACE",
+                targetId = wsId,
+                reason = "Pitch accepted for proposal '${project.title}'. Workspace & Draft Contract created.",
+                createdAt = System.currentTimeMillis()
+            ))
+
             // Notify Applicant
             repository.insertNotification(Notification(
                 id = UUID.randomUUID().toString(),
                 userId = pitch.senderId,
-                title = "Pitch Accepted!",
-                body = "Your pitch for '${project.title}' was accepted! A new workspace has been created.",
+                title = "Pitch Accepted & Contract Drafted!",
+                body = "Your pitch for '${project.title}' was accepted! A workspace and contract draft have been initialized.",
                 type = "PITCH_ACCEPTED",
                 createdAt = System.currentTimeMillis()
             ))
 
+            // Decline remaining candidate pitches for this proposal
+            repository.declineOtherPitchesForProject(project.id, pitch.id)
             repository.deleteProjectProposalById(project.id)
-            _toastMessage.value = "Match confirmed! Workspace '${project.title}' is ready!"
+            _toastMessage.value = "Match confirmed! Workspace & Draft Contract for '${project.title}' are ready!"
         }
     }
 

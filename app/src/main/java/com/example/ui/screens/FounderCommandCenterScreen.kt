@@ -51,29 +51,29 @@ val launchTasksList = listOf(
     LaunchTaskItem(
         index = 1,
         key = "launch_task_1",
-        title = "WebRTC Video/Audio Streams",
-        category = "Category 1: Frontend Simulation",
-        targetFile = "VideoHuddleScreen.kt",
-        description = "Bridge simulated speaking grids and active stream video frames to real WebRTC peer channels or an external streaming provider.",
-        launchImpact = "Essential for live-collaboration rooms, content huddles, and interactive brainstorms."
+        title = "Modern Workspace & Kanban Engine",
+        category = "Category 1: Core Collaboration",
+        targetFile = "TeamSpaceScreen.kt",
+        description = "Structured workspace lanes, subtask checklists, deliverable review queues, and role-gated asset management.",
+        launchImpact = "Essential for team project execution, task tracking, and milestone completion."
     ),
     LaunchTaskItem(
         index = 2,
         key = "launch_task_2",
-        title = "Google Play Billing Integration",
-        category = "Category 1: Frontend Simulation",
-        targetFile = "PremiumSubscriptionScreen.kt",
-        description = "Connect billing purchase states directly to Google Play Billing Client SDK rather than using our in-memory BillingSimulatorDialog.",
-        launchImpact = "Secures the payment gateway for premium creator status subscriptions and individual paywalls."
+        title = "Digital Agreements Vault & Multi-Sig Signatures",
+        category = "Category 1: Governance & Contracts",
+        targetFile = "AgreementVault.kt",
+        description = "Cryptographic SHA-256 agreement signature verification, milestone payout terms, and IP split clauses.",
+        launchImpact = "Guarantees binding legal clarity and revenue allocations across all co-op members."
     ),
     LaunchTaskItem(
         index = 3,
         key = "launch_task_3",
-        title = "Co-Op Subscription Engine Scaling",
-        category = "Category 1: Frontend Simulation",
-        targetFile = "PremiumSubscriptionScreen.kt",
-        description = "Manage tier benefits, seat quotas, and automated renewal state management for verified pro members.",
-        launchImpact = "Sustains long-term co-op platform growth and team workspace subscription management."
+        title = "Supabase Realtime Cloud Synchronization",
+        category = "Category 1: Cloud Infrastructure",
+        targetFile = "SupabaseSynchronizer.kt",
+        description = "Bi-directional real-time delta synchronization between local Room SQLite database and Supabase Postgrest tables.",
+        launchImpact = "Sustains instant live updates across team members and ensures seamless offline-first performance."
     ),
     LaunchTaskItem(
         index = 4,

@@ -49,9 +49,42 @@ object SupabaseConfig {
         }
     }
 
+    val isConfigured: Boolean by lazy {
+        try {
+            val url = supabaseUrl
+            val key = supabaseKey
+            url.isNotBlank() &&
+                    !url.contains("your-project") &&
+                    !url.contains("example.com") &&
+                    key.isNotBlank() &&
+                    !key.contains("your-supabase-public") &&
+                    !key.contains("your-anon-key")
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
+    val isRealtimeEnabled: Boolean by lazy {
+        try {
+            val flag = try {
+                val field = BuildConfig::class.java.getField("SUPABASE_ENABLE_REALTIME")
+                field.get(null)?.toString()
+            } catch (e: Throwable) {
+                null
+            }
+            flag?.equals("true", ignoreCase = true) == true
+        } catch (e: Throwable) {
+            false
+        }
+    }
+
     // Official Supabase SDK Client
     val client: SupabaseClient by lazy {
-        val okHttpClient = OkHttpClient.Builder().build()
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
 
         createSupabaseClient(
             supabaseUrl = supabaseUrl,

@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.CreatorCoopApp
 import com.example.data.model.*
+import com.example.data.supabase.SupabaseConfig
+import com.example.data.supabase.SupabaseSynchronizer
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.AdminViewModel
 import kotlinx.coroutines.delay
@@ -172,6 +174,15 @@ fun BackupCenterScreen(
                 )
                 repository.insertAuditLog(log)
                 
+                // If Supabase is configured and online, push audit log & sync state
+                if (SupabaseConfig.isConfigured && SupabaseConfig.isNetworkAvailable(context)) {
+                    try {
+                        SupabaseSynchronizer.syncDownEverything(context, repository)
+                    } catch (e: Exception) {
+                        // Silent fallback to local storage
+                    }
+                }
+                
                 loadBackups()
                 android.widget.Toast.makeText(context, "Backup '$backupName' completed successfully!", android.widget.Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -192,13 +203,13 @@ fun BackupCenterScreen(
                 val jsonSerializer = Json { ignoreUnknownKeys = true }
                 val snapshot = jsonSerializer.decodeFromString<DatabaseSnapshot>(backup.rawJson)
                 
-                // Restore logic: write sequentially into tables
-                snapshot.users.forEach { repository.updateUserProfile(it) }
-                snapshot.workspaces.forEach { repository.insertWorkspace(it) }
-                snapshot.tasks.forEach { repository.insertTask(it) }
-                snapshot.tickets.forEach { repository.insertSupportTicket(it) }
-                snapshot.reports.forEach { repository.reportDao.insertReport(it) }
-                snapshot.announcements.forEach { repository.insertAnnouncement(it) }
+                // Restore logic: write safely into tables with per-record fault isolation
+                snapshot.users.forEach { try { repository.updateUserProfile(it) } catch (e: Exception) {} }
+                snapshot.workspaces.forEach { try { repository.insertWorkspace(it) } catch (e: Exception) {} }
+                snapshot.tasks.forEach { try { repository.insertTask(it) } catch (e: Exception) {} }
+                snapshot.tickets.forEach { try { repository.insertSupportTicket(it) } catch (e: Exception) {} }
+                snapshot.reports.forEach { try { repository.reportDao.insertReport(it) } catch (e: Exception) {} }
+                snapshot.announcements.forEach { try { repository.insertAnnouncement(it) } catch (e: Exception) {} }
                 
                 // Log audit action
                 val log = AuditLog(
@@ -212,6 +223,15 @@ fun BackupCenterScreen(
                     createdAt = System.currentTimeMillis()
                 )
                 repository.insertAuditLog(log)
+                
+                // Trigger cloud sync down if connected
+                if (SupabaseConfig.isConfigured && SupabaseConfig.isNetworkAvailable(context)) {
+                    try {
+                        SupabaseSynchronizer.syncDownEverything(context, repository)
+                    } catch (e: Exception) {
+                        // Keep restored local state
+                    }
+                }
                 
                 android.widget.Toast.makeText(context, "Full state restore complete! Systems synchronized.", android.widget.Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -260,7 +280,28 @@ fun BackupCenterScreen(
                 border = BorderStroke(1.dp, ColorDivider)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("ACTIVE STATE OVERVIEW", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    val hasSupabase = SupabaseConfig.isConfigured
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("ACTIVE STATE OVERVIEW", color = AccentBlue, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = if (hasSupabase) NeonEmerald.copy(alpha = 0.15f) else CrispAmber.copy(alpha = 0.15f),
+                            border = BorderStroke(0.5.dp, if (hasSupabase) NeonEmerald else CrispAmber)
+                        ) {
+                            Text(
+                                text = if (hasSupabase) "SUPABASE ACTIVE" else "STANDALONE STORE",
+                                color = if (hasSupabase) NeonEmerald else CrispAmber,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     Row(
@@ -286,15 +327,39 @@ fun BackupCenterScreen(
                             Text("Securing secure state configuration...", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
-                        Button(
-                            onClick = { triggerBackup() },
-                            modifier = Modifier.fillMaxWidth().testTag("create_backup_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(Icons.Default.Backup, null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("CREATE FULL STATE BACKUP", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { triggerBackup() },
+                                modifier = Modifier.fillMaxWidth().testTag("create_backup_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Backup, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("CREATE FULL STATE BACKUP", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            
+                            if (hasSupabase) {
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            try {
+                                                SupabaseSynchronizer.syncDownEverything(context, repository)
+                                                android.widget.Toast.makeText(context, "Supabase Cloud DB Synchronized!", android.widget.Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                android.widget.Toast.makeText(context, "Cloud sync fail: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    border = BorderStroke(1.dp, NeonEmerald),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.CloudSync, null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("FORCE SUPABASE CLOUD RESYNC", color = NeonEmerald, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+                            }
                         }
                     }
                 }

@@ -46,8 +46,10 @@ media3 = "1.5.0"
 ktor = "3.0.0"
 kotlinxSerializationJson = "1.7.3"
 hilt = "2.55"
+browser = "1.8.0"
 
 [libraries]
+androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

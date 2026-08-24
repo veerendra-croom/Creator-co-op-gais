@@ -58,7 +58,10 @@ data class TeamAgreement(
 )
 
 @Serializable
-@Entity(tableName = "agreement_acknowledgments")
+@Entity(
+    tableName = "agreement_acknowledgments",
+    indices = [Index(value = ["agreementId", "userId"], unique = true)]
+)
 data class AgreementAcknowledgment(
     @PrimaryKey val id: String,
     val agreementId: String,

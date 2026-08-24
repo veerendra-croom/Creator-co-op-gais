@@ -4,11 +4,15 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.example.ui.screens.*
 import com.example.CreatorCoOpDashboard
 
@@ -28,20 +32,30 @@ fun AppNavHost(
     val authViewModel: AuthViewModel = viewModel(factory = factory)
     val showSplash by globalViewModel.showSplash.collectAsState()
     val currentUserId by authViewModel.currentUserId.collectAsState(initial = null)
+    var showStandaloneOnboarding by remember { mutableStateOf(false) }
 
     androidx.compose.runtime.LaunchedEffect(currentUserId, showSplash) {
         if (!showSplash) {
             val currentDestination = navController.currentBackStackEntry?.destination?.route
-            val targetRoute = if (currentUserId != null) Screen.Dashboard::class.qualifiedName else Screen.Auth::class.qualifiedName
-            
-            if (currentDestination != targetRoute) {
-                val route = if (currentUserId != null) Screen.Dashboard else Screen.Auth
-                navController.navigate(route) {
-                    // Pop up to the start destination (Splash) and remove it
-                    popUpTo(navController.graph.startDestinationId) {
-                        inclusive = true
+            if (currentUserId != null) {
+                if (currentDestination != Screen.Dashboard::class.qualifiedName) {
+                    navController.navigate(Screen.Dashboard) {
+                        popUpTo(navController.graph.startDestinationId) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
                     }
-                    launchSingleTop = true
+                }
+            } else {
+                // If logged out or starting fresh and not on Landing or Auth, navigate to Landing
+                if (currentDestination != Screen.Landing::class.qualifiedName && 
+                    currentDestination?.contains("Auth") != true) {
+                    navController.navigate(Screen.Landing) {
+                        popUpTo(navController.graph.startDestinationId) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
                 }
             }
         }
@@ -64,8 +78,62 @@ fun AppNavHost(
             )
         }
 
-        composable<Screen.Auth> {
-            AuthScreen(authViewModel = authViewModel)
+        composable<Screen.Landing> {
+            if (showStandaloneOnboarding) {
+                OnboardingScreen(
+                    globalViewModel = globalViewModel,
+                    onComplete = { showStandaloneOnboarding = false },
+                    onLaunchDemo = {
+                        showStandaloneOnboarding = false
+                        authViewModel.launchDemoMode(asAdmin = false)
+                        globalViewModel.replayTour("demo_user", "dashboard_tour")
+                    }
+                )
+            } else {
+                LandingScreen(
+                    globalViewModel = globalViewModel,
+                    authViewModel = authViewModel,
+                    onNavigateToSignIn = {
+                        navController.navigate(Screen.Auth("LOGIN"))
+                    },
+                    onNavigateToSignUp = {
+                        navController.navigate(Screen.Auth("REGISTER"))
+                    },
+                    onLaunchUserDemo = {
+                        authViewModel.launchDemoMode(asAdmin = false)
+                        globalViewModel.replayTour("demo_user", "dashboard_tour")
+                    },
+                    onLaunchAdminDemo = {
+                        authViewModel.launchDemoMode(asAdmin = true)
+                        globalViewModel.replayTour("demo_admin", "founder_command_tour")
+                    },
+                    onLaunchFullDemo = {
+                        authViewModel.launchDemoMode(asAdmin = false)
+                        globalViewModel.replayTour("demo_user", "dashboard_tour")
+                    },
+                    onViewOnboarding = {
+                        showStandaloneOnboarding = true
+                    }
+                )
+            }
+        }
+
+        composable<Screen.Auth> { backStackEntry ->
+            val authArgs = backStackEntry.toRoute<Screen.Auth>()
+            AuthScreen(
+                authViewModel = authViewModel,
+                initialMode = authArgs.initialMode,
+                onNavigateToLanding = {
+                    navController.navigate(Screen.Landing) {
+                        popUpTo(Screen.Landing) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+                onLaunchDemo = {
+                    authViewModel.launchDemoMode(asAdmin = false)
+                    globalViewModel.replayTour("demo_user", "dashboard_tour")
+                }
+            )
         }
 
         composable<Screen.Dashboard> {

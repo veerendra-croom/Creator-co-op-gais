@@ -21,7 +21,13 @@ data class Report(
 )
 
 @Serializable
-@Entity(tableName = "admin_audit_logs")
+@Entity(
+    tableName = "admin_audit_logs",
+    indices = [
+        Index(value = ["adminId"]),
+        Index(value = ["createdAt"])
+    ]
+)
 data class AuditLog(
     @PrimaryKey val id: String,
     val adminId: String,
@@ -57,8 +63,12 @@ data class GlobalSetting(
 @Entity(tableName = "feature_flags_table")
 data class FeatureFlag(
     @PrimaryKey @androidx.room.ColumnInfo(name = "flag_key") val flagKey: String,
-    @androidx.room.ColumnInfo(name = "is_enabled") val isEnabled: Boolean = false,
+    @androidx.room.ColumnInfo(name = "is_enabled") val isEnabled: Boolean = true,
+    @androidx.room.ColumnInfo(name = "organizer_enabled") val organizerEnabled: Boolean = true,
+    @androidx.room.ColumnInfo(name = "participant_enabled") val participantEnabled: Boolean = true,
+    @androidx.room.ColumnInfo(name = "global_override_enabled") val globalOverrideEnabled: Boolean = true,
     val description: String? = null,
+    val category: String = "CORE", // GOVERNANCE, COLLABORATION, MEDIA, COMMUNICATION, CORE
     val lastModifiedAt: Long = System.currentTimeMillis(),
     val lastModifiedByAdminId: String = ""
 )

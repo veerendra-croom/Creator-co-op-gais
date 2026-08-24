@@ -28,6 +28,7 @@ import com.example.data.model.TaskTemplate
 import com.example.data.model.TemplateTask
 import com.example.ui.theme.*
 import com.example.ui.components.*
+import com.example.ui.tour.guidedTourTarget
 import com.example.ui.viewmodels.WorkspaceViewModel
 import java.util.Calendar
 import java.util.GregorianCalendar
@@ -38,7 +39,8 @@ fun TeamSpaceScreen(
     workspaceId: String,
     userId: String,
     isAgreementActive: Boolean = true,
-    onGoToAgreement: () -> Unit = {}
+    onGoToAgreement: () -> Unit = {},
+    globalViewModel: com.example.ui.viewmodels.GlobalViewModel? = null
 ) {
     if (!isAgreementActive) {
         Box(
@@ -205,7 +207,7 @@ fun TeamSpaceScreen(
                                 }
                             } else {
                                 LazyRow(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = if (globalViewModel != null) Modifier.fillMaxSize().guidedTourTarget("workspace_kanban_columns", globalViewModel.tourManager) else Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(horizontal = DS.Space16, vertical = DS.Space16),
                                     horizontalArrangement = Arrangement.spacedBy(DS.Space16)
                                 ) {
@@ -347,16 +349,28 @@ fun TeamSpaceScreen(
                                         
                                         if (lane == "IDEAS" && canModify) {
                                             Spacer(modifier = Modifier.height(DS.Space12))
-                                            Button(
-                                                onClick = { showCreateTaskDialog = true },
-                                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
-                                                shape = DS.RadiusMedium,
-                                                border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
+                                            FeatureGate(
+                                                flagKey = "TASK_CREATION",
+                                                userRole = currentUserProfile?.systemRole ?: "CREATOR",
+                                                repository = viewModel.repository,
+                                                fallback = {
+                                                    FeatureRestrictedBanner(
+                                                        featureTitle = "Task Creation",
+                                                        restrictedMessage = "Task drafting is temporarily restricted by platform governance."
+                                                    )
+                                                }
                                             ) {
-                                                Icon(Icons.Default.Add, null, tint = AccentRed, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(DS.Space8))
-                                                Text("New Task", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                                Button(
+                                                    onClick = { showCreateTaskDialog = true },
+                                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
+                                                    shape = DS.RadiusMedium,
+                                                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
+                                                ) {
+                                                    Icon(Icons.Default.Add, null, tint = AccentRed, modifier = Modifier.size(18.dp))
+                                                    Spacer(modifier = Modifier.width(DS.Space8))
+                                                    Text("New Task", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                                }
                                             }
                                         }
                                     }
@@ -429,7 +443,8 @@ fun TeamSpaceScreen(
             userId = userId,
             currentUser = currentUserProfile,
             allUsers = allUsers,
-            onDismiss = { selectedTask = null }
+            onDismiss = { selectedTask = null },
+            globalViewModel = globalViewModel
         )
     }
 

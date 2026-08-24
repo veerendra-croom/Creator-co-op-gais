@@ -21,6 +21,9 @@ class CommunityFeedViewModel constructor(
     val currentFeedTab = MutableStateFlow("TRENDING")
     val selectedSpaceName = MutableStateFlow("All")
 
+    private val _isSubmitting = MutableStateFlow(false)
+    val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
+
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
@@ -44,42 +47,64 @@ class CommunityFeedViewModel constructor(
         }
     }.cachedIn(viewModelScope)
 
-    fun submitPost(title: String, body: String, spaceName: String, user: UserProfile?) {
+    fun submitPost(title: String, body: String, spaceName: String, user: UserProfile?, onComplete: (() -> Unit)? = null) {
+        if (_isSubmitting.value) return
+        _isSubmitting.value = true
         viewModelScope.launch {
-            val post = Post(
-                id = UUID.randomUUID().toString(),
-                title = title,
-                body = body,
-                spaceName = spaceName,
-                authorName = user?.displayName ?: "Creator",
-                authorRole = user?.primarySpecialty ?: "Artist",
-                timestamp = System.currentTimeMillis()
-            )
-            repository.insertPost(post)
-            _toastMessage.value = "New post shared to #$spaceName"
+            try {
+                val post = Post(
+                    id = UUID.randomUUID().toString(),
+                    title = title,
+                    body = body,
+                    spaceName = spaceName,
+                    authorName = user?.displayName ?: "Creator",
+                    authorRole = user?.primarySpecialty ?: "Artist",
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertPost(post)
+                _toastMessage.value = "New post shared to #$spaceName"
+                onComplete?.invoke()
+            } catch (e: Exception) {
+                _toastMessage.value = "Failed to post: ${e.message}"
+            } finally {
+                _isSubmitting.value = false
+            }
         }
     }
 
     fun votePost(postId: String, voteType: String) {
         viewModelScope.launch {
-            repository.updatePostVote(postId, voteType)
+            try {
+                repository.updatePostVote(postId, voteType)
+            } catch (e: Exception) {
+                _toastMessage.value = "Failed to submit vote: ${e.message}"
+            }
         }
     }
 
     fun getCommentsForPost(postId: String): Flow<List<Comment>> = repository.commentDao.getCommentsForPost(postId)
 
-    fun submitComment(postId: String, text: String, user: UserProfile?) {
+    fun submitComment(postId: String, text: String, user: UserProfile?, onComplete: (() -> Unit)? = null) {
+        if (_isSubmitting.value) return
+        _isSubmitting.value = true
         viewModelScope.launch {
-            val comment = Comment(
-                id = UUID.randomUUID().toString(),
-                postId = postId,
-                authorName = user?.displayName ?: "Creator",
-                authorRole = user?.primarySpecialty ?: "Artist",
-                text = text,
-                timestamp = System.currentTimeMillis()
-            )
-            repository.insertComment(comment)
-            _toastMessage.value = "Comment added."
+            try {
+                val comment = Comment(
+                    id = UUID.randomUUID().toString(),
+                    postId = postId,
+                    authorName = user?.displayName ?: "Creator",
+                    authorRole = user?.primarySpecialty ?: "Artist",
+                    text = text,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertComment(comment)
+                _toastMessage.value = "Comment added."
+                onComplete?.invoke()
+            } catch (e: Exception) {
+                _toastMessage.value = "Failed to add comment: ${e.message}"
+            } finally {
+                _isSubmitting.value = false
+            }
         }
     }
 

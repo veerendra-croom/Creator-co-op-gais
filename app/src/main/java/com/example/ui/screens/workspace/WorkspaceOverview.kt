@@ -25,6 +25,7 @@ import com.example.data.model.WorkspaceAsset
 import com.example.data.model.ProductionTask
 import com.example.ui.theme.*
 import com.example.ui.components.*
+import com.example.ui.tour.guidedTourTarget
 import com.example.ui.viewmodels.WorkspaceViewModel
 import kotlinx.serialization.json.*
 import java.util.UUID
@@ -41,7 +42,8 @@ fun WorkspaceOverview(
     onGoToAgreement: () -> Unit,
     onGoToTasks: () -> Unit,
     onGoToChat: () -> Unit,
-    onGoToTeam: () -> Unit
+    onGoToTeam: () -> Unit,
+    globalViewModel: com.example.ui.viewmodels.GlobalViewModel? = null
 ) {
     val isTestEnv = remember {
         try {
@@ -142,8 +144,6 @@ fun WorkspaceOverview(
     var privateNoteBody by remember { mutableStateOf("") }
     
     val featureFlags by viewModel.featureFlags.collectAsState()
-    val isHuddlesEnabled = featureFlags.find { it.flagKey == "huddles_enabled" }?.isEnabled ?: true
-    var showHuddleDialog by remember { mutableStateOf(false) }
     
     Column(
         modifier = Modifier
@@ -168,16 +168,14 @@ fun WorkspaceOverview(
                     Icon(Icons.Default.FileDownload, "Compliance Log Summary", tint = Color.White)
                 }
                 
-                if (isHuddlesEnabled) {
-                    IconButton(
-                        onClick = { showHuddleDialog = true },
-                        modifier = Modifier
-                            .background(SurfaceColor, DS.RadiusMedium)
-                            .border(1.dp, ColorDivider.copy(alpha = 0.5f), DS.RadiusMedium)
-                            .size(40.dp)
-                    ) {
-                        Icon(Icons.Default.VideoCall, "Live Video Huddle", tint = AccentBlue)
-                    }
+                IconButton(
+                    onClick = onGoToAgreement,
+                    modifier = Modifier
+                        .background(SurfaceColor, DS.RadiusMedium)
+                        .border(1.dp, ColorDivider.copy(alpha = 0.5f), DS.RadiusMedium)
+                        .size(40.dp)
+                ) {
+                    Icon(Icons.Default.HistoryEdu, "Digital Agreement Vault", tint = AccentBlue)
                 }
             }
         )
@@ -309,7 +307,7 @@ fun WorkspaceOverview(
         Column(verticalArrangement = Arrangement.spacedBy(DS.Space12)) {
             SectionHeader(title = "Living Production Center")
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = if (globalViewModel != null) Modifier.fillMaxWidth().guidedTourTarget("workspace_sprint_tracker", globalViewModel.tourManager) else Modifier.fillMaxWidth(),
                 shape = DS.RadiusLarge,
                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
                 border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
@@ -733,7 +731,7 @@ fun WorkspaceOverview(
                                     unfocusedTextColor = Color.White
                                 ),
                                 shape = DS.RadiusMedium,
-                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, color = Color.White)
                             )
                             
                             Spacer(modifier = Modifier.height(12.dp))
@@ -795,10 +793,6 @@ fun WorkspaceOverview(
             members = activeMembers,
             onDismiss = { showPDFDialog = false }
         )
-    }
-
-    if (showHuddleDialog) {
-        LiveHuddleDialog(onDismiss = { showHuddleDialog = false })
     }
 
     if (selectedTaskForDetails != null) {

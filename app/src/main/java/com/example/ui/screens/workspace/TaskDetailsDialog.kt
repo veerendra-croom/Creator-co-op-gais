@@ -21,6 +21,7 @@ import com.example.data.model.*
 import com.example.data.repository.AppRepository
 import com.example.ui.components.*
 import com.example.ui.theme.*
+import com.example.ui.tour.guidedTourTarget
 import com.example.ui.viewmodels.WorkspaceViewModel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -68,7 +69,8 @@ fun TaskDetailsDialog(
     userId: String,
     currentUser: UserProfile?,
     allUsers: List<UserProfile>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    globalViewModel: com.example.ui.viewmodels.GlobalViewModel? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val activeTasks by viewModel.activeTasks.collectAsState()
@@ -438,29 +440,41 @@ fun TaskDetailsDialog(
                                 }
                             }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            FeatureGate(
+                                flagKey = "FILE_UPLOADS",
+                                userRole = currentUser?.systemRole ?: "CREATOR",
+                                repository = repository,
+                                fallback = {
+                                    FeatureRestrictedBanner(
+                                        featureTitle = "File & Asset Uploads",
+                                        restrictedMessage = "Attachment uploads are currently restricted by platform governance."
+                                    )
+                                }
                             ) {
-                                TextField(
-                                    value = newAttachmentUrl,
-                                    onValueChange = { newAttachmentUrl = it },
-                                    placeholder = { Text("Add attachment URL...", fontSize = 12.sp, color = TextSecondary) },
-                                    colors = TextFieldDefaults.colors(focusedContainerColor = SurfaceLightColor, unfocusedContainerColor = SurfaceLightColor, focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                Button(
-                                    onClick = {
-                                        if (newAttachmentUrl.isNotBlank()) {
-                                            val atts = richData.attachments + newAttachmentUrl
-                                            saveTaskUpdates(richData.copy(attachments = atts))
-                                            newAttachmentUrl = ""
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("Add")
+                                    TextField(
+                                        value = newAttachmentUrl,
+                                        onValueChange = { newAttachmentUrl = it },
+                                        placeholder = { Text("Add attachment URL...", fontSize = 12.sp, color = TextSecondary) },
+                                        colors = TextFieldDefaults.colors(focusedContainerColor = SurfaceLightColor, unfocusedContainerColor = SurfaceLightColor, focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    Button(
+                                        onClick = {
+                                            if (newAttachmentUrl.isNotBlank()) {
+                                                val atts = richData.attachments + newAttachmentUrl
+                                                saveTaskUpdates(richData.copy(attachments = atts))
+                                                newAttachmentUrl = ""
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                                    ) {
+                                        Text("Add")
+                                    }
                                 }
                             }
                         }
@@ -495,7 +509,14 @@ fun TaskDetailsDialog(
                             val assigneeName = currentAssignee?.userId ?: "Unassigned"
                             
                             Box(
-                                modifier = Modifier
+                                modifier = if (globalViewModel != null) Modifier
+                                    .fillMaxWidth()
+                                    .background(SurfaceColor, RoundedCornerShape(8.dp))
+                                    .border(1.dp, ColorDivider, RoundedCornerShape(8.dp))
+                                    .clickable { showAssigneeDropdown = true }
+                                    .guidedTourTarget("workspace_task_assignment", globalViewModel.tourManager)
+                                    .padding(12.dp)
+                                else Modifier
                                     .fillMaxWidth()
                                     .background(SurfaceColor, RoundedCornerShape(8.dp))
                                     .border(1.dp, ColorDivider, RoundedCornerShape(8.dp))

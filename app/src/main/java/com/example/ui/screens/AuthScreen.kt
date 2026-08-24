@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,9 +42,12 @@ import com.example.ui.components.*
 @Composable
 fun AuthScreen(
     authViewModel: AuthViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialMode: String = "LOGIN",
+    onNavigateToLanding: (() -> Unit)? = null,
+    onLaunchDemo: (() -> Unit)? = null
 ) {
-    var isLoginMode by remember { mutableStateOf(true) }
+    var isLoginMode by remember(initialMode) { mutableStateOf(initialMode != "REGISTER") }
     var devTapCount by remember { mutableStateOf(0) }
     var developerModeEnabled by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
@@ -52,12 +56,12 @@ fun AuthScreen(
     var isCustomGoogleEmailExpanded by remember { mutableStateOf(false) }
 
     // Form states
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var inviteCode by remember { mutableStateOf("") }
-    var displayName by remember { mutableStateOf("") }
-    var isPasswordVisible by remember { mutableStateOf(false) }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var username by rememberSaveable { mutableStateOf("") }
+    var inviteCode by rememberSaveable { mutableStateOf("") }
+    var displayName by rememberSaveable { mutableStateOf("") }
+    var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
     
     val isLoading by authViewModel.isLoading.collectAsState()
     val toastMessage by authViewModel.toastMessage.collectAsState()
@@ -83,13 +87,58 @@ fun AuthScreen(
 
     Scaffold(
         containerColor = PrimaryBackground,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            if (onNavigateToLanding != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(PrimaryBackground)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onNavigateToLanding,
+                        modifier = Modifier.testTag("auth_back_to_landing_button")
+                    ) {
+                        Icon(Icons.Default.ArrowBack, "Back to Landing", tint = TextPrimary)
+                    }
+
+                    if (onLaunchDemo != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = NeonEmerald.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, NeonEmerald),
+                            modifier = Modifier
+                                .clickable { onLaunchDemo() }
+                                .testTag("auth_top_demo_button")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Demo", tint = NeonEmerald, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "DEMO",
+                                    color = NeonEmerald,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     ) { innerPadding ->
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(PrimaryBackground)
+                .imePadding()
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
@@ -253,6 +302,52 @@ fun AuthScreen(
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Interactive Demo Mode Quick Gateway
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (onLaunchDemo != null) onLaunchDemo()
+                            else authViewModel.launchDemoMode(asAdmin = false)
+                        }
+                        .testTag("auth_explore_demo_card"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.6f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = NeonEmerald.copy(alpha = 0.2f),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Explore, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Preview App Without Signing In",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Full 22-stop interactive User & Admin tour",
+                                color = NeonEmerald,
+                                fontSize = 10.sp
+                            )
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 TabRow(
                 selectedTabIndex = if (isLoginMode) 0 else 1,
                 containerColor = SurfaceColor,

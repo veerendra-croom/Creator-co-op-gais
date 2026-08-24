@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.*
+import com.example.ui.tour.guidedTourTarget
 
 @Composable
 fun MoreScreen(
@@ -58,14 +61,13 @@ fun MoreScreen(
 
     val filteredItems = remember(featureFlags, currentRole) {
         val items = mutableListOf(
-            MoreMenuItem("Discover", "Browse talents & projects", Icons.Default.Groups, AccentRed, "DISCOVERY"),
-            MoreMenuItem("Commons", "Co-op discussion boards", Icons.Default.Forum, AccentBlue, "COMMONS"),
-            MoreMenuItem("Search", "Global index lookup", Icons.Default.Search, CrispAmber, "SEARCH"),
+            MoreMenuItem("My Profile", "Identity, skills & reputation", Icons.Default.Person, AccentBlue, "PROFILE"),
             MoreMenuItem("Analytics", "Growth & engagement insights", Icons.Default.Leaderboard, NeonEmerald, "ANALYTICS"),
             MoreMenuItem("Pipeline", "Production task funnel", Icons.Default.Analytics, AccentBlue, "CONTENT_PIPELINE"),
             MoreMenuItem("Video Huddle", "Live team video room", Icons.Default.VideoCall, AccentRed, "VIDEO_HUDDLE"),
             MoreMenuItem("Knowledge", "Co-op manuals & resources", Icons.Default.AutoStories, CrispAmber, "KNOWLEDGE_BASE"),
             MoreMenuItem("Premium Pro", "Manage subscription", Icons.Default.Star, CrispAmber, "PREMIUM_SUBSCRIPTION"),
+            MoreMenuItem("Search", "Global index lookup", Icons.Default.Search, CrispAmber, "SEARCH"),
             MoreMenuItem("Refer a Teammate", "Invite friends & earn premium", Icons.Default.CardGiftcard, CrispAmber, "REFER_TEAMMATE"),
             MoreMenuItem("Connections", "Network requests", Icons.Default.PersonAdd, NeonEmerald, "CONNECTION_REQUESTS"),
             MoreMenuItem("Blocked Users", "Manage ignored profiles", Icons.Default.Block, TextMuted, "BLOCKED_USERS"),
@@ -82,8 +84,6 @@ fun MoreScreen(
 
         items.filter { item ->
             when (item.route) {
-                "DISCOVERY" -> featureFlags.find { it.flagKey == "portfolio_discovery_enabled" }?.isEnabled ?: true
-                "COMMONS" -> featureFlags.find { it.flagKey == "creator_commons_enabled" }?.isEnabled ?: true
                 "ANALYTICS" -> featureFlags.find { it.flagKey == "analytics_enabled" }?.isEnabled ?: true
                 "VIDEO_HUDDLE" -> featureFlags.find { it.flagKey == "huddles_enabled" }?.isEnabled ?: true
                 "FOUNDER_CRM" -> featureFlags.find { it.flagKey == "founder_crm_enabled" }?.isEnabled ?: true
@@ -104,6 +104,216 @@ fun MoreScreen(
             .fillMaxSize()
             .background(PrimaryBackground)
     ) {
+        // Contextual Screen-Specific Guided Tutorials Section
+        item(span = { GridItemSpan(2) }) {
+            val uid = userId ?: "guest"
+            val tourStatuses by globalViewModel.tourManager.tourStatuses.collectAsState()
+            var isExpanded by remember { mutableStateOf(true) }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("more_screen_guided_tutorials_card")
+                    .guidedTourTarget("settings_help_tutorials", globalViewModel.tourManager),
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(AccentBlue, NeonEmerald, CrispAmber)))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = AccentBlue.copy(alpha = 0.2f),
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.HelpOutline,
+                                        contentDescription = "Guided Tutorials",
+                                        tint = AccentBlue,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = NeonEmerald.copy(alpha = 0.2f),
+                                    border = BorderStroke(0.5.dp, NeonEmerald.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = "CONTEXTUAL IN-APP GUIDES",
+                                        color = NeonEmerald,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.8.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Interactive Screen Walkthroughs",
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Text(
+                                    text = "Screen-specific spotlight tours with dynamic coach marks",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = { isExpanded = !isExpanded }) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle Guides List",
+                                tint = TextSecondary
+                            )
+                        }
+                    }
+
+                    if (isExpanded) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(color = ColorDivider)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "AVAILABLE SCREEN TOURS (${com.example.ui.tour.GuidedTourRepository.ALL_TOURS.size})",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.6.sp,
+                                color = TextMuted
+                            )
+
+                            OutlinedButton(
+                                onClick = { globalViewModel.resetAllTours(uid) },
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.6f)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RestartAlt,
+                                    contentDescription = null,
+                                    tint = AccentRed,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "RESET ALL TOURS",
+                                    color = AccentRed,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.example.ui.tour.GuidedTourRepository.ALL_TOURS.forEach { tour ->
+                                val status = tourStatuses[tour.tourId] ?: com.example.ui.tour.TourStatus.NOT_STARTED
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = PrimaryBackground,
+                                    border = BorderStroke(1.dp, ColorDivider),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val statusColor = when(status) {
+                                                com.example.ui.tour.TourStatus.COMPLETED -> NeonEmerald
+                                                com.example.ui.tour.TourStatus.SKIPPED -> CrispAmber
+                                                com.example.ui.tour.TourStatus.NOT_STARTED -> AccentBlue
+                                            }
+                                            val statusText = when(status) {
+                                                com.example.ui.tour.TourStatus.COMPLETED -> "COMPLETED"
+                                                com.example.ui.tour.TourStatus.SKIPPED -> "SKIPPED"
+                                                com.example.ui.tour.TourStatus.NOT_STARTED -> "NEW"
+                                            }
+
+                                            Column {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = tour.screenTitle,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = TextPrimary
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Surface(
+                                                        shape = RoundedCornerShape(4.dp),
+                                                        color = statusColor.copy(alpha = 0.15f),
+                                                        border = BorderStroke(0.5.dp, statusColor.copy(alpha = 0.5f))
+                                                    ) {
+                                                        Text(
+                                                            text = statusText,
+                                                            color = statusColor,
+                                                            fontSize = 8.5.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = "${tour.steps.size} interactive steps • Target Tab: ${tour.targetTab}",
+                                                    fontSize = 10.5.sp,
+                                                    color = TextMuted
+                                                )
+                                            }
+                                        }
+
+                                        Button(
+                                            onClick = { globalViewModel.replayTour(uid, tour.tourId) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Text(
+                                                text = "REPLAY",
+                                                color = Color.Black,
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Theme Selector Card
         item(span = { GridItemSpan(2) }) {
             Card(
@@ -580,6 +790,83 @@ fun SettingsFooterSection(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = ColorDivider)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- SECTION: DATABASE SEEDING & PRODUCTION TOGGLE ---
+            val isDemoSandbox by globalViewModel.demoSandboxMode.collectAsState()
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Storage,
+                    contentDescription = "Database Mode",
+                    tint = if (isDemoSandbox) CrispAmber else NeonEmerald,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "DATA INITIALIZATION & SANDBOX",
+                    color = TextPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.2.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = if (isDemoSandbox) {
+                    "Demo Sandbox Active: Includes pre-seeded creator profiles, demo channel workspaces, and sample syndicate proposals for sandbox testing."
+                } else {
+                    "Clean Production Mode: Running with a pristine local database for real production onboarding."
+                },
+                color = TextSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceLightColor, RoundedCornerShape(12.dp))
+                    .border(1.dp, ColorDivider, RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isDemoSandbox) "Demo Sandbox Data" else "Clean Production DB",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (isDemoSandbox) "Prepopulated sandbox enabled" else "Zero mock records populated",
+                        color = TextSecondary,
+                        fontSize = 10.sp
+                    )
+                }
+                Switch(
+                    checked = isDemoSandbox,
+                    onCheckedChange = { globalViewModel.toggleDemoSandboxMode(it) },
+                    modifier = Modifier.testTag("sandbox_data_toggle"),
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = CrispAmber,
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = SurfaceColor
+                    )
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))

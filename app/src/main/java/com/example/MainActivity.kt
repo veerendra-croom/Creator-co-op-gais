@@ -41,30 +41,37 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private val globalViewModel: GlobalViewModel by viewModels {
+        AppViewModelFactory(applicationContext as CreatorCoopApp)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        intent?.data?.let { uri ->
-            lifecycleScope.launch {
-                try {
-                    // SupabaseConfig.client.auth.importSessionFromDeeplink(uri.toString())
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Failed to handle deep link", e)
-                    Toast.makeText(this@MainActivity, "Link could not be processed", Toast.LENGTH_SHORT).show()
-                }
+        enableEdgeToEdge()
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
             }
         }
 
-        enableEdgeToEdge()
-        val application = applicationContext as CreatorCoopApp
-        val factory = AppViewModelFactory(application)
-        val globalViewModel: GlobalViewModel by viewModels { factory }
+        intent?.data?.let { uri ->
+            globalViewModel.handleDeepLink(uri)
+        }
 
         setContent {
             val themeMode by globalViewModel.themeMode.collectAsState()
             MyApplicationTheme(themeMode = themeMode) {
                 AppNavHost(globalViewModel = globalViewModel)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.data?.let { uri ->
+            globalViewModel.handleDeepLink(uri)
         }
     }
 }

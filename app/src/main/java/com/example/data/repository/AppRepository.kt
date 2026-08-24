@@ -39,6 +39,7 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         coerceInputValues = true
     }
     val userDao = db.userDao()
+    fun getUserById(userId: String): Flow<UserProfile?> = userDao.getUserById(userId)
 
     suspend fun exportUserData(userId: String): String {
         val profile = userDao.getUserById(userId).firstOrNull()
@@ -100,16 +101,141 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             try {
                 val defaults = listOf(
-                    FeatureFlag("huddles_enabled", true, "Enable real-time voice and video workspace huddles for active team creators."),
-                    FeatureFlag("referral_system_enabled", true, "Enable user referrals, code sharing, and Premium trial extension rewards."),
-                    FeatureFlag("weekly_digest_enabled", true, "Enable weekly summary digest notifications for matchmaking and active spaces."),
-                    FeatureFlag("looking_for_work_board_enabled", true, "Enable the Looking for Work board for active freelancers and matching projects."),
-                    FeatureFlag("creator_commons_enabled", true, "Control platform-wide access to the shared Creator Commons social arena."),
-                    FeatureFlag("analytics_enabled", true, "Enable or disable aggregated team and syndicate metrics."),
-                    FeatureFlag("portfolio_discovery_enabled", true, "Control search index visibility for creator profile discovery."),
-                    FeatureFlag("verification_requests_enabled", true, "Enable or disable automated peer-to-peer verification pipelines."),
-                    FeatureFlag("founder_crm_enabled", true, "Control access to automated founder crm, cohort tracking and health score logs."),
-                    FeatureFlag("moderation_center_enabled", true, "Enable platform-wide profile audits, flag reviews, and moderation dashboards.")
+                    FeatureFlag(
+                        flagKey = "SYNDICATE_PITCH_CREATION",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Enables creation and submission of new syndicate collaboration pitches.",
+                        category = "COLLABORATION"
+                    ),
+                    FeatureFlag(
+                        flagKey = "AGREEMENT_DRAFTING",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = false,
+                        globalOverrideEnabled = true,
+                        description = "Enables drafting, version updating, and hashing of digital team agreements.",
+                        category = "GOVERNANCE"
+                    ),
+                    FeatureFlag(
+                        flagKey = "COMMUNITY_FORUM_POSTING",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Allows posting updates and discussion threads in the Creator Commons arena.",
+                        category = "COMMUNICATION"
+                    ),
+                    FeatureFlag(
+                        flagKey = "FILE_UPLOADS",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Controls media asset attachment and deliverable uploads across workspaces.",
+                        category = "MEDIA"
+                    ),
+                    FeatureFlag(
+                        flagKey = "VOICE_HUDDLE_BETA",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Access to real-time voice huddle rooms for team syncs.",
+                        category = "COMMUNICATION"
+                    ),
+                    FeatureFlag(
+                        flagKey = "huddles_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Enable real-time voice and video workspace huddles for active team creators.",
+                        category = "COMMUNICATION"
+                    ),
+                    FeatureFlag(
+                        flagKey = "referral_system_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Enable user referrals, code sharing, and Premium trial extension rewards.",
+                        category = "CORE"
+                    ),
+                    FeatureFlag(
+                        flagKey = "weekly_digest_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Enable weekly summary digest notifications for matchmaking and active spaces.",
+                        category = "COMMUNICATION"
+                    ),
+                    FeatureFlag(
+                        flagKey = "looking_for_work_board_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Enable the Looking for Work board for active freelancers and matching projects.",
+                        category = "COLLABORATION"
+                    ),
+                    FeatureFlag(
+                        flagKey = "creator_commons_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Control platform-wide access to the shared Creator Commons social arena.",
+                        category = "COMMUNICATION"
+                    ),
+                    FeatureFlag(
+                        flagKey = "analytics_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = false,
+                        globalOverrideEnabled = true,
+                        description = "Enable or disable aggregated team and syndicate metrics.",
+                        category = "CORE"
+                    ),
+                    FeatureFlag(
+                        flagKey = "portfolio_discovery_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Control search index visibility for creator profile discovery.",
+                        category = "MEDIA"
+                    ),
+                    FeatureFlag(
+                        flagKey = "verification_requests_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = true,
+                        globalOverrideEnabled = true,
+                        description = "Enable or disable automated peer-to-peer verification pipelines.",
+                        category = "GOVERNANCE"
+                    ),
+                    FeatureFlag(
+                        flagKey = "founder_crm_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = false,
+                        globalOverrideEnabled = true,
+                        description = "Control access to automated founder crm, cohort tracking and health score logs.",
+                        category = "GOVERNANCE"
+                    ),
+                    FeatureFlag(
+                        flagKey = "moderation_center_enabled",
+                        isEnabled = true,
+                        organizerEnabled = true,
+                        participantEnabled = false,
+                        globalOverrideEnabled = true,
+                        description = "Enable platform-wide profile audits, flag reviews, and moderation dashboards.",
+                        category = "GOVERNANCE"
+                    )
                 )
                 for (f in defaults) {
                     if (featureFlagDao.getFeatureFlag(f.flagKey) == null) {
@@ -258,19 +384,16 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     suspend fun updateUserProfile(profile: UserProfile) {
         userDao.insertUser(profile)
         val currentContext = context
-        if (currentContext != null && SupabaseConfig.isNetworkAvailable(currentContext)) {
-            try {
-                SupabaseConfig.client.from("user_profiles").upsert(profile)
-            } catch (e: Exception) {
-                Log.e("Supabase", "Failed to sync profile update", e)
-                syncDao.insertSyncEvent(SyncEntity(
-                    id = UUID.randomUUID().toString(),
-                    entityType = "USER_PROFILE",
-                    entityJson = Json.encodeToString(UserProfile.serializer(), profile),
-                    actionType = "UPSERT",
-                    createdAt = System.currentTimeMillis()
-                ))
-            }
+        if (currentContext != null && SupabaseConfig.isConfigured && SupabaseConfig.isNetworkAvailable(currentContext)) {
+            SupabaseSynchronizer.syncUpUser(currentContext, profile)
+        } else {
+            syncDao.insertSyncEvent(SyncEntity(
+                id = UUID.randomUUID().toString(),
+                entityType = "USER_PROFILE",
+                entityJson = Json.encodeToString(UserProfile.serializer(), profile),
+                actionType = "UPSERT",
+                createdAt = System.currentTimeMillis()
+            ))
         }
     }
 
@@ -278,7 +401,12 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         adDao.updateSetting(setting)
     }
 
-    private suspend fun queueSync(entityType: String, entity: Any, action: String = "UPSERT") {
+    private suspend fun queueSync(
+        entityType: String,
+        entity: Any,
+        action: String = "UPSERT",
+        syncCall: (suspend () -> Unit)? = null
+    ): String {
         val jsonStr = when (entity) {
             is Post -> json.encodeToString(Post.serializer(), entity)
             is Message -> json.encodeToString(Message.serializer(), entity)
@@ -330,9 +458,10 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
             else -> UUID.randomUUID().toString()
         }
 
+        val eventId = "${entityType}_${id}_${action}_${System.currentTimeMillis()}"
         syncDao.insertSyncEvent(
             SyncEntity(
-                id = "${entityType}_${id}_${action}_${System.currentTimeMillis()}",
+                id = eventId,
                 entityType = entityType,
                 entityJson = jsonStr,
                 actionType = action,
@@ -342,6 +471,16 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                 lastAttemptedAt = 0
             )
         )
+
+        if (syncCall != null) {
+            try {
+                syncCall()
+                syncDao.updateSyncStatus(eventId, "SYNCED")
+            } catch (e: Exception) {
+                Log.w("AppRepository", "Direct sync call failed for $eventId, left as PENDING for retry: ${e.message}")
+            }
+        }
+        return eventId
     }
 
     suspend fun submitReport(report: Report) {
@@ -430,7 +569,17 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     suspend fun getCommentById(id: String) = commentDao.getCommentById(id)
     suspend fun getMessageById(id: String) = messageDao.getMessageById(id)
 
-    suspend fun deletePost(id: String) {
+    suspend fun deletePost(id: String, requesterId: String? = null) {
+        if (requesterId != null) {
+            val post = postDao.getPostById(id).firstOrNull()
+            val requester = userDao.getUserById(requesterId).firstOrNull()
+            val isAuthor = post?.authorId == requesterId
+            val isAdmin = requester?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || requester?.globalRole == "ADMIN"
+            if (!isAuthor && !isAdmin) {
+                throw SecurityException("Unauthorized: Cannot delete another user's post.")
+            }
+        }
+        commentDao.deleteCommentsForPost(id)
         postDao.deletePost(id)
         queueSync("POST", id, "DELETE")
         context?.let { SupabaseSynchronizer.syncDeletePost(it, id) }
@@ -470,12 +619,34 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         }
     }
 
-    suspend fun deleteComment(id: String) {
+    suspend fun deleteComment(id: String, requesterId: String? = null) {
+        val comment = commentDao.getCommentById(id)
+        if (requesterId != null && comment != null) {
+            val requester = userDao.getUserById(requesterId).firstOrNull()
+            val isAuthor = comment.authorId == requesterId
+            val isAdmin = requester?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || requester?.globalRole == "ADMIN"
+            if (!isAuthor && !isAdmin) {
+                throw SecurityException("Unauthorized: Cannot delete another user's comment.")
+            }
+        }
+        val postId = comment?.postId
         commentDao.deleteComment(id)
+        if (postId != null) {
+            postDao.refreshPostCommentCount(postId)
+        }
         context?.let { SupabaseSynchronizer.syncDeleteComment(it, id) }
     }
 
-    suspend fun deleteMessage(id: String) {
+    suspend fun deleteMessage(id: String, requesterId: String? = null) {
+        if (requesterId != null) {
+            val msg = messageDao.getMessageById(id)
+            val requester = userDao.getUserById(requesterId).firstOrNull()
+            val isSender = msg?.senderId == requesterId
+            val isAdmin = requester?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || requester?.globalRole == "ADMIN"
+            if (!isSender && !isAdmin) {
+                throw SecurityException("Unauthorized: Cannot delete another user's message.")
+            }
+        }
         messageDao.deleteMessage(id)
         queueSync("MESSAGE", id, "DELETE")
         context?.let { SupabaseSynchronizer.syncDeleteMessage(it, id) }
@@ -489,7 +660,12 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     }
 
     suspend fun deleteProjectProposalById(id: String) {
+        talentPitchDao.deletePitchesForProject(id)
         projectProposalDao.deleteProjectProposalById(id)
+    }
+
+    suspend fun declineOtherPitchesForProject(projectId: String, acceptedPitchId: String) {
+        talentPitchDao.declineOtherPitchesForProject(projectId, acceptedPitchId)
     }
 
     suspend fun insertTalentPitch(pitch: TalentPitch) {
@@ -505,10 +681,17 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     val flaggedUsers: Flow<List<UserProfile>> = adminDao.getFlaggedUsers()
     val allWorkspacesAdmin: Flow<List<Workspace>> = adminDao.getAllWorkspacesForAdmin()
 
-    suspend fun setUserRole(userId: String, role: String) {
+    suspend fun setUserRole(userId: String, role: String, requesterId: String? = null) {
+        if (requesterId != null) {
+            val requester = userDao.getUserById(requesterId).firstOrNull()
+            val isAdmin = requester?.systemRole in listOf("ADMIN", "PLATFORM_ADMIN") || requester?.globalRole == "ADMIN"
+            if (!isAdmin) {
+                throw SecurityException("Unauthorized: Caller $requesterId is not an administrator.")
+            }
+        }
         adminDao.setUserRole(userId, role)
         ClientSecurityInterceptor.wrap {
-            SupabaseConfig.client.postgrest.from("users").update(mapOf("global_role" to role)) {
+            SupabaseConfig.client.postgrest.from("user_profiles").update(mapOf("global_role" to role)) {
                 filter {
                     eq("id", userId)
                 }
@@ -520,8 +703,9 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
      * Connects Postgrest data parsing directly to Room data class insertions using clean map loops.
      */
     suspend fun syncRemoteUsers() {
+        if (!SupabaseConfig.isConfigured) return
         ClientSecurityInterceptor.wrap {
-            val response = SupabaseConfig.client.postgrest.from("users").select().data
+            val response = SupabaseConfig.client.postgrest.from("user_profiles").select().data
             val remoteUsers = json.decodeFromString<List<UserProfile>>(response)
             remoteUsers.map { user ->
                 userDao.insertUser(user)
@@ -591,6 +775,7 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     fun getTaskById(id: String) = productionTaskDao.getTaskById(id)
     fun getMessagesForWorkspace(workspaceId: String) = messageDao.getMessagesForWorkspace(workspaceId)
     fun getDMsForWorkspace(workspaceId: String, myId: String) = messageDao.getDMsForWorkspace(workspaceId, myId)
+    fun getAllDMsForUser(myId: String) = messageDao.getAllDMsForUser(myId)
     fun getLatestAgreement(workspaceId: String) = agreementDao.getLatestAgreementFlow(workspaceId)
     fun getAllAgreementsForWorkspace(workspaceId: String) = agreementDao.getAllAgreementsForWorkspace(workspaceId)
     fun getAcknowledgmentsFlow(agreementId: String) = agreementDao.getAcknowledgmentsFlow(agreementId)
@@ -609,14 +794,16 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
             }
         }
         agreementDao.insertAgreement(agreement)
-        queueSync("AGREEMENT", agreement)
-        context?.let { SupabaseSynchronizer.syncUpAgreement(it, agreement) }
+        queueSync("AGREEMENT", agreement) {
+            context?.let { SupabaseSynchronizer.syncUpAgreement(it, agreement) }
+        }
     }
 
     suspend fun insertAcknowledgment(acknowledgment: AgreementAcknowledgment) {
         agreementDao.insertAcknowledgment(acknowledgment)
-        queueSync("AGREEMENT_ACK", acknowledgment)
-        context?.let { SupabaseSynchronizer.syncUpAcknowledgment(it, acknowledgment) }
+        queueSync("AGREEMENT_ACK", acknowledgment) {
+            context?.let { SupabaseSynchronizer.syncUpAcknowledgment(it, acknowledgment) }
+        }
     }
 
     val allSyncEvents: kotlinx.coroutines.flow.Flow<List<SyncEntity>> = syncDao.getAllSyncEventsFlow()
@@ -670,7 +857,7 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                     }
                     "ENDORSEMENT" -> {
                         val endorsement = json.decodeFromString(Endorsement.serializer(), event.entityJson)
-                        SupabaseConfig.client.postgrest.from("endorsements").upsert(endorsement)
+                        SupabaseSynchronizer.syncUpEndorsement(context, endorsement)
                         true
                     }
                     "COMMENT" -> {
@@ -806,14 +993,16 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     // Write actions
     suspend fun saveUser(user: UserProfile) {
         userDao.insertUser(user)
-        queueSync("USER", user)
-        context?.let { SupabaseSynchronizer.syncUpUser(it, user) }
+        queueSync("USER", user) {
+            context?.let { SupabaseSynchronizer.syncUpUser(it, user) }
+        }
     }
 
     suspend fun insertPost(post: Post) {
         postDao.insertPost(post)
-        queueSync("POST", post)
-        context?.let { SupabaseSynchronizer.syncUpPost(it, post) }
+        queueSync("POST", post) {
+            context?.let { SupabaseSynchronizer.syncUpPost(it, post) }
+        }
         checkPostRateLimit(post.authorId)
     }
 
@@ -824,15 +1013,11 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
         // Handle vote logic changes
         val originalVote = currentPost.userVote
-        val updatedPost = if (originalVote == voteType) {
+        val (newUserVote, newUpvotes, newDownvotes) = if (originalVote == voteType) {
             // Undo vote
             if (originalVote == "up") diffUp = -1
             if (originalVote == "down") diffDown = -1
-            currentPost.copy(
-                userVote = "none",
-                upvotes = (currentPost.upvotes + diffUp).coerceAtLeast(0),
-                downvotes = (currentPost.downvotes + diffDown).coerceAtLeast(0)
-            )
+            Triple("none", (currentPost.upvotes + diffUp).coerceAtLeast(0), (currentPost.downvotes + diffDown).coerceAtLeast(0))
         } else {
             // Undo old vote
             if (originalVote == "up") diffUp = -1
@@ -842,20 +1027,19 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
             if (voteType == "up") diffUp += 1
             if (voteType == "down") diffDown += 1
 
-            currentPost.copy(
-                userVote = voteType,
-                upvotes = (currentPost.upvotes + diffUp).coerceAtLeast(0),
-                downvotes = (currentPost.downvotes + diffDown).coerceAtLeast(0)
-            )
+            Triple(voteType, (currentPost.upvotes + diffUp).coerceAtLeast(0), (currentPost.downvotes + diffDown).coerceAtLeast(0))
         }
-        postDao.insertPost(updatedPost)
+        postDao.updatePostVotes(postId, newUpvotes, newDownvotes, newUserVote)
+        val updatedPost = currentPost.copy(userVote = newUserVote, upvotes = newUpvotes, downvotes = newDownvotes)
         context?.let { SupabaseSynchronizer.syncUpPost(it, updatedPost) }
     }
 
     suspend fun insertComment(comment: Comment) {
         commentDao.insertComment(comment)
-        queueSync("COMMENT", comment)
-        context?.let { SupabaseSynchronizer.syncUpComment(it, comment) }
+        postDao.refreshPostCommentCount(comment.postId)
+        queueSync("COMMENT", comment) {
+            context?.let { SupabaseSynchronizer.syncUpComment(it, comment) }
+        }
     }
 
     fun getCommentsForEntity(entityId: String): Flow<List<Comment>> =
@@ -863,27 +1047,34 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun insertWorkspace(workspace: Workspace) {
         workspaceDao.insertWorkspace(workspace)
-        queueSync("WORKSPACE", workspace)
-        context?.let { SupabaseSynchronizer.syncUpWorkspace(it, workspace) }
+        queueSync("WORKSPACE", workspace) {
+            context?.let { SupabaseSynchronizer.syncUpWorkspace(it, workspace) }
+        }
     }
 
     suspend fun insertMember(member: WorkspaceMember) {
         workspaceMemberDao.insertMember(member)
-        queueSync("WORKSPACE_MEMBER", member)
-        context?.let { SupabaseSynchronizer.syncUpWorkspaceMember(it, member) }
+        queueSync("WORKSPACE_MEMBER", member) {
+            context?.let { SupabaseSynchronizer.syncUpWorkspaceMember(it, member) }
+        }
     }
 
     suspend fun insertTask(task: ProductionTask) {
         productionTaskDao.insertTask(task)
-        queueSync("TASK", task)
-        context?.let { SupabaseSynchronizer.syncUpProductionTask(it, task) }
+        queueSync("TASK", task) {
+            context?.let { SupabaseSynchronizer.syncUpProductionTask(it, task) }
+        }
+    }
+
+    suspend fun updateTaskLane(taskId: String, newLane: String) {
+        productionTaskDao.updateTaskLane(taskId, newLane)
     }
 
     suspend fun updateTaskStatus(taskId: String, status: String) {
         val task = productionTaskDao.getTaskByIdSuspend(taskId)
         if (task != null) {
+            productionTaskDao.updateTaskLane(taskId, status)
             val updatedTask = task.copy(kanbanLane = status)
-            productionTaskDao.insertTask(updatedTask)
             queueSync("TASK", updatedTask)
             context?.let { SupabaseSynchronizer.syncUpProductionTask(it, updatedTask) }
             
@@ -956,8 +1147,9 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun insertMessage(message: Message) {
         messageDao.insertMessage(message)
-        queueSync("MESSAGE", message)
-        context?.let { SupabaseSynchronizer.syncUpMessage(it, message) }
+        queueSync("MESSAGE", message) {
+            context?.let { SupabaseSynchronizer.syncUpMessage(it, message) }
+        }
         
         AnalyticsManager.trackEvent("message_sent", mapOf(
             "workspace_id" to message.workspaceId,
@@ -983,22 +1175,44 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         endorsementDao.insertEndorsement(endorsement)
         queueSync("ENDORSEMENT", endorsement)
         val currentContext = context
-        if (currentContext != null && SupabaseConfig.isNetworkAvailable(currentContext)) {
-            try {
-                SupabaseConfig.client.postgrest.from("endorsements").upsert(endorsement)
-            } catch (e: Exception) {
-                Log.e("Supabase", "Failed to sync endorsement update", e)
-            }
+        if (currentContext != null) {
+            SupabaseSynchronizer.syncUpEndorsement(currentContext, endorsement)
         }
     }
 
-    suspend fun prepopulateIfEmpty() {
+    suspend fun getDemoSandboxPreference(): Boolean {
+        val setting = userSettingsDao.getSetting("system", "demo_sandbox_mode")
+        // Defaults to true for initial testing and demo tours, but user can toggle to false for clean production database
+        return setting == null || setting == "true"
+    }
+
+    suspend fun setDemoSandboxPreference(enabled: Boolean) {
+        userSettingsDao.setSetting(
+            UserSetting(
+                id = "system_demo_sandbox_mode",
+                userId = "system",
+                key = "demo_sandbox_mode",
+                value = enabled.toString()
+            )
+        )
+    }
+
+    suspend fun clearSandboxData() {
+        userDao.deleteUserById("admin_seed")
+        userDao.deleteUserById("DemoUser")
+        workspaceDao.deleteWorkspaceById("ws_youtube_main")
+        projectProposalDao.deleteProjectProposalById("proj_001")
+        projectProposalDao.deleteProjectProposalById("proj_002")
+    }
+
+    suspend fun prepopulateIfEmpty(forceSeedDemo: Boolean? = null) {
         val isTest = try {
             Class.forName("org.robolectric.Robolectric") != null
         } catch (e: Throwable) {
             false
         }
-        if (isTest && userDao.getAllUsers().firstOrNull()?.isEmpty() == true) {
+        val shouldSeedDemo = forceSeedDemo ?: (isTest || getDemoSandboxPreference())
+        if (shouldSeedDemo && userDao.getAllUsers().firstOrNull()?.isEmpty() == true) {
             val myId = "admin_seed"
             val me = UserProfile(
                 id = myId,
@@ -1265,6 +1479,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                 isVerifiedPro = true // Mark verified pro trial
             )
             userDao.insertUser(updatedReferred)
+            queueSync("USER", updatedReferred)
+            context?.let { SupabaseSynchronizer.syncUpUser(it, updatedReferred) }
 
             // 2. Referrer
             val referrer = userDao.getUserById(referral.referrerId).firstOrNull()
@@ -1274,6 +1490,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                     isVerifiedPro = true
                 )
                 userDao.insertUser(updatedReferrer)
+                queueSync("USER", updatedReferrer)
+                context?.let { SupabaseSynchronizer.syncUpUser(it, updatedReferrer) }
             }
 
             // Mark referral reward as granted
@@ -1314,6 +1532,29 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
                 value = dismissed.toString()
             )
         )
+    }
+
+    // TOUR PERSISTENCE FUNCTIONS
+    fun getTourSettingsFlow(userId: String): Flow<List<UserSetting>> =
+        userSettingsDao.getTourSettingsFlow(userId)
+
+    suspend fun getTourStatus(userId: String, tourId: String): String? {
+        return userSettingsDao.getSetting(userId, "tour_$tourId")
+    }
+
+    suspend fun setTourStatus(userId: String, tourId: String, status: String) {
+        userSettingsDao.setSetting(
+            UserSetting(
+                id = "${userId}_tour_${tourId}",
+                userId = userId,
+                key = "tour_$tourId",
+                value = status
+            )
+        )
+    }
+
+    suspend fun clearAllTours(userId: String) {
+        userSettingsDao.clearTourSettings(userId)
     }
 
     // SPAM AND RATELIMIT UTILITIES
@@ -1751,5 +1992,13 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     fun getAllAgreementsFlow(): Flow<List<TeamAgreement>> = agreementDao.getAllAgreementsFlow()
     fun getAllCommentsFlow(): Flow<List<Comment>> = commentDao.getAllCommentsFlow()
     fun getAllWorkspaceMembersFlow(): Flow<List<WorkspaceMember>> = workspaceMemberDao.getAllMembersFlow()
+
+    suspend fun clearUserDataOnLogout() = withContext(Dispatchers.IO) {
+        try {
+            db.clearAllTables()
+        } catch (e: Exception) {
+            Log.e("AppRepository", "Failed to clear database on logout: ${e.message}", e)
+        }
+    }
 }
 

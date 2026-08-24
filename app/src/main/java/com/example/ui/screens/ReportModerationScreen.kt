@@ -14,9 +14,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.ui.viewmodels.GlobalViewModel
 
 @Composable
-fun ReportModerationScreen(onBack: () -> Unit) {
+fun ReportModerationScreen(
+    globalViewModel: GlobalViewModel,
+    currentUserId: String,
+    targetType: String = "CONTENT",
+    targetId: String = "general",
+    onBack: () -> Unit
+) {
     var reason by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
 
@@ -38,7 +45,7 @@ fun ReportModerationScreen(onBack: () -> Unit) {
         }
 
         Text(
-            text = "Please provide details about the issue. Our moderation team will review this within 24 hours.",
+            text = "Please provide details about the issue. Our moderation team will review this in the Admin Queue.",
             color = TextSecondary,
             fontSize = 14.sp,
             lineHeight = 20.sp
@@ -48,7 +55,7 @@ fun ReportModerationScreen(onBack: () -> Unit) {
             value = reason,
             onValueChange = { reason = it },
             label = { Text("Reason for reporting") },
-            placeholder = { Text("e.g. Spam, Harassment, Inappropriate Content") },
+            placeholder = { Text("e.g. Spam, Harassment, Terms Violation") },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AccentBlue,
@@ -63,7 +70,7 @@ fun ReportModerationScreen(onBack: () -> Unit) {
             value = details,
             onValueChange = { details = it },
             label = { Text("Additional Details") },
-            placeholder = { Text("Please provide any relevant context...") },
+            placeholder = { Text("Please provide context for the admin team...") },
             modifier = Modifier.fillMaxWidth().height(150.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = AccentBlue,
@@ -78,14 +85,26 @@ fun ReportModerationScreen(onBack: () -> Unit) {
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = onBack,
+            onClick = {
+                if (reason.isNotBlank()) {
+                    globalViewModel.submitReport(
+                        reporterId = currentUserId,
+                        targetType = targetType,
+                        targetId = targetId,
+                        reason = reason,
+                        details = details
+                    )
+                    onBack()
+                }
+            },
+            enabled = reason.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
             shape = RoundedCornerShape(12.dp)
         ) {
             Icon(Icons.Default.Report, null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Submit Report")
+            Text("Submit Report to Moderation Queue")
         }
     }
 }

@@ -125,6 +125,43 @@ fun DirectMessagesScreen(
                                 )
                             }
                         }
+
+                        // Quick Action Buttons
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            IconButton(
+                                onClick = {
+                                    chatViewModel.sendDirectMessage(
+                                        workspaceId = "dm_general",
+                                        recipientId = activeTargetUser.id,
+                                        text = "📌 WORKSPACE INVITE: Hey @${activeTargetUser.username}, I'd like to invite you to collaborate on our active workspace! Tap to open Workspace Invitation.",
+                                        senderId = currentUserId,
+                                        user = null
+                                    )
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(AccentBlue.copy(alpha = 0.15f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.GroupAdd, contentDescription = "Invite to Workspace", tint = AccentBlue, modifier = Modifier.size(18.dp))
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    chatViewModel.sendDirectMessage(
+                                        workspaceId = "dm_general",
+                                        recipientId = activeTargetUser.id,
+                                        text = "🤝 SYNDICATE PROPOSAL: Hey @${activeTargetUser.username}, I submitted a project pitch for us to co-create! Let's discuss equity and terms.",
+                                        senderId = currentUserId,
+                                        user = null
+                                    )
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(NeonEmerald.copy(alpha = 0.15f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.Handshake, contentDescription = "Pitch Project", tint = NeonEmerald, modifier = Modifier.size(18.dp))
+                            }
+                        }
                     }
 
                     // Chat messages body
@@ -148,26 +185,72 @@ fun DirectMessagesScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(40.dp),
+                                        .padding(24.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        Icon(Icons.Default.QuestionAnswer, null, tint = TextSecondary, modifier = Modifier.size(40.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .clip(CircleShape)
+                                                .background(AccentBlue.copy(alpha = 0.15f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.Forum, null, tint = AccentBlue, modifier = Modifier.size(28.dp))
+                                        }
                                         Text(
-                                            text = "Secure Sandbox DM Session Established",
+                                            text = "Encrypted Peer Handshake Ready",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Text(
+                                            text = "Start a direct conversation with @${activeTargetUser.username}. Messages are securely preserved on-device.",
                                             color = TextSecondary,
                                             fontSize = 12.sp,
                                             textAlign = TextAlign.Center
                                         )
-                                        Text(
-                                            text = "All messages are fully stored locally in Room database.",
-                                            color = TextMuted,
-                                            fontSize = 11.sp,
-                                            textAlign = TextAlign.Center
-                                        )
+                                        
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("QUICK PROMPTS", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                        
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            SuggestionChip(
+                                                onClick = {
+                                                    chatViewModel.sendDirectMessage(
+                                                        workspaceId = "dm_general",
+                                                        recipientId = activeTargetUser.id,
+                                                        text = "👋 Hey @${activeTargetUser.username}! Let's connect on Creator Co-Op.",
+                                                        senderId = currentUserId,
+                                                        user = userProfile
+                                                    )
+                                                },
+                                                label = { Text("👋 Say Hello", fontSize = 11.sp, color = Color.White) },
+                                                colors = SuggestionChipDefaults.suggestionChipColors(containerColor = SurfaceColor),
+                                                border = BorderStroke(1.dp, ColorDivider)
+                                            )
+                                            SuggestionChip(
+                                                onClick = {
+                                                    chatViewModel.sendDirectMessage(
+                                                        workspaceId = "dm_general",
+                                                        recipientId = activeTargetUser.id,
+                                                        text = "⚡ Are you currently open for new project collaborations?",
+                                                        senderId = currentUserId,
+                                                        user = userProfile
+                                                    )
+                                                },
+                                                label = { Text("⚡ Check Availability", fontSize = 11.sp, color = AccentBlue) },
+                                                colors = SuggestionChipDefaults.suggestionChipColors(containerColor = SurfaceColor),
+                                                border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.4f))
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -279,17 +362,13 @@ fun DirectMessagesScreen(
                         IconButton(
                             onClick = {
                                 if (typedText.isNotBlank()) {
-                                    val newMsg = Message(
-                                        id = "msg_" + UUID.randomUUID().toString().take(6),
-                                        workspaceId = "DM_WORKSPACE",
-                                        senderId = currentUserId,
-                                        senderName = userProfile?.displayName ?: "Me",
-                                        senderRole = "MEMBER",
+                                    chatViewModel.sendDirectMessage(
+                                        workspaceId = "dm_${listOf(currentUserId, activeTargetUser.id).sorted().joinToString("_")}",
                                         recipientId = activeTargetUser.id,
-                                        messageBody = typedText.trim(),
-                                        timestamp = System.currentTimeMillis()
+                                        text = typedText.trim(),
+                                        senderId = currentUserId,
+                                        user = userProfile
                                     )
-                                    chatViewModel.insertMessage(newMsg)
                                     typedText = ""
                                 }
                             },
@@ -327,6 +406,13 @@ fun DirectMessagesScreen(
                         onValueChange = { searchQuery = it },
                         placeholder = { Text("Search creators to chat...", color = TextSecondary) },
                         leadingIcon = { Icon(Icons.Default.Search, tint = TextSecondary, contentDescription = null) },
+                        trailingIcon = if (searchQuery.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear search", tint = TextMuted, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        } else null,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = AccentBlue,
@@ -353,10 +439,53 @@ fun DirectMessagesScreen(
                         if (filteredCreators.isEmpty()) {
                             item {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(32.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("No other creators registered on the network.", color = TextMuted, fontSize = 13.sp)
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .clip(CircleShape)
+                                                .background(SurfaceColor),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                if (searchQuery.isNotEmpty()) Icons.Default.SearchOff else Icons.Default.Group,
+                                                null,
+                                                tint = TextSecondary,
+                                                modifier = Modifier.size(28.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = if (searchQuery.isNotEmpty()) "No creators found matching '$searchQuery'" else "No other creators in directory",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Text(
+                                            text = if (searchQuery.isNotEmpty()) "Try adjusting your search terms or clearing the filter." else "Connect with other creators across workspaces or invite teammates.",
+                                            color = TextSecondary,
+                                            fontSize = 12.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        if (searchQuery.isNotEmpty()) {
+                                            Button(
+                                                onClick = { searchQuery = "" },
+                                                colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
+                                                border = BorderStroke(1.dp, ColorDivider),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text("Clear Filter", fontSize = 12.sp, color = AccentBlue)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         } else {

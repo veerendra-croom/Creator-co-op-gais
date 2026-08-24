@@ -227,10 +227,46 @@ class AuthViewModel constructor(
         }
     }
 
+    fun launchDemoMode(asAdmin: Boolean = false) {
+        viewModelScope.launch {
+            val targetId = if (asAdmin) "admin_seed" else "alex_mercer"
+            val userExists = repository.userDao.getUserById(targetId).firstOrNull() != null
+            if (!userExists) {
+                val mockUser = UserProfile(
+                    id = targetId,
+                    email = if (asAdmin) "admin@creatorcoop.com" else "alex.mercer@creatorcoop.com",
+                    username = if (asAdmin) "admin" else "alexmercer",
+                    displayName = if (asAdmin) "Platform Admin" else "Alex Mercer",
+                    avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=$targetId",
+                    globalRole = if (asAdmin) "ADMIN" else "CREATOR",
+                    systemRole = if (asAdmin) "PLATFORM_ADMIN" else "USER",
+                    bio = if (asAdmin) "Platform Operations & Governance" else "Lead VFX Artist & Virtual Production Specialist",
+                    skillsJson = if (asAdmin) "[\"Governance\",\"Audit\",\"Operations\"]" else "[\"VFX\",\"Virtual Production\",\"Unreal Engine 5\",\"Color Grading\"]",
+                    reputationScore = if (asAdmin) 100 else 98
+                )
+                repository.updateUserProfile(mockUser)
+            }
+            sharedPrefs.edit().putString("active_user_id", targetId).apply()
+            _currentUserId.value = targetId
+            AnalyticsManager.trackUserActivation(targetId)
+            _toastMessage.value = "Demo mode active as " + if (asAdmin) "Platform Admin" else "Alex Mercer (Creator)"
+        }
+    }
+
     fun logout() {
-        sharedPrefs.edit().remove("active_user_id").apply()
-        _currentUserId.value = null
-        _toastMessage.value = "Logged out successfully."
+        viewModelScope.launch {
+            try {
+                if (SupabaseConfig.isConfigured) {
+                    SupabaseConfig.client.auth.signOut()
+                }
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Supabase signOut failed during logout", e)
+            }
+            repository.clearUserDataOnLogout()
+            sharedPrefs.edit().remove("active_user_id").apply()
+            _currentUserId.value = null
+            _toastMessage.value = "Logged out successfully."
+        }
     }
 
     fun deleteAccountAndCascade(userId: String) {

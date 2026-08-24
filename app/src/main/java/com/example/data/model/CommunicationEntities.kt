@@ -1,11 +1,20 @@
 package com.example.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
 @Serializable
-@Entity(tableName = "messages")
+@Entity(
+    tableName = "messages",
+    indices = [
+        Index(value = ["workspaceId"]),
+        Index(value = ["senderId"]),
+        Index(value = ["recipientId"]),
+        Index(value = ["timestamp"])
+    ]
+)
 data class Message(
     @PrimaryKey val id: String,
     val workspaceId: String,
@@ -31,7 +40,14 @@ data class ConnectionRequest(
 )
 
 @Serializable
-@Entity(tableName = "notifications")
+@Entity(
+    tableName = "notifications",
+    indices = [
+        Index(value = ["userId"]),
+        Index(value = ["type"]),
+        Index(value = ["createdAt"])
+    ]
+)
 data class Notification(
     @PrimaryKey val id: String,
     val userId: String,

@@ -35,6 +35,7 @@ import com.example.data.model.ProductionTask
 import com.example.data.model.TeamAgreement
 import com.example.data.model.Workspace
 import com.example.ui.theme.*
+import com.example.ui.tour.guidedTourTarget
 import com.example.ui.viewmodels.AgreementViewModel
 import com.example.ui.viewmodels.GlobalViewModel
 import com.example.ui.viewmodels.WorkspaceViewModel
@@ -244,6 +245,7 @@ fun CreationSpeedDialFab(
                     )
                 )
                 .border(2.dp, if (isExpanded) AccentRed else AccentBlue, CircleShape)
+                .guidedTourTarget("dashboard_speed_dial", globalViewModel.tourManager)
                 .clickable {
                     if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -623,6 +625,7 @@ fun PremiumCreationDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
+                .heightIn(max = 620.dp)
                 .wrapContentHeight()
                 .border(1.dp, ColorDivider, RoundedCornerShape(16.dp)),
             colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -631,6 +634,8 @@ fun PremiumCreationDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .imePadding()
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
