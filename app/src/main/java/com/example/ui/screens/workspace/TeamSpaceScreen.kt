@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -324,7 +326,7 @@ fun TeamSpaceScreen(
                                                                             .background(Color.White.copy(alpha = 0.05f), CircleShape)
                                                                             .size(28.dp)
                                                                     ) {
-                                                                        Icon(Icons.Default.ArrowBack, "Move Left", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                                                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Move Left", tint = TextSecondary, modifier = Modifier.size(14.dp))
                                                                     }
                                                                 }
                                                                 
@@ -337,7 +339,7 @@ fun TeamSpaceScreen(
                                                                             .background(laneColor.copy(alpha = 0.1f), CircleShape)
                                                                             .size(28.dp)
                                                                     ) {
-                                                                        Icon(Icons.Default.ArrowForward, "Move Right", tint = laneColor, modifier = Modifier.size(14.dp))
+                                                                        Icon(Icons.AutoMirrored.Filled.ArrowForward, "Move Right", tint = laneColor, modifier = Modifier.size(14.dp))
                                                                     }
                                                                 }
                                                             }

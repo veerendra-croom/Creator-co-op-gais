@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -227,11 +228,14 @@ fun ReferTeammateScreen(
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = { shareReferralPass() },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .minimumInteractiveComponentSize()
+                                .testTag("share_invitation_pass_btn"),
                             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Share Invitation Pass", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("SHARE INVITATION PASS", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }

@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -550,7 +553,7 @@ fun WorkspaceOverview(
                     horizontalArrangement = Arrangement.spacedBy(DS.Space16)
                 ) {
                     ResourceCard("Brand Identity Assets.zip", Icons.Default.FolderZip, "14.2 MB • Zip File")
-                    ResourceCard("Compliance Guidelines", Icons.Default.MenuBook, "1.4 MB • PDF Document")
+                    ResourceCard("Compliance Guidelines", Icons.AutoMirrored.Filled.MenuBook, "1.4 MB • PDF Document")
                     ResourceCard("Cloud Storage Sync", Icons.Default.Cloud, "Google Drive Connected")
                 }
             } else {
@@ -1647,8 +1650,8 @@ fun HuddleParticipantItem(
             Icon(Icons.Default.VideocamOff, contentDescription = "Cam Off", tint = TextSecondary, modifier = Modifier.size(16.dp))
         } else {
             Icon(
-                imageVector = if (isActive) Icons.Default.VolumeUp else Icons.Default.VolumeMute,
-                contentDescription = null,
+                imageVector = if (isActive) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeMute,
+                contentDescription = if (isActive) "Audio active" else "Audio muted",
                 tint = if (isActive) MaterialTheme.colorScheme.primary else TextSecondary.copy(alpha = 0.5f),
                 modifier = Modifier.size(16.dp)
             )

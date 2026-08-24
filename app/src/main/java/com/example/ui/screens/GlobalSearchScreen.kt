@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -155,7 +157,7 @@ fun GlobalSearchScreen(
                         title = task.title,
                         subtitle = task.contentBody,
                         status = task.stateScope,
-                        icon = Icons.Default.Assignment,
+                        icon = Icons.AutoMirrored.Filled.Assignment,
                         accentColor = AccentBlue,
                         originalEntity = task
                     )
@@ -216,7 +218,7 @@ fun GlobalSearchScreen(
                         title = "Comment by ${comment.authorName}",
                         subtitle = comment.text,
                         status = "REPLY",
-                        icon = Icons.Default.Comment,
+                        icon = Icons.AutoMirrored.Filled.Comment,
                         accentColor = CrispAmber,
                         originalEntity = comment
                     )

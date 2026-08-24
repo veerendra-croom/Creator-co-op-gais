@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -89,13 +90,17 @@ fun FounderCrmScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { showHelpDialog = true },
-                        modifier = Modifier.testTag("action_help_button")
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("action_help_button")
                     ) {
-                        Icon(Icons.Default.HelpOutline, "Help Guide", tint = AccentBlue)
+                        Icon(Icons.AutoMirrored.Filled.HelpOutline, "Help Guide", tint = AccentBlue)
                     }
                     IconButton(
                         onClick = { showRegistrationDialog = true },
-                        modifier = Modifier.testTag("action_register_user_button")
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("action_register_user_button")
                     ) {
                         Icon(Icons.Default.PersonAdd, "Register Creator", tint = NeonEmerald)
                     }

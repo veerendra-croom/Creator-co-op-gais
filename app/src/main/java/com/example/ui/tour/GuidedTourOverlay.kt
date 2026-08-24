@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -356,7 +358,7 @@ fun GuidedTourOverlay(
                                     modifier = Modifier.testTag("guided_tour_prev_button")
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ArrowBack,
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "Back",
                                         tint = TextPrimary,
                                         modifier = Modifier.size(14.dp)
@@ -390,7 +392,7 @@ fun GuidedTourOverlay(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
-                                    imageVector = if (isLastStep) Icons.Default.Check else Icons.Default.ArrowForward,
+                                    imageVector = if (isLastStep) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = if (isLastStep) "Done" else "Next",
                                     tint = Color.Black,
                                     modifier = Modifier.size(14.dp)

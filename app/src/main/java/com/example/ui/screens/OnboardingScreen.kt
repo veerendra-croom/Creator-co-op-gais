@@ -13,6 +13,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -231,7 +233,7 @@ fun OnboardingScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, ColorDivider),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextSecondary, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("BACK", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
@@ -260,7 +262,7 @@ fun OnboardingScreen(
                         )
                         if (pagerState.currentPage < onboardingPages.size - 1) {
                             Spacer(modifier = Modifier.width(6.dp))
-                            Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Continue", modifier = Modifier.size(16.dp))
                         }
                     }
                 }

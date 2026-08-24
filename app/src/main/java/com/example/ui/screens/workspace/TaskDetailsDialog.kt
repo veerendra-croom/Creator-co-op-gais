@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -134,8 +135,8 @@ fun TaskDetailsDialog(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(
-                            imageVector = if (richData.isMilestone) Icons.Default.Flag else Icons.Default.Assignment,
-                            contentDescription = null,
+                            imageVector = if (richData.isMilestone) Icons.Default.Flag else Icons.AutoMirrored.Filled.Assignment,
+                            contentDescription = if (richData.isMilestone) "Milestone Task" else "Standard Task",
                             tint = if (richData.isMilestone) CrispAmber else AccentBlue
                         )
                         Column {

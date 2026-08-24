@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Share
@@ -482,7 +484,12 @@ fun PostDetailDialog(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = onDismiss) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.minimumInteractiveComponentSize().testTag("commons_discussion_back")
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                }
                 Text("Discussion", color = Color.White, fontWeight = FontWeight.Black)
                 IconButton(onClick = { /* Share */ }) { Icon(Icons.Default.Share, null, tint = Color.White) }
             }
@@ -570,7 +577,7 @@ fun PostDetailDialog(
                             enabled = commentText.isNotBlank(),
                             modifier = Modifier.background(if(commentText.isNotBlank()) AccentBlue else SurfaceLightColor, CircleShape)
                         ) {
-                            Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send Comment", tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
