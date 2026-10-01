@@ -312,6 +312,21 @@ class AppRepository(
                         )
                     )
                 }
+
+                // Pre-populate all 20 launch checklist tasks as COMPLETED for founder_admin
+                for (i in 1..20) {
+                    val key = "launch_task_$i"
+                    if (userSettingsDao.getSetting("founder_admin", key) == null) {
+                        userSettingsDao.setSetting(
+                            com.example.data.model.UserSetting(
+                                id = "founder_admin_$key",
+                                userId = "founder_admin",
+                                key = key,
+                                value = "COMPLETED"
+                            )
+                        )
+                    }
+                }
             } catch (e: Exception) {
                 Log.e("AppRepository", "Error prepopulating feature flags: ${e.message}")
             }

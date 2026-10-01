@@ -6,6 +6,9 @@ import { SyndicateScreen } from './screens/SyndicateScreen';
 import { FounderCommandCenterScreen } from './screens/FounderCommandCenterScreen';
 import { SupportCenterScreen } from './screens/SupportCenterScreen';
 import { PremiumSubscriptionScreen } from './screens/PremiumSubscriptionScreen';
+import { WorkspaceHub } from './screens/WorkspaceHub';
+import { CreatorCommonsScreen } from './screens/CreatorCommonsScreen';
+import { AnalyticsDashboardScreen } from './screens/AnalyticsDashboardScreen';
 import {
   Bolt,
   LayoutDashboard,
@@ -16,10 +19,22 @@ import {
   Gem,
   LogOut,
   Menu,
-  X
+  X,
+  FolderOpen,
+  MessageSquare,
+  TrendingUp
 } from 'lucide-react';
 
-type ScreenID = 'DASHBOARD' | 'CONTENT_PIPELINE' | 'SYNDICATE' | 'FOUNDER_COMMAND' | 'SUPPORT_CENTER' | 'PREMIUM';
+type ScreenID = 
+  | 'DASHBOARD' 
+  | 'CONTENT_PIPELINE' 
+  | 'SYNDICATE' 
+  | 'FOUNDER_COMMAND' 
+  | 'SUPPORT_CENTER' 
+  | 'PREMIUM'
+  | 'WORKSPACE_HUB'
+  | 'CREATOR_COMMONS'
+  | 'ANALYTICS';
 
 interface User {
   displayName: string;
@@ -33,7 +48,6 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    // If the user's name is founder or platform admin, default them to the admin panel or dashboard
     if (user.role === 'PLATFORM_ADMIN') {
       setCurrentScreen('FOUNDER_COMMAND');
     } else {
@@ -50,7 +64,7 @@ const App: React.FC = () => {
     return <LandingScreen onLogin={handleLogin} />;
   }
 
-  // Render current selected screen
+  // Render current selected screen (Narrowed to guaranteed non-null User)
   const renderScreen = () => {
     switch (currentScreen) {
       case 'DASHBOARD':
@@ -65,6 +79,12 @@ const App: React.FC = () => {
         return <SupportCenterScreen />;
       case 'PREMIUM':
         return <PremiumSubscriptionScreen />;
+      case 'WORKSPACE_HUB':
+        return <WorkspaceHub />;
+      case 'CREATOR_COMMONS':
+        return <CreatorCommonsScreen />;
+      case 'ANALYTICS':
+        return <AnalyticsDashboardScreen />;
       default:
         return <DashboardScreen />;
     }
@@ -72,8 +92,11 @@ const App: React.FC = () => {
 
   const menuItems = [
     { id: 'DASHBOARD', label: 'Cockpit Dashboard', icon: LayoutDashboard, adminOnly: false },
+    { id: 'WORKSPACE_HUB', label: 'Workspace Hub', icon: FolderOpen, adminOnly: false },
     { id: 'CONTENT_PIPELINE', label: 'Content Pipeline', icon: Film, adminOnly: false },
     { id: 'SYNDICATE', label: 'Syndicate Treasury', icon: Users2, adminOnly: false },
+    { id: 'CREATOR_COMMONS', label: 'Creator Commons', icon: MessageSquare, adminOnly: false },
+    { id: 'ANALYTICS', label: 'KPI Telemetry', icon: TrendingUp, adminOnly: false },
     { id: 'PREMIUM', label: 'Creator Premium', icon: Gem, adminOnly: false },
     { id: 'SUPPORT_CENTER', label: 'SLA Support', icon: HelpCircle, adminOnly: false },
     { id: 'FOUNDER_COMMAND', label: 'Founder Command', icon: Terminal, adminOnly: true }
@@ -92,6 +115,7 @@ const App: React.FC = () => {
           <span className="text-sm font-black tracking-widest text-white">CREATOR CO-OP</span>
         </div>
         <button
+          type="button"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-1 text-textSecondary hover:text-white transition"
         >
@@ -109,6 +133,7 @@ const App: React.FC = () => {
               return (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => {
                     setCurrentScreen(item.id);
                     setMobileMenuOpen(false);
@@ -131,6 +156,7 @@ const App: React.FC = () => {
               <p className="text-[10px] text-textSecondary uppercase tracking-wider font-semibold">{currentUser.role}</p>
             </div>
             <button
+              type="button"
               onClick={handleLogout}
               className="flex items-center gap-2 text-xs font-bold text-accentRed hover:text-accentRed/80 transition"
             >
@@ -162,6 +188,7 @@ const App: React.FC = () => {
               return (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => setCurrentScreen(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold text-left transition border ${
                     isActive
@@ -184,6 +211,7 @@ const App: React.FC = () => {
             <p className="text-[9px] text-textMuted uppercase tracking-wider font-bold mt-0.5">{currentUser.role}</p>
           </div>
           <button
+            type="button"
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-surfaceLight hover:bg-background border border-divider text-accentRed hover:text-white rounded-xl text-xs font-black transition"
           >

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bolt, ShieldCheck, ArrowRight, Smartphone } from 'lucide-react';
+import { Bolt, ShieldCheck, ArrowRight, Smartphone, BookOpen, Layers, Award } from 'lucide-react';
 
 interface LandingScreenProps {
   onLogin: (user: { displayName: string; role: string }) => void;
@@ -12,6 +12,31 @@ export const LandingScreen = ({ onLogin }: LandingScreenProps) => {
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Onboarding Slideshow (OnboardingScreen parity)
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  const onboardingSlides = [
+    {
+      title: 'Welcome to Creator Co-Op',
+      desc: 'The premier decentralized platform for joint media productions, creative schedules, and mutual milestone syndicates.',
+      icon: BookOpen,
+      color: 'text-accentBlue'
+    },
+    {
+      title: 'Automated Milestone Splits',
+      desc: 'Draft peer-to-peer agreements on our ledger. Let automated smart splits route your milestone payments securely.',
+      icon: Layers,
+      color: 'text-neonEmerald'
+    },
+    {
+      title: 'Real-Time Collaboration',
+      desc: 'Sync content pipelines instantly, host video huddles, review asset changes, and secure your IP in our agreement vault.',
+      icon: Award,
+      color: 'text-crispAmber'
+    }
+  ];
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,11 +66,12 @@ export const LandingScreen = ({ onLogin }: LandingScreenProps) => {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      // Determine user privilege: If user signs up as Platform Admin or Admin, give them admin roles
       const systemRole = name.toLowerCase().includes('founder') || name.toLowerCase().includes('admin') || name === 'Botla Veerendra' || name === 'Macha Praveen' ? 'PLATFORM_ADMIN' : 'CREATOR';
       onLogin({ displayName: name || 'Collaborator', role: systemRole });
     }, 1000);
   };
+
+  const CurrentOnboardIcon = onboardingSlides[onboardingStep].icon;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 cyber-bg relative text-left">
@@ -53,17 +79,22 @@ export const LandingScreen = ({ onLogin }: LandingScreenProps) => {
       <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-accentBlue/10 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-neonEmerald/10 rounded-full blur-3xl pointer-events-none"></div>
 
+      {/* Main Authentication Card */}
       <div className="w-full max-w-md glass-panel rounded-2xl p-8 border border-divider shadow-glass z-10 transition-all duration-300">
         <div className="text-center mb-8">
           <div className="inline-flex p-3 bg-gradient-to-tr from-accentBlue to-neonEmerald rounded-2xl mb-4 shadow-lg animate-pulse">
             <Bolt className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-white mb-2">
+          <h1 className="text-3xl font-black tracking-tight text-white mb-1">
             CREATOR CO-OP
           </h1>
-          <p className="text-sm text-textSecondary max-w-xs mx-auto">
-            Secure workspace syndication, analytics, and content pipeline workflows for video creators.
-          </p>
+          <button
+            type="button"
+            onClick={() => setShowOnboarding(true)}
+            className="text-[10px] text-accentBlue font-black uppercase tracking-wider hover:text-white transition"
+          >
+            📖 View Onboarding Slideshow
+          </button>
         </div>
 
         {error && (
@@ -76,7 +107,7 @@ export const LandingScreen = ({ onLogin }: LandingScreenProps) => {
           <form onSubmit={handleSendOtp} className="space-y-5">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-textSecondary mb-2">
-                Carrier Verification
+                Carrier Verification (SMS Auth)
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-textMuted text-sm">
@@ -171,6 +202,69 @@ export const LandingScreen = ({ onLogin }: LandingScreenProps) => {
           Co-Op Platform • Founder: Botla Veerendra • Co-Founder: Macha Praveen
         </div>
       </div>
+
+      {/* Onboarding Dialog Walkthrough Overlay (OnboardingScreen parity) */}
+      {showOnboarding && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-md bg-surface border border-divider rounded-2xl p-6 text-center space-y-6">
+            <div className="flex justify-between items-center pb-2 border-b border-divider">
+              <span className="text-[10px] font-bold text-textMuted uppercase tracking-wider">ONBOARDING PRESETS</span>
+              <button
+                type="button"
+                onClick={() => setShowOnboarding(false)}
+                className="text-xs text-textMuted hover:text-white font-bold"
+              >
+                Close ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="inline-flex p-4 bg-surfaceLight border border-divider rounded-xl">
+                <CurrentOnboardIcon className={`w-8 h-8 ${onboardingSlides[onboardingStep].color}`} />
+              </div>
+              <h2 className="text-lg font-black text-white">{onboardingSlides[onboardingStep].title}</h2>
+              <p className="text-xs text-textSecondary leading-relaxed">{onboardingSlides[onboardingStep].desc}</p>
+            </div>
+
+            <div className="flex justify-between items-center pt-4 border-t border-divider">
+              <span className="text-xs font-bold text-textMuted">
+                Step {onboardingStep + 1} of {onboardingSlides.length}
+              </span>
+              <div className="flex gap-2">
+                {onboardingStep > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingStep(prev => prev - 1)}
+                    className="px-3 py-1 bg-surfaceLight border border-divider text-xs rounded hover:text-white"
+                  >
+                    Back
+                  </button>
+                )}
+                {onboardingStep < onboardingSlides.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingStep(prev => prev + 1)}
+                    className="px-4 py-1 bg-accentBlue text-background text-xs font-black rounded hover:bg-accentBlue/90"
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnboardingStep(0);
+                      setShowOnboarding(false);
+                    }}
+                    className="px-4 py-1 bg-neonEmerald text-background text-xs font-black rounded hover:bg-neonEmerald/90"
+                  >
+                    Finish Onboarding
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
