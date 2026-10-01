@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, Search, CheckCheck, FolderPlus, ArrowLeft } from 'lucide-react';
+import { dbService, DirectMessage } from '../dbService';
 
 interface Creator {
   id: string;
@@ -11,17 +12,12 @@ interface Creator {
   unread: number;
 }
 
-interface ChatMessage {
-  id: string;
-  senderId: string;
-  text: string;
-  timestamp: string;
-}
-
 export const DirectMessagesScreen: React.FC = () => {
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   
   const [creators, setCreators] = useState<Creator[]>([
     { id: '1', name: 'Alex Mercer', username: 'alex_tech', avatar: 'Alex', online: true, lastMsg: 'Storyboards are looking incredible!', unread: 1 },
@@ -30,78 +26,73 @@ export const DirectMessagesScreen: React.FC = () => {
     { id: '4', name: 'David Miller', username: 'miller_cine', avatar: 'David', online: true, lastMsg: 'Can we schedule a fast sync?', unread: 2 },
   ]);
 
-  const [chats, setChats] = useState<{ [creatorId: string]: ChatMessage[] }>({
-    '1': [
-      { id: '1', senderId: '1', text: "Hey! Did you have a chance to look at the intro hook edits?", timestamp: '10:30 AM' },
-      { id: '2', senderId: 'me', text: "Yes! The pacing looks excellent. Let's make sure the audio drop matches the zoom.", timestamp: '10:32 AM' },
-      { id: '3', senderId: '1', text: "Awesome. Storyboards are looking incredible!", timestamp: '10:33 AM' },
-    ],
-    '2': [
-      { id: '1', senderId: '2', text: "The Blender render is 95% done.", timestamp: 'Yesterday' },
-      { id: '2', senderId: 'me', text: "Perfect! Post the draft link in the Content Pipeline stage once it's complete.", timestamp: 'Yesterday' },
-    ],
-  });
+  // Load messages whenever a creator is selected
+  useEffect(() => {
+    if (!selectedCreator) {
+      setMessages([]);
+      return;
+    }
+
+    const fetchMessages = async () => {
+      setIsLoading(true);
+      const data = await dbService.getDirectMessages(selectedCreator.id);
+      setMessages(data);
+      setIsLoading(false);
+    };
+
+    fetchMessages();
+  }, [selectedCreator]);
 
   const messageEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [selectedCreator, chats]);
+  }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !selectedCreator) return;
 
-    const newMsg: ChatMessage = {
-      id: Date.now().toString(),
-      senderId: 'me',
-      text: inputText.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    // Update messages
-    const creatorId = selectedCreator.id;
-    setChats(prev => ({
-      ...prev,
-      [creatorId]: [...(prev[creatorId] || []), newMsg]
-    }));
-
+    const trimmedText = inputText.trim();
     setInputText('');
 
-    // Simulate real-time creator reply after a short delay
-    setTimeout(() => {
-      const replyMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        senderId: creatorId,
-        text: `⚡ RECEIVED CO-OP DISPATCH: Thanks for syncing! I've logged this to our milestone workspace. Let's do a huddle call later.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
+    // Append instantly to state for snappy UI
+    const tempMsg: DirectMessage = {
+      id: `temp_${Date.now()}`,
+      senderId: 'me',
+      recipientId: selectedCreator.id,
+      text: trimmedText,
+      createdAt: Date.now()
+    };
+    setMessages(prev => [...prev, tempMsg]);
 
-      setChats(prev => ({
-        ...prev,
-        [creatorId]: [...(prev[creatorId] || []), replyMsg]
-      }));
+    // Save to database/Supabase
+    const savedMsg = await dbService.sendDirectMessage('me', selectedCreator.id, trimmedText);
+    
+    // Replace temp with saved msg
+    setMessages(prev => prev.map(m => m.id === tempMsg.id ? savedMsg : m));
+
+    // Update last message in sidebar
+    setCreators(prev => prev.map(c => c.id === selectedCreator.id ? { ...c, lastMsg: trimmedText } : c));
+
+    // Simulate real-time creator reply after a short delay for interactive sandbox
+    setTimeout(async () => {
+      const botReplyText = `⚡ RECEIVED CO-OP DISPATCH: Thanks for syncing! I've logged this to our milestone workspace. Let's do a huddle call later.`;
+      
+      const botMsg = await dbService.sendDirectMessage(selectedCreator.id, 'me', botReplyText);
+      setMessages(prev => [...prev, botMsg]);
 
       // Update last message in sidebar
-      setCreators(prev => prev.map(c => c.id === creatorId ? { ...c, lastMsg: replyMsg.text } : c));
+      setCreators(prev => prev.map(c => c.id === selectedCreator.id ? { ...c, lastMsg: botReplyText } : c));
     }, 1500);
   };
 
-  const sendWorkspaceInvite = () => {
+  const sendWorkspaceInvite = async () => {
     if (!selectedCreator) return;
     const inviteText = `📌 WORKSPACE INVITE: Hey @${selectedCreator.username}, I'd like to invite you to collaborate on our active milestone workspace! Click here to accept.`;
     
-    const newMsg: ChatMessage = {
-      id: Date.now().toString(),
-      senderId: 'me',
-      text: inviteText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setChats(prev => ({
-      ...prev,
-      [selectedCreator.id]: [...(prev[selectedCreator.id] || []), newMsg]
-    }));
+    const inviteMsg = await dbService.sendDirectMessage('me', selectedCreator.id, inviteText);
+    setMessages(prev => [...prev, inviteMsg]);
   };
 
   const filteredCreators = creators.filter(c => 
@@ -109,8 +100,12 @@ export const DirectMessagesScreen: React.FC = () => {
     c.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
-    <div className="min-h-[80vh] flex flex-col md:flex-row bg-background border border-divider rounded-2xl overflow-hidden shadow-2xl relative text-left select-none">
+    <div className="min-h-[80vh] flex flex-col md:flex-row bg-background border border-divider rounded-2xl overflow-hidden shadow-2xl relative text-left select-none animate-fadeIn">
       {/* Sidebar List */}
       <div className={`w-full md:w-80 bg-surface border-r border-divider flex flex-col ${selectedCreator ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b border-divider space-y-3">
@@ -217,26 +212,33 @@ export const DirectMessagesScreen: React.FC = () => {
 
           {/* Messages Container */}
           <div className="flex-1 p-4 space-y-4 overflow-y-auto max-h-[50vh] md:max-h-none">
-            {(chats[selectedCreator.id] || []).map((msg) => {
-              const isMe = msg.senderId === 'me';
-              return (
-                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-2xl p-3 text-xs space-y-1 ${
-                    isMe 
-                      ? 'bg-accentBlue text-background rounded-tr-none' 
-                      : 'bg-surface border border-divider text-white rounded-tl-none'
-                  }`}>
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                    <div className={`flex justify-end items-center gap-1 text-[8px] ${
-                      isMe ? 'text-background/70' : 'text-textMuted'
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="w-6 h-6 border-2 border-accentBlue border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-[10px] text-textSecondary font-bold">DECRYPTING SECURE COMM CHANNELS...</p>
+              </div>
+            ) : (
+              messages.map((msg) => {
+                const isMe = msg.senderId === 'me';
+                return (
+                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] rounded-2xl p-3 text-xs space-y-1 ${
+                      isMe 
+                        ? 'bg-accentBlue text-background rounded-tr-none' 
+                        : 'bg-surface border border-divider text-white rounded-tl-none'
                     }`}>
-                      <span>{msg.timestamp}</span>
-                      {isMe && <CheckCheck className="w-3 h-3" />}
+                      <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      <div className={`flex justify-end items-center gap-1 text-[8px] ${
+                        isMe ? 'text-background/70' : 'text-textMuted'
+                      }`}>
+                        <span>{formatTime(msg.createdAt)}</span>
+                        {isMe && <CheckCheck className="w-3 h-3" />}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
             <div ref={messageEndRef} />
           </div>
 

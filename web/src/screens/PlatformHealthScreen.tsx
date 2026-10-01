@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, Database, Zap, CheckCircle2, Terminal } from 'lucide-react';
 import { isSupabaseConfigured } from '../supabase';
-
-interface AuditLog {
-  id: string;
-  action: string;
-  timestamp: string;
-  operator: string;
-  status: 'SUCCESS' | 'WARNING' | 'FAILED';
-}
+import { dbService, AuditLog } from '../dbService';
 
 export const PlatformHealthScreen: React.FC = () => {
   const [latency, setLatency] = useState(42);
@@ -19,14 +12,21 @@ export const PlatformHealthScreen: React.FC = () => {
   // Diagnostic states
   const [isRunningAudit, setIsRunningAudit] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([
-    { id: '1', action: 'DATABASE INDEX INTEGRITY VERIFICATION', timestamp: '2026-10-01 10:00:15', operator: 'SRE System', status: 'SUCCESS' },
-    { id: '2', action: 'SQLITE ROOM LEDGER VACUUM COMPRESSION', timestamp: '2026-10-01 09:30:00', operator: 'Founder Botla', status: 'SUCCESS' },
-    { id: '3', action: 'FOREIGN KEY INTEGRITY CONFORMANCE CHECK', timestamp: '2026-10-01 09:00:22', operator: 'Co-Founder Praveen', status: 'SUCCESS' },
-    { id: '4', action: 'SUPABASE STORAGE REGISTRY SYNC AUDIT', timestamp: '2026-10-01 08:15:10', operator: 'SRE Cron', status: 'SUCCESS' },
-  ]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [auditMessage, setAuditMessage] = useState<string | null>(null);
+
+  // Load audit logs from unified dbService
+  useEffect(() => {
+    const fetchLogs = async () => {
+      setIsLoading(true);
+      const data = await dbService.getAuditLogs();
+      setAuditLogs(data);
+      setIsLoading(false);
+    };
+    fetchLogs();
+  }, []);
 
   // Fluctuating real-time telemetry simulator
   useEffect(() => {
@@ -65,15 +65,10 @@ export const PlatformHealthScreen: React.FC = () => {
     setAuditMessage(null);
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    const newLog: AuditLog = {
-      id: Date.now().toString(),
-      action: 'MANUAL LEDGER RELATION INTEGRITY AUDIT',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      operator: 'Platform Admin',
-      status: 'SUCCESS'
-    };
+    const actionText = 'MANUAL LEDGER RELATION INTEGRITY AUDIT';
+    const savedLog = await dbService.addAuditLog(actionText, 'Platform Admin');
 
-    setAuditLogs(prev => [newLog, ...prev]);
+    setAuditLogs(prev => [savedLog, ...prev]);
     setIsRunningAudit(false);
     setAuditMessage('✅ DATABASE AUDIT PASSED: All 18 relation tables verified with 0 null keys!');
   };
@@ -83,15 +78,10 @@ export const PlatformHealthScreen: React.FC = () => {
     setAuditMessage(null);
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    const newLog: AuditLog = {
-      id: Date.now().toString(),
-      action: 'SQLITE COMPRESSION & VACUUM RE-INDEX',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      operator: 'Platform Admin',
-      status: 'SUCCESS'
-    };
+    const actionText = 'SQLITE COMPRESSION & VACUUM RE-INDEX';
+    const savedLog = await dbService.addAuditLog(actionText, 'Platform Admin');
 
-    setAuditLogs(prev => [newLog, ...prev]);
+    setAuditLogs(prev => [savedLog, ...prev]);
     setIsOptimizing(false);
     setAuditMessage('⚡ OPTIMIZATION COMPLETE: Compacted SQLite indices. Disk IO performance enhanced by +14.2%!');
   };
@@ -216,28 +206,35 @@ export const PlatformHealthScreen: React.FC = () => {
         </h3>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="border-b border-divider text-textMuted uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-4 font-bold">Action / Trigger</th>
-                <th className="py-3 px-4 font-bold">Timestamp</th>
-                <th className="py-3 px-4 font-bold">Operator</th>
-                <th className="py-3 px-4 font-bold text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-divider/50 font-mono text-[11px]">
-              {auditLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-surfaceLight/40 transition">
-                  <td className="py-3 px-4 font-bold text-white uppercase">{log.action}</td>
-                  <td className="py-3 px-4 text-textSecondary">{log.timestamp}</td>
-                  <td className="py-3 px-4 text-textSecondary">{log.operator}</td>
-                  <td className="py-3 px-4 text-right">
-                    <span className="text-neonEmerald font-black">PASSED</span>
-                  </td>
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="w-6 h-6 border-2 border-accentBlue border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-xs text-textSecondary font-bold">FETCHING SRE DIAGNOSTIC AUDIT LOGS...</p>
+            </div>
+          ) : (
+            <table className="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr className="border-b border-divider text-textMuted uppercase tracking-wider text-[10px]">
+                  <th className="py-3 px-4 font-bold">Action / Trigger</th>
+                  <th className="py-3 px-4 font-bold">Timestamp</th>
+                  <th className="py-3 px-4 font-bold">Operator</th>
+                  <th className="py-3 px-4 font-bold text-right">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-divider/50 font-mono text-[11px]">
+                {auditLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-surfaceLight/40 transition">
+                    <td className="py-3 px-4 font-bold text-white uppercase">{log.action}</td>
+                    <td className="py-3 px-4 text-textSecondary">{log.timestamp}</td>
+                    <td className="py-3 px-4 text-textSecondary">{log.operator}</td>
+                    <td className="py-3 px-4 text-right">
+                      <span className="text-neonEmerald font-black">PASSED</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
