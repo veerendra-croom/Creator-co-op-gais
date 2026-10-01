@@ -9,6 +9,12 @@ import { PremiumSubscriptionScreen } from './screens/PremiumSubscriptionScreen';
 import { WorkspaceHub } from './screens/WorkspaceHub';
 import { CreatorCommonsScreen } from './screens/CreatorCommonsScreen';
 import { AnalyticsDashboardScreen } from './screens/AnalyticsDashboardScreen';
+import { VideoHuddleScreen } from './screens/VideoHuddleScreen';
+import { FounderCrmScreen } from './screens/FounderCrmScreen';
+import { PlatformHealthScreen } from './screens/PlatformHealthScreen';
+import { EditProfileScreen } from './screens/EditProfileScreen';
+import { DirectMessagesScreen } from './screens/DirectMessagesScreen';
+import { LegalScreen } from './screens/LegalScreen';
 import {
   Bolt,
   LayoutDashboard,
@@ -22,7 +28,12 @@ import {
   X,
   FolderOpen,
   MessageSquare,
-  TrendingUp
+  TrendingUp,
+  Video,
+  Users,
+  Activity,
+  User,
+  Scale
 } from 'lucide-react';
 
 type ScreenID = 
@@ -34,11 +45,18 @@ type ScreenID =
   | 'PREMIUM'
   | 'WORKSPACE_HUB'
   | 'CREATOR_COMMONS'
-  | 'ANALYTICS';
+  | 'ANALYTICS'
+  | 'VIDEO_HUDDLE'
+  | 'FOUNDER_CRM'
+  | 'PLATFORM_HEALTH'
+  | 'EDIT_PROFILE'
+  | 'DIRECT_MESSAGES'
+  | 'LEGAL';
 
 interface User {
   displayName: string;
   role: string;
+  email: string;
 }
 
 const App: React.FC = () => {
@@ -58,6 +76,12 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     setCurrentScreen('DASHBOARD');
+  };
+
+  const handleProfileSave = (updatedUser: { displayName: string; role: string; email: string }) => {
+    if (currentUser) {
+      setCurrentUser(updatedUser);
+    }
   };
 
   if (!currentUser) {
@@ -85,6 +109,18 @@ const App: React.FC = () => {
         return <CreatorCommonsScreen />;
       case 'ANALYTICS':
         return <AnalyticsDashboardScreen />;
+      case 'VIDEO_HUDDLE':
+        return <VideoHuddleScreen />;
+      case 'FOUNDER_CRM':
+        return <FounderCrmScreen />;
+      case 'PLATFORM_HEALTH':
+        return <PlatformHealthScreen />;
+      case 'EDIT_PROFILE':
+        return <EditProfileScreen initialUser={currentUser} onSave={handleProfileSave} />;
+      case 'DIRECT_MESSAGES':
+        return <DirectMessagesScreen />;
+      case 'LEGAL':
+        return <LegalScreen />;
       default:
         return <DashboardScreen />;
     }
@@ -94,12 +130,18 @@ const App: React.FC = () => {
     { id: 'DASHBOARD', label: 'Cockpit Dashboard', icon: LayoutDashboard, adminOnly: false },
     { id: 'WORKSPACE_HUB', label: 'Workspace Hub', icon: FolderOpen, adminOnly: false },
     { id: 'CONTENT_PIPELINE', label: 'Content Pipeline', icon: Film, adminOnly: false },
+    { id: 'DIRECT_MESSAGES', label: 'Direct Messages', icon: MessageSquare, adminOnly: false },
+    { id: 'VIDEO_HUDDLE', label: 'Video Huddle', icon: Video, adminOnly: false },
     { id: 'SYNDICATE', label: 'Syndicate Treasury', icon: Users2, adminOnly: false },
     { id: 'CREATOR_COMMONS', label: 'Creator Commons', icon: MessageSquare, adminOnly: false },
     { id: 'ANALYTICS', label: 'KPI Telemetry', icon: TrendingUp, adminOnly: false },
     { id: 'PREMIUM', label: 'Creator Premium', icon: Gem, adminOnly: false },
+    { id: 'EDIT_PROFILE', label: 'Manage Identity', icon: User, adminOnly: false },
     { id: 'SUPPORT_CENTER', label: 'SLA Support', icon: HelpCircle, adminOnly: false },
-    { id: 'FOUNDER_COMMAND', label: 'Founder Command', icon: Terminal, adminOnly: true }
+    { id: 'LEGAL', label: 'Legal Center', icon: Scale, adminOnly: false },
+    { id: 'FOUNDER_COMMAND', label: 'Founder Command', icon: Terminal, adminOnly: true },
+    { id: 'FOUNDER_CRM', label: 'Founder CRM', icon: Users, adminOnly: true },
+    { id: 'PLATFORM_HEALTH', label: 'SRE Telemetry', icon: Activity, adminOnly: true }
   ] as const;
 
   const activeMenuItems = menuItems.filter(item => !item.adminOnly || currentUser.role === 'PLATFORM_ADMIN');

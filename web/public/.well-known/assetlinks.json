@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aistudio.creatorcoop",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:83:C5:E0:14:D0:6B:AA:6C:58:63:F1:C9:92:B5:1A:DE:54:E5:6C:EA:9E:2B:51:AD:E5:4E:56:CE:A9"
+      ]
+    }
+  }
+]
