@@ -197,11 +197,45 @@ fun TaskDetailsDialog(
                             Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate Task", tint = Color.White)
                         }
 
-                        // Archive Toggle
+                        // Delete Task Action with Confirmation
+                        var showConfirmDeleteTaskDialog by remember { mutableStateOf(false) }
+
+                        if (showConfirmDeleteTaskDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showConfirmDeleteTaskDialog = false },
+                                containerColor = SurfaceColor,
+                                shape = RoundedCornerShape(16.dp),
+                                title = { Text("Delete Task?", color = Color.White, fontWeight = FontWeight.Bold) },
+                                text = {
+                                    Text(
+                                        "Are you sure you want to permanently delete \"${task.title}\"? This action cannot be undone.",
+                                        color = TextSecondary,
+                                        fontSize = 13.sp
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            viewModel.deleteTask(task.id, userId)
+                                            showConfirmDeleteTaskDialog = false
+                                            onDismiss()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                                    ) {
+                                        Text("DELETE", fontWeight = FontWeight.Bold)
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showConfirmDeleteTaskDialog = false }) {
+                                        Text("CANCEL", color = TextSecondary)
+                                    }
+                                }
+                            )
+                        }
+
                         IconButton(
                             onClick = {
-                                viewModel.deleteTask(task.id, userId)
-                                onDismiss()
+                                showConfirmDeleteTaskDialog = true
                             }
                         ) {
                             Icon(

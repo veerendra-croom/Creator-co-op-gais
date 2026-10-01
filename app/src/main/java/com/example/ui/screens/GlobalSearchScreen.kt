@@ -68,7 +68,7 @@ fun GlobalSearchScreen(
     val application = LocalContext.current.applicationContext as CreatorCoopApp
     val repository = remember { application.container.repository }
 
-    val currentUserId = userProfile?.id ?: "DemoUser"
+    val currentUserId = userProfile?.id.orEmpty()
     val savedSearchesFromDb by globalViewModel.getSavedSearchesForUser(currentUserId).collectAsState(initial = emptyList())
     val blockedUserIds by globalViewModel.blockedUsers.collectAsState(initial = emptySet())
 

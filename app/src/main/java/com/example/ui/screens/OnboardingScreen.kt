@@ -36,8 +36,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun OnboardingScreen(
     globalViewModel: com.example.ui.viewmodels.GlobalViewModel,
-    onComplete: () -> Unit,
-    onLaunchDemo: (() -> Unit)? = null
+    onComplete: () -> Unit
 ) {
     val dbSlides by globalViewModel.onboardingSlides.collectAsState()
     val scope = rememberCoroutineScope()
@@ -135,54 +134,18 @@ fun OnboardingScreen(
                     )
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Skip Button
+                TextButton(
+                    onClick = onComplete,
+                    modifier = Modifier.testTag("onboarding_skip_button")
                 ) {
-                    // Demo Mode Quick Action Button
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = NeonEmerald.copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, NeonEmerald),
-                        modifier = Modifier
-                            .clickable {
-                                if (onLaunchDemo != null) {
-                                    onLaunchDemo()
-                                } else {
-                                    onComplete()
-                                    globalViewModel.replayTour("guest", "dashboard_tour")
-                                }
-                            }
-                            .testTag("onboarding_top_demo_button")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Demo", tint = NeonEmerald, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "DEMO",
-                                color = NeonEmerald,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    // Skip Button
-                    TextButton(
-                        onClick = onComplete,
-                        modifier = Modifier.testTag("onboarding_skip_button")
-                    ) {
-                        Text(
-                            text = "SKIP",
-                            color = AccentBlue,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            letterSpacing = 1.sp
-                        )
-                    }
+                    Text(
+                        text = "SKIP",
+                        color = AccentBlue,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
         },
@@ -267,35 +230,6 @@ fun OnboardingScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Prominent Live Demo Launcher from bottom bar
-                OutlinedButton(
-                    onClick = {
-                        if (onLaunchDemo != null) {
-                            onLaunchDemo()
-                        } else {
-                            onComplete()
-                            globalViewModel.replayTour("guest", "dashboard_tour")
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .testTag("onboarding_launch_tour_button"),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.6f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Explore, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "🚀 Launch Full Platform Interactive Demo",
-                        color = NeonEmerald,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 11.5.sp
-                    )
-                }
-                
                 Spacer(modifier = Modifier.height(10.dp))
                 Text("Created by Founder Botla Veerendra & Co-Founder Macha Praveen", color = TextSecondary, fontSize = 9.sp)
             }

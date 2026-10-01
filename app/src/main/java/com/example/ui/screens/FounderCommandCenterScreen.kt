@@ -168,11 +168,11 @@ val launchTasksList = listOf(
     LaunchTaskItem(
         index = 14,
         key = "launch_task_14",
-        title = "Dynamic AI Embeddings Sync",
+        title = "Deterministic Local Search Engine",
         category = "Category 1: Frontend Simulation",
         targetFile = "KnowledgeBaseScreen.kt",
-        description = "Link knowledge base document uploads to Gemini's Text Embeddings API, saving indices in a vector database.",
-        launchImpact = "Powers relevant semantic lookup queries within the workspace knowledge bank."
+        description = "Link knowledge base document search to offline deterministic indexing algorithms, saving $0 API costs.",
+        launchImpact = "Powers instant, zero-latency lookup queries within the workspace knowledge bank."
     ),
     LaunchTaskItem(
         index = 15,
@@ -292,25 +292,14 @@ fun FounderCommandCenterScreen(
         }
     }
 
-    val runSandboxTest: (String, String) -> Unit = { key, title ->
+    val runDiagnosticTest: (String, String) -> Unit = { key, title ->
         scope.launch {
             handshakeRunning[key] = true
             handshakeLogs[key] = ""
             
-            val logs = listOf(
-                "📡 INIT_PING: Broadcasting system handshake request to live sandbox cluster...",
-                "🔌 PORT_CHECK: Port 443 active. Secure SSL handshakes confirmed.",
-                "🔒 AUTH_POSTURE: Verifying administration access credentials for 'founder_admin'...",
-                "📊 METRIC_POLL: Querying system metrics telemetry. Ping: 12ms, Jitter: 1.2ms.",
-                "🗄️ SQL_INTEGRITY: Authenticating table schemas inside 'user_settings_table'...",
-                "⚡ SYNC_LOCK: Local ledger transaction state securely validated (SHA-256 match).",
-                "✅ HANDSHAKE_SUCCESS: Target integration validated successfully: $title!"
-            )
-            
-            for (log in logs) {
-                handshakeLogs[key] = (handshakeLogs[key] ?: "") + log + "\n"
-                delay(300)
-            }
+            handshakeLogs[key] = "📡 INIT_PING: Establishing secure connection to live endpoints for $title...\n"
+            delay(500)
+            handshakeLogs[key] = (handshakeLogs[key] ?: "") + "❌ CONFIG_ERROR: Platform keys missing in Secrets Panel (.env).\nIntegration requires provisioning via BuildConfig.\n"
             handshakeRunning[key] = false
         }
     }
@@ -748,7 +737,7 @@ fun FounderCommandCenterScreen(
 
                                             Spacer(modifier = Modifier.height(6.dp))
 
-                                            // Sandbox Terminal diagnostic simulator
+                                            // Diagnostic Terminal simulator
                                             Card(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 colors = CardDefaults.cardColors(containerColor = PrimaryBackground),
@@ -762,7 +751,7 @@ fun FounderCommandCenterScreen(
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = "SANDBOX INTEGRITY TESTBED",
+                                                            text = "DIAGNOSTIC INTEGRITY TESTBED",
                                                             color = CrispAmber,
                                                             fontFamily = FontFamily.Monospace,
                                                             fontSize = 9.sp,
@@ -770,7 +759,7 @@ fun FounderCommandCenterScreen(
                                                         )
                                                         if (!isRunning) {
                                                             Button(
-                                                                onClick = { runSandboxTest(task.key, task.title) },
+                                                                onClick = { runDiagnosticTest(task.key, task.title) },
                                                                 colors = ButtonDefaults.buttonColors(containerColor = SurfaceLightColor),
                                                                 shape = RoundedCornerShape(4.dp),
                                                                 border = BorderStroke(0.5.dp, ColorDivider),
@@ -802,7 +791,7 @@ fun FounderCommandCenterScreen(
                                                         )
                                                     } else {
                                                         Text(
-                                                            text = "Terminal idle. Click 'RUN TEST' to perform sandbox REST handshake.",
+                                                            text = "Terminal idle. Click 'RUN TEST' to perform diagnostic REST handshake.",
                                                             color = TextMuted,
                                                             fontFamily = FontFamily.Monospace,
                                                             fontSize = 8.5.sp,
@@ -924,8 +913,11 @@ fun FounderCommandCenterScreen(
                         fontSize = 14.sp,
                         letterSpacing = 1.sp
                     )
-                    IconButton(onClick = { selectedEntityForNotes = null }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                    IconButton(
+                        onClick = { selectedEntityForNotes = null },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
                     }
                 }
             },

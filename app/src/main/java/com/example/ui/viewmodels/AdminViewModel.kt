@@ -412,15 +412,16 @@ class AdminViewModel constructor(
         viewModelScope.launch {
             if (!verifyAdminAccess(adminId)) return@launch
             val newOverride = !flag.globalOverrideEnabled
-            val isOverallActive = newOverride && (flag.organizerEnabled || flag.participantEnabled)
             val updated = flag.copy(
                 globalOverrideEnabled = newOverride,
-                isEnabled = isOverallActive,
+                isEnabled = newOverride && (flag.organizerEnabled || flag.participantEnabled),
+                organizerEnabled = if (!newOverride) false else flag.organizerEnabled,
+                participantEnabled = if (!newOverride) false else flag.participantEnabled,
                 lastModifiedByAdminId = adminId,
                 lastModifiedAt = System.currentTimeMillis()
             )
             repository.updateFeatureFlag(updated, adminId, reason)
-            _toastMessage.value = "Flag '${flag.flagKey}' master switch updated."
+            _toastMessage.value = "Flag '${flag.flagKey}' master switch ${if (newOverride) "ENABLED" else "KILLED and cascaded"}."
         }
     }
 
@@ -434,10 +435,12 @@ class AdminViewModel constructor(
     ) {
         viewModelScope.launch {
             if (!verifyAdminAccess(adminId)) return@launch
-            val isOverallActive = globalOverrideEnabled && (organizerEnabled || participantEnabled)
+            val effectiveOrg = if (globalOverrideEnabled) organizerEnabled else false
+            val effectivePart = if (globalOverrideEnabled) participantEnabled else false
+            val isOverallActive = globalOverrideEnabled && (effectiveOrg || effectivePart)
             val updated = flag.copy(
-                organizerEnabled = organizerEnabled,
-                participantEnabled = participantEnabled,
+                organizerEnabled = effectiveOrg,
+                participantEnabled = effectivePart,
                 globalOverrideEnabled = globalOverrideEnabled,
                 isEnabled = isOverallActive,
                 lastModifiedByAdminId = adminId,

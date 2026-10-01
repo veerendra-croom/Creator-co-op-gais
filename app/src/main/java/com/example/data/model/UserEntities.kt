@@ -48,3 +48,15 @@ data class UserSetting(
     val key: String,
     val value: String
 )
+
+@Serializable
+@Entity(tableName = "personal_notes")
+data class PersonalNote(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val title: String,
+    val content: String,
+    val category: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+

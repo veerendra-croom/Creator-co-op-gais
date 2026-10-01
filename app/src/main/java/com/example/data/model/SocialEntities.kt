@@ -55,3 +55,14 @@ data class Endorsement(
     val comment: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Serializable
+@Entity(tableName = "community_likes", indices = [Index(value = ["userId", "postId", "interactionType"], unique = true)])
+data class CommunityLikeEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val postId: String,
+    val interactionType: String, // "LIKE", "SAVE", "REPOST"
+    val timestamp: Long = System.currentTimeMillis()
+)
+

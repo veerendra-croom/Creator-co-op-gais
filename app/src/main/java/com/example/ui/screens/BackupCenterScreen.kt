@@ -257,7 +257,7 @@ fun BackupCenterScreen(
                 actionTaken = "BACKUP_DELETED",
                 targetType = "SYSTEM",
                 targetId = id,
-                reason = "State snapshot metadata pruned from device sandbox history.",
+                reason = "State snapshot metadata pruned from device history.",
                 createdAt = System.currentTimeMillis()
             )
             repository.insertAuditLog(log)

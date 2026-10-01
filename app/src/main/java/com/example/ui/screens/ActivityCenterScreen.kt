@@ -38,59 +38,16 @@ fun ActivityCenterScreen(
 ) {
     val application = LocalContext.current.applicationContext as com.example.CreatorCoopApp
     val repository = remember { application.container.repository }
-    val currentUserId = userProfile?.id ?: "DemoUser"
+    val currentUserId = userProfile?.id.orEmpty()
 
     val auditLogs by repository.getAllUserAuditLogsFlow().collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
 
     // Filter logs for this user
     val userLogs = remember(auditLogs, currentUserId) {
-        auditLogs.filter { it.userId == currentUserId || it.targetUserId == currentUserId }
+        if (currentUserId.isBlank()) emptyList()
+        else auditLogs.filter { it.userId == currentUserId || it.targetUserId == currentUserId }
             .sortedByDescending { it.createdAt }
-    }
-
-    // Auto-seed default logs if the audit list is empty for this user
-    LaunchedEffect(currentUserId, auditLogs) {
-        val isTestEnv = try {
-            Class.forName("org.robolectric.Robolectric") != null
-        } catch (e: Throwable) {
-            false
-        }
-        if (isTestEnv) {
-            val userSpecificLogs = auditLogs.filter { it.userId == currentUserId || it.targetUserId == currentUserId }
-            if (userSpecificLogs.isEmpty()) {
-                repository.insertUserAuditLog(
-                    UserAuditLog(
-                        id = "seed_act_1_$currentUserId",
-                        userId = currentUserId,
-                        action = "WORKSPACE_CREATED",
-                        actionTaken = "Created workspace 'Apex Design Group'",
-                        reason = "Initial production team setup for Q3 deliverables",
-                        createdAt = System.currentTimeMillis() - 3600000 * 4 // 4 hours ago
-                    )
-                )
-                repository.insertUserAuditLog(
-                    UserAuditLog(
-                        id = "seed_act_2_$currentUserId",
-                        userId = currentUserId,
-                        action = "ROLE_ASSIGNED",
-                        actionTaken = "Assigned 'Lead Motion Designer' role",
-                        reason = "Syndicate verification matching completed",
-                        createdAt = System.currentTimeMillis() - 3600000 * 2 // 2 hours ago
-                    )
-                )
-                repository.insertUserAuditLog(
-                    UserAuditLog(
-                        id = "seed_act_3_$currentUserId",
-                        userId = currentUserId,
-                        action = "CONTRACT_LOCKED",
-                        actionTaken = "Locked agreement milestone #1",
-                        reason = "Escrow funded with security handshake complete",
-                        createdAt = System.currentTimeMillis() - 600000 // 10 mins ago
-                    )
-                )
-            }
-        }
     }
 
     Column(

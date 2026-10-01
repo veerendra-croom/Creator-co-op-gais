@@ -1,15 +1,22 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -26,9 +33,15 @@ fun ReferFriendDialog(
     globalViewModel: GlobalViewModel,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var friendCode by remember { mutableStateOf("") }
     val referralsCount by remember(userProfile.id) { globalViewModel.getSuccessfulReferralCount(userProfile.id) }.collectAsState(initial = 0)
     
+    val activeCode = remember(userProfile.referralCode, userProfile.id) {
+        userProfile.referralCode?.takeIf { it.isNotBlank() } ?: ("REF" + userProfile.id.take(6).uppercase())
+    }
+    val referralLink = "https://creatorcoop.com/join?ref=$activeCode"
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             color = SurfaceColor,
@@ -64,34 +77,90 @@ fun ReferFriendDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = userProfile.referralCode?.ifEmpty { "Generating..." } ?: "Generating...",
+                            text = activeCode,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             modifier = Modifier.testTag("my_referral_code")
                         )
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = "Share",
-                            tint = AccentBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Referral Code", activeCode))
+                                    Toast.makeText(context, "Referral Code Copied!", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Copy Code",
+                                    tint = AccentBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_SUBJECT, "Join me on Creator Co-Op")
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            "Join my creative crew on Creator Co-Op! Use my referral link: $referralLink (Code: $activeCode) to claim 7 days Premium extension."
+                                        )
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share Referral Link"))
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = "Share",
+                                    tint = NeonEmerald,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("Referral Link", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentBlue)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "https://creatorcoop.com/join?ref=${userProfile.referralCode}",
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    modifier = Modifier.testTag("referral_link")
-                )
+                Surface(
+                    color = PrimaryBackground.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = referralLink,
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f).testTag("referral_link")
+                        )
+                        IconButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Referral Link", referralLink))
+                                Toast.makeText(context, "Referral Link Copied!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Link", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
                 HorizontalDivider(color = ColorDivider)

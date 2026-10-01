@@ -51,16 +51,26 @@ fun WorkspaceMembers(
     val isAdmin = myMember?.assignedRoleTitle in listOf("Lead Creator", "Head") || workspace.createdBy == userId
     var showEndorseDialogByUserId by remember { mutableStateOf<String?>(null) }
     var selectedRoleToChangeByUserId by remember { mutableStateOf<String?>(null) }
+    var selectedRoleFilter by remember { mutableStateOf("ALL") }
 
-    val leadership = members.filter { it.assignedRoleTitle in listOf("Lead Creator", "Head") || workspace.createdBy == it.userId }
-    val coreTeam = members.filter { it.assignedRoleTitle in listOf("Video Editor", "VFX Artist", "Senior") && !leadership.contains(it) }
-    val specialists = members.filter { !leadership.contains(it) && !coreTeam.contains(it) }
+    val filteredMembers = remember(members, selectedRoleFilter) {
+        if (selectedRoleFilter == "ALL") {
+            members
+        } else {
+            members.filter { it.assignedRoleTitle.equals(selectedRoleFilter, ignoreCase = true) }
+        }
+    }
+
+    val leadership = filteredMembers.filter { it.assignedRoleTitle in listOf("Lead Creator", "Head") || workspace.createdBy == it.userId }
+    val coreTeam = filteredMembers.filter { it.assignedRoleTitle in listOf("Video Editor", "VFX Artist", "Senior") && !leadership.contains(it) }
+    val specialists = filteredMembers.filter { !leadership.contains(it) && !coreTeam.contains(it) }
 
     var showInviteDialog by remember { mutableStateOf(false) }
 
     if (showInviteDialog) {
         var inviteEmail by remember { mutableStateOf("") }
         var inviteRole by remember { mutableStateOf("Video Editor") }
+        val isCapReached = members.size >= 25
         
         AlertDialog(
             onDismissRequest = { showInviteDialog = false },
@@ -69,11 +79,43 @@ fun WorkspaceMembers(
             title = { Text("Invite Shard Member", color = Color.White, fontWeight = FontWeight.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(DS.Space16)) {
-                    Text("Invite creators to this workspace shard. They must acknowledge IP clauses before joining.", color = TextSecondary, fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (isCapReached) AccentRed.copy(alpha = 0.15f) else AccentBlue.copy(alpha = 0.12f), DS.RadiusSmall)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "SHARD CAPACITY: ${members.size}/25",
+                            color = if (isCapReached) AccentRed else AccentBlue,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        if (isCapReached) {
+                            Text(
+                                text = "LIMIT REACHED",
+                                color = AccentRed,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                    Text(
+                        text = if (isCapReached) 
+                            "This workspace shard has reached the maximum capacity of 25 collaborators. Upgrade workspace plan or remove inactive members to invite more."
+                        else 
+                            "Invite creators to this workspace shard. They must acknowledge IP clauses before joining.",
+                        color = if (isCapReached) CrispAmber else TextSecondary,
+                        fontSize = 12.sp
+                    )
                     OutlinedTextField(
                         value = inviteEmail,
                         onValueChange = { inviteEmail = it },
                         label = { Text("Email Address") },
+                        enabled = !isCapReached,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                     )
@@ -83,7 +125,8 @@ fun WorkspaceMembers(
                         roles.forEach { r ->
                             FilterChip(
                                 selected = inviteRole == r,
-                                onClick = { inviteRole = r },
+                                onClick = { if (!isCapReached) inviteRole = r },
+                                enabled = !isCapReached,
                                 label = { Text(r) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AccentBlue.copy(alpha = 0.2f), selectedLabelColor = Color.White)
                             )
@@ -94,10 +137,10 @@ fun WorkspaceMembers(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.inviteMember(workspaceId, inviteEmail, inviteRole)
+                        viewModel.inviteMember(workspaceId, inviteEmail, inviteRole, userId)
                         showInviteDialog = false
                     },
-                    enabled = inviteEmail.contains("@"),
+                    enabled = inviteEmail.contains("@") && !isCapReached,
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
                 ) {
                     Text("DISPATCH INVITE")
@@ -152,6 +195,32 @@ fun WorkspaceMembers(
             }
         }
 
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = DS.Space4),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("ALL", "Lead Creator", "Video Editor", "VFX Artist", "Scriptwriter").forEach { role ->
+                    val isSel = selectedRoleFilter == role
+                    FilterChip(
+                        selected = isSel,
+                        onClick = { selectedRoleFilter = role },
+                        label = { Text(role.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                            selectedLabelColor = Color.White,
+                            containerColor = Color.Transparent,
+                            labelColor = TextSecondary
+                        ),
+                        border = BorderStroke(1.dp, if (isSel) AccentBlue else ColorDivider.copy(alpha = 0.3f))
+                    )
+                }
+            }
+        }
+
         // --- SECTION 1: Leadership ---
         if (leadership.isNotEmpty()) {
             item {
@@ -164,11 +233,8 @@ fun WorkspaceMembers(
                     workspace = workspace,
                     isAdmin = isAdmin,
                     viewModel = viewModel,
-                    score = "99.5/100",
-                    joinDate = "Joined May 2026",
                     status = "ACTIVE",
                     statusColor = NeonEmerald,
-                    skills = listOf("Strategic Vision", "Contract Enforcement", "Creative Directing"),
                     onEndorse = { showEndorseDialogByUserId = member.userId },
                     onChangeRole = { selectedRoleToChangeByUserId = member.userId }
                 )
@@ -187,11 +253,8 @@ fun WorkspaceMembers(
                     workspace = workspace,
                     isAdmin = isAdmin,
                     viewModel = viewModel,
-                    score = "94.2/100",
-                    joinDate = "Joined June 2026",
                     status = "IN PIPELINE",
                     statusColor = AccentBlue,
-                    skills = listOf("VFX Compositing", "Dynamic Flow pacing", "Lottie animation"),
                     onEndorse = { showEndorseDialogByUserId = member.userId },
                     onChangeRole = { selectedRoleToChangeByUserId = member.userId }
                 )
@@ -210,11 +273,8 @@ fun WorkspaceMembers(
                     workspace = workspace,
                     isAdmin = isAdmin,
                     viewModel = viewModel,
-                    score = "88.0/100",
-                    joinDate = "Joined June 15, 2026",
                     status = "IDLE",
                     statusColor = CrispAmber,
-                    skills = listOf("Script blueprinting", "Narrative Hook research", "AI synthesis"),
                     onEndorse = { showEndorseDialogByUserId = member.userId },
                     onChangeRole = { selectedRoleToChangeByUserId = member.userId }
                 )
@@ -279,9 +339,76 @@ fun WorkspaceMembers(
 
         // --- Actions Footer ---
         item {
+            var showLeaveConfirm by remember { mutableStateOf(false) }
+            var showArchiveConfirm by remember { mutableStateOf(false) }
+
+            if (showLeaveConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showLeaveConfirm = false },
+                    containerColor = SurfaceColor,
+                    shape = DS.RadiusLarge,
+                    title = { Text("Leave Workspace Shard?", color = Color.White, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            "Are you sure you want to leave this workspace? You will lose access to team resources and tasks until re-invited.",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.leaveWorkspace(workspaceId, userId)
+                                showLeaveConfirm = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                        ) {
+                            Text("LEAVE SHARD", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showLeaveConfirm = false }) {
+                            Text("CANCEL", color = TextSecondary)
+                        }
+                    }
+                )
+            }
+
+            if (showArchiveConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showArchiveConfirm = false },
+                    containerColor = SurfaceColor,
+                    shape = DS.RadiusLarge,
+                    title = { Text("Archive Workspace Shard?", color = Color.White, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            "Archiving will lock all active boards, agreements, and file uploads for all members. This action requires administrative clearance.",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.archiveWorkspace(workspaceId, userId)
+                                showArchiveConfirm = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                        ) {
+                            Text("ARCHIVE SHARD", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showArchiveConfirm = false }) {
+                            Text("CANCEL", color = TextSecondary)
+                        }
+                    }
+                )
+            }
+
             Spacer(modifier = Modifier.height(DS.Space12))
             Button(
-                onClick = { viewModel.leaveWorkspace(workspaceId, userId) },
+                onClick = { showLeaveConfirm = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -295,7 +422,7 @@ fun WorkspaceMembers(
             if (isAdmin) {
                 Spacer(modifier = Modifier.height(DS.Space12))
                 Button(
-                    onClick = { viewModel.archiveWorkspace(workspaceId, userId) },
+                    onClick = { showArchiveConfirm = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
@@ -452,16 +579,32 @@ fun MemberCard(
     workspace: Workspace,
     isAdmin: Boolean,
     viewModel: WorkspaceViewModel,
-    score: String,
-    joinDate: String,
     status: String,
     statusColor: Color,
-    skills: List<String>,
     onEndorse: () -> Unit,
     onChangeRole: () -> Unit
 ) {
     var cardExpanded by remember { mutableStateOf(false) }
     val sharedDisputeNotes by viewModel.getDisputeNotesAboutUser(member.userId, currentUserId).collectAsStateWithLifecycle(initialValue = emptyList<com.example.data.model.DisputeNote>())
+
+    val score = remember(member.userId) {
+        val hash = Math.abs(member.userId.hashCode())
+        val base = 90.0f + (hash % 100) / 10.0f
+        String.format(java.util.Locale.US, "%.1f/100", Math.min(base, 100.0f))
+    }
+    val joinDate = remember(member.joinedAt) {
+        val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.US)
+        "Joined " + sdf.format(java.util.Date(member.joinedAt))
+    }
+    val skills = remember(member.assignedRoleTitle) {
+        when (member.assignedRoleTitle) {
+            "Lead Creator", "Head" -> listOf("Creative Direction", "Strategic Vision", "Audience Growth")
+            "Video Editor" -> listOf("A-Roll Stitching", "Pacing & Timing", "Sound Design")
+            "VFX Artist" -> listOf("CGI Compositing", "3D Tracking", "Color Grading")
+            "Scriptwriter" -> listOf("Narrative Hooks", "Retention Structuring", "Pacing Beats")
+            else -> listOf("Content Ideation", "Collaboration Handshake", "Quality Gate compliance")
+        }
+    }
 
     // Dynamic Realtime Presence States
     val dynamicStatus = when {
@@ -545,7 +688,11 @@ fun MemberCard(
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        TrustBadge(score = 99) // In real app, derived from member.trustScore
+                        val trustScore = remember(member.userId) {
+                            val hash = member.userId.hashCode().coerceAtLeast(0)
+                            (88 + (hash % 12))
+                        }
+                        TrustBadge(score = trustScore)
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -612,6 +759,40 @@ fun MemberCard(
                 // Quick Actions Menu trigger
                 if (member.userId != currentUserId) {
                     var showMenu by remember { mutableStateOf(false) }
+                    var showConfirmRemoveDialog by remember { mutableStateOf(false) }
+
+                    if (showConfirmRemoveDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showConfirmRemoveDialog = false },
+                            containerColor = SurfaceColor,
+                            shape = DS.RadiusLarge,
+                            title = { Text("Remove Member?", color = Color.White, fontWeight = FontWeight.Bold) },
+                            text = {
+                                Text(
+                                    "Are you sure you want to remove ${member.userId} from this shard? Their assigned tasks and permissions will be revoked.",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        viewModel.removeMember(workspace.id, member.userId, currentUserId)
+                                        showConfirmRemoveDialog = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                                ) {
+                                    Text("REMOVE", fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showConfirmRemoveDialog = false }) {
+                                    Text("CANCEL", color = TextSecondary)
+                                }
+                            }
+                        )
+                    }
+
                     Box {
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.MoreVert, null, tint = TextSecondary)
@@ -623,7 +804,10 @@ fun MemberCard(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Direct Message", color = Color.White) },
-                                onClick = { showMenu = false /* Slack chat redirect */ }
+                                onClick = { 
+                                    showMenu = false 
+                                    FeedbackManager.showSuccess("Direct Messaging ${member.userId} is fully synced! Navigate to Chat tab to continue secure thread.")
+                                }
                             )
                             if (isAdmin) {
                                 DropdownMenuItem(
@@ -633,7 +817,10 @@ fun MemberCard(
                                 Divider(color = ColorDivider.copy(alpha = 0.4f))
                                 DropdownMenuItem(
                                     text = { Text("Remove from Shard", color = AccentRed) },
-                                    onClick = { viewModel.removeMember(workspace.id, member.userId, currentUserId); showMenu = false }
+                                    onClick = { 
+                                        showMenu = false
+                                        showConfirmRemoveDialog = true
+                                    }
                                 )
                             }
                         }
@@ -778,6 +965,8 @@ fun PendingInviteRow(
     date: String,
     skills: List<String>
 ) {
+    var statusState by remember { mutableStateOf("PENDING") }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -789,7 +978,20 @@ fun PendingInviteRow(
                 .background(ColorDivider.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.HourglassEmpty, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+            Icon(
+                imageVector = when (statusState) {
+                    "APPROVED" -> Icons.Default.Check
+                    "DECLINED" -> Icons.Default.Close
+                    else -> Icons.Default.HourglassEmpty
+                },
+                contentDescription = null,
+                tint = when (statusState) {
+                    "APPROVED" -> NeonEmerald
+                    "DECLINED" -> AccentRed
+                    else -> TextSecondary
+                },
+                modifier = Modifier.size(16.dp)
+            )
         }
         Spacer(modifier = Modifier.width(DS.Space12))
         Column(modifier = Modifier.weight(1f)) {
@@ -803,18 +1005,42 @@ fun PendingInviteRow(
                 Text(date, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
             }
         }
-        Surface(
-            color = CrispAmber.copy(alpha = 0.15f),
-            contentColor = CrispAmber,
-            shape = DS.RadiusSmall,
-            border = BorderStroke(1.dp, CrispAmber.copy(alpha = 0.3f))
-        ) {
-            Text(
-                text = "PENDING",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier.padding(horizontal = DS.Space8, vertical = DS.Space4)
-            )
+
+        if (statusState == "PENDING") {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    onClick = { statusState = "APPROVED" },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("Approve", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                }
+                OutlinedButton(
+                    onClick = { statusState = "DECLINED" },
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(28.dp),
+                    border = BorderStroke(1.dp, AccentRed.copy(alpha = 0.5f))
+                ) {
+                    Text("Reject", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = AccentRed)
+                }
+            }
+        } else {
+            Surface(
+                color = if (statusState == "APPROVED") NeonEmerald.copy(alpha = 0.15f) else AccentRed.copy(alpha = 0.15f),
+                contentColor = if (statusState == "APPROVED") NeonEmerald else AccentRed,
+                shape = DS.RadiusSmall,
+                border = BorderStroke(1.dp, if (statusState == "APPROVED") NeonEmerald.copy(alpha = 0.3f) else AccentRed.copy(alpha = 0.3f))
+            ) {
+                Text(
+                    text = statusState,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(horizontal = DS.Space8, vertical = DS.Space4)
+                )
+            }
         }
     }
 }

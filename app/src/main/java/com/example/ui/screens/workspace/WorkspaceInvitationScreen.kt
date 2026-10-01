@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 import com.example.ui.viewmodels.GlobalViewModel
 import com.example.ui.viewmodels.WorkspaceViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun WorkspaceInvitationScreen(
@@ -30,15 +31,62 @@ fun WorkspaceInvitationScreen(
 ) {
     val pendingWsId by globalViewModel.pendingInvitationWorkspaceId.collectAsState()
     val workspaces by workspaceViewModel.workspaces.collectAsState()
+    val scope = rememberCoroutineScope()
     
-    // Fallback or fetched workspace
-    val targetWs = remember(pendingWsId, workspaces) {
-        workspaces.find { it.id == pendingWsId }
+    var inviteCode by remember { mutableStateOf("") }
+    var inviteDetails by remember { mutableStateOf<com.example.data.model.WorkspaceInviteEntity?>(null) }
+    var inviteError by remember { mutableStateOf<String?>(null) }
+    
+    // Automatically prefill if we received a deep link style code in pendingWsId
+    LaunchedEffect(pendingWsId) {
+        if (pendingWsId != null && pendingWsId!!.startsWith("COOP-")) {
+            inviteCode = pendingWsId!!
+        }
+    }
+    
+    // Validate invite code reactively
+    LaunchedEffect(inviteCode) {
+        val trimmed = inviteCode.trim().uppercase()
+        if (trimmed.startsWith("COOP-") && trimmed.length >= 10) {
+            val result = workspaceViewModel.repository.getInviteByCode(trimmed)
+            if (result != null) {
+                // Compute and verify SHA-256 token
+                val digest = java.security.MessageDigest.getInstance("SHA-256").digest(trimmed.toByteArray())
+                val sha256Token = digest.joinToString("") { "%02x".format(it) }
+                
+                if (sha256Token != result.sha256Token) {
+                    inviteError = "Token payload mismatch! Security violation detected."
+                    inviteDetails = null
+                } else if (result.isUsed) {
+                    inviteError = "This invitation code has already been used!"
+                    inviteDetails = null
+                } else if (result.expirationTimestamp < System.currentTimeMillis()) {
+                    inviteError = "This invitation has expired!"
+                    inviteDetails = null
+                } else {
+                    inviteError = null
+                    inviteDetails = result
+                }
+            } else {
+                inviteError = "Invitation code not found in security database."
+                inviteDetails = null
+            }
+        } else {
+            inviteDetails = null
+            inviteError = null
+        }
+    }
+    
+    // Fallback or fetched workspace based on invite details or pendingWsId
+    val targetWs = remember(pendingWsId, inviteDetails, workspaces) {
+        val targetId = inviteDetails?.workspaceId ?: pendingWsId
+        workspaces.find { it.id == targetId }
     }
     
     val workspaceName = targetWs?.name ?: "TechPulse Main Channel"
     val workspacePlatform = targetWs?.platformType ?: "YOUTUBE"
     val workspaceId = targetWs?.id ?: "ws_youtube_main"
+    val assignedRole = inviteDetails?.roleTitle ?: "Co-Op Collaborator"
     
     Column(
         modifier = Modifier
@@ -57,14 +105,39 @@ fun WorkspaceInvitationScreen(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Text("You have been invited to join", color = TextSecondary, fontSize = 14.sp)
+        Text("SECURE DEEP LINK INVITATION", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         Text(workspaceName, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        Text("Invited to Collaborate on $workspacePlatform", color = AccentBlue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("Enclave Node: $workspacePlatform", color = AccentBlue, fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Invite code text field
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Enter Security Invite Code", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = inviteCode,
+                onValueChange = { inviteCode = it },
+                placeholder = { Text("e.g. COOP-AB12CD", color = TextMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = if (inviteDetails != null) NeonEmerald else if (inviteError != null) AccentRed else AccentBlue,
+                    unfocusedBorderColor = ColorDivider
+                )
+            )
+            if (inviteError != null) {
+                Text(inviteError!!, color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            } else if (inviteDetails != null) {
+                Text("✓ Secure invitation validated successfully via SHA-256 protocol.", color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -73,12 +146,19 @@ fun WorkspaceInvitationScreen(
             border = BorderStroke(1.dp, ColorDivider)
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("WORKSPACE DETAILS", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                Text("Access real-time production boards, shared content calendars, automated agreements, and team communication shards.", color = Color.White, fontSize = 14.sp, lineHeight = 20.sp)
+                Text("WORKSPACE ACCESS LEVEL", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                Text("Access real-time production boards, shared content calendars, automated agreements, and team communication shards.", color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
                 Divider(color = ColorDivider)
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Text("Role Offered", color = TextSecondary, fontSize = 13.sp)
-                    Text("Collaborator", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(assignedRole, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                if (inviteDetails != null) {
+                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Expiration Window", color = TextSecondary, fontSize = 13.sp)
+                        val relativeText = com.example.util.DateTimeUtils.getRelativeTimeSpanString(inviteDetails!!.expirationTimestamp)
+                        Text(relativeText, color = CrispAmber, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -87,17 +167,31 @@ fun WorkspaceInvitationScreen(
 
         Button(
             onClick = {
-                workspaceViewModel.joinWorkspace(workspaceId, "me")
-                workspaceViewModel.selectedWorkspaceId.value = workspaceId
-                workspaceViewModel.workspaceViewMode.value = "VIEW"
-                globalViewModel.pendingInvitationWorkspaceId.value = null
-                globalViewModel.currentTab.value = "WORKSPACES"
+                if (inviteDetails != null) {
+                    workspaceViewModel.acceptInviteByCode(inviteCode.trim().uppercase(), "me") {
+                        workspaceViewModel.selectedWorkspaceId.value = inviteDetails!!.workspaceId
+                        workspaceViewModel.workspaceViewMode.value = "VIEW"
+                        globalViewModel.pendingInvitationWorkspaceId.value = null
+                        globalViewModel.currentTab.value = "WORKSPACES"
+                    }
+                } else {
+                    // Fallback direct join (backward-compatible)
+                    workspaceViewModel.joinWorkspace(workspaceId, "me", assignedRole)
+                    workspaceViewModel.selectedWorkspaceId.value = workspaceId
+                    workspaceViewModel.workspaceViewMode.value = "VIEW"
+                    globalViewModel.pendingInvitationWorkspaceId.value = null
+                    globalViewModel.currentTab.value = "WORKSPACES"
+                }
             },
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+            colors = ButtonDefaults.buttonColors(containerColor = if (inviteDetails != null) NeonEmerald else AccentRed),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Accept Invitation & Join Team", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(
+                text = if (inviteDetails != null) "Accept Protocol & Join" else "Direct Connect (No Code)",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -106,7 +200,7 @@ fun WorkspaceInvitationScreen(
             globalViewModel.pendingInvitationWorkspaceId.value = null
             onBack()
         }) {
-            Text("Decline", color = TextSecondary)
+            Text("Decline Protocol", color = TextSecondary)
         }
     }
 }

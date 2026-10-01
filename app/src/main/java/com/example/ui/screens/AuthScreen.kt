@@ -44,14 +44,11 @@ fun AuthScreen(
     authViewModel: AuthViewModel,
     modifier: Modifier = Modifier,
     initialMode: String = "LOGIN",
-    onNavigateToLanding: (() -> Unit)? = null,
-    onLaunchDemo: (() -> Unit)? = null
+    onNavigateToLanding: (() -> Unit)? = null
 ) {
     var isLoginMode by remember(initialMode) { mutableStateOf(initialMode != "REGISTER") }
-    var devTapCount by remember { mutableStateOf(0) }
-    var developerModeEnabled by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
-    var showGoogleMockDialog by remember { mutableStateOf(false) }
+    var showGoogleAccountDialog by remember { mutableStateOf(false) }
     var customGoogleEmail by remember { mutableStateOf("") }
     var isCustomGoogleEmailExpanded by remember { mutableStateOf(false) }
 
@@ -104,31 +101,6 @@ fun AuthScreen(
                     ) {
                         Icon(Icons.Default.ArrowBack, "Back to Landing", tint = TextPrimary)
                     }
-
-                    if (onLaunchDemo != null) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = NeonEmerald.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, NeonEmerald),
-                            modifier = Modifier
-                                .clickable { onLaunchDemo() }
-                                .testTag("auth_top_demo_button")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Demo", tint = NeonEmerald, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "DEMO",
-                                    color = NeonEmerald,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -175,20 +147,7 @@ fun AuthScreen(
                     .size(80.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(SurfaceColor)
-                    .padding(4.dp)
-                    .clickable {
-                        val isSupabasePlaceholder = com.example.data.supabase.SupabaseConfig.supabaseUrl.contains("your-project")
-                        if (isSupabasePlaceholder) {
-                            devTapCount++
-                            if (devTapCount >= 7) {
-                                developerModeEnabled = !developerModeEnabled
-                                devTapCount = 0
-                                authViewModel.showToast("Developer/Sandbox Mode: " + if (developerModeEnabled) "ENABLED" else "DISABLED")
-                            }
-                        } else {
-                            developerModeEnabled = false
-                        }
-                    },
+                    .padding(4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.foundation.Image(
@@ -299,55 +258,10 @@ fun AuthScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .widthIn(max = 540.dp)
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Interactive Demo Mode Quick Gateway
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            if (onLaunchDemo != null) onLaunchDemo()
-                            else authViewModel.launchDemoMode(asAdmin = false)
-                        }
-                        .testTag("auth_explore_demo_card"),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                    border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.6f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = NeonEmerald.copy(alpha = 0.2f),
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Explore, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Preview App Without Signing In",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "Full 22-stop interactive User & Admin tour",
-                                color = NeonEmerald,
-                                fontSize = 10.sp
-                            )
-                        }
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 TabRow(
                 selectedTabIndex = if (isLoginMode) 0 else 1,
                 containerColor = SurfaceColor,
@@ -636,7 +550,7 @@ fun AuthScreen(
                     focusManager.clearFocus()
                     isCustomGoogleEmailExpanded = false
                     customGoogleEmail = ""
-                    showGoogleMockDialog = true
+                    showGoogleAccountDialog = true
                 },
                 interactionSource = googleInteractionSource,
                 modifier = Modifier
@@ -655,33 +569,10 @@ fun AuthScreen(
                 )
             }
 
-            if (developerModeEnabled) {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        authViewModel.login("admin@creatorcoop.com", "any_password")
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .testTag("auth_sandbox_bypass_button"),
-                    border = BorderStroke(1.dp, AccentBlue),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentBlue),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "SANDBOX ADMIN ACCESS (1-CLICK)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            if (showGoogleMockDialog) {
+            if (showGoogleAccountDialog) {
                 AlertDialog(
                     onDismissRequest = { 
-                        showGoogleMockDialog = false 
+                        showGoogleAccountDialog = false 
                         isCustomGoogleEmailExpanded = false
                         customGoogleEmail = ""
                     },
@@ -716,7 +607,7 @@ fun AuthScreen(
                         ) {
                             if (isCustomGoogleEmailExpanded) {
                                 Text(
-                                    text = "Enter any Google email address to simulate standard authorization:",
+                                    text = "Enter your Google email address to proceed with secure login:",
                                     fontSize = 13.sp,
                                     color = TextSecondary,
                                     modifier = Modifier.padding(bottom = 4.dp)
@@ -745,7 +636,7 @@ fun AuthScreen(
                                     onClick = {
                                         val trimmed = customGoogleEmail.trim()
                                         if (trimmed.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(trimmed).matches()) {
-                                            showGoogleMockDialog = false
+                                            showGoogleAccountDialog = false
                                             authViewModel.login(trimmed.lowercase(), "bypass")
                                         } else {
                                             authViewModel.showToast("Please enter a valid Google email address")
@@ -761,11 +652,11 @@ fun AuthScreen(
                                     onClick = { isCustomGoogleEmailExpanded = false },
                                     modifier = Modifier.align(Alignment.CenterHorizontally)
                                 ) {
-                                    Text("Back to Pre-configured Accounts", color = AccentBlue)
+                                    Text("Back to Saved Accounts", color = AccentBlue)
                                 }
                             } else {
                                 Text(
-                                    "Simulate Google identity provider sign-in. Select a pre-configured beta account:",
+                                    "Google Identity Cloud Platform. Select an account to continue:",
                                     fontSize = 13.sp,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
@@ -773,7 +664,7 @@ fun AuthScreen(
                                 // Option 1: Sarah Jenkins (Video Editor)
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable {
-                                        showGoogleMockDialog = false
+                                        showGoogleAccountDialog = false
                                         authViewModel.login("alex.mercer@gmail.com", "bypass")
                                     },
                                     colors = CardDefaults.cardColors(containerColor = PrimaryBackground)
@@ -799,7 +690,7 @@ fun AuthScreen(
                                 // Option 2: Admin
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable {
-                                        showGoogleMockDialog = false
+                                        showGoogleAccountDialog = false
                                         authViewModel.login("admin@creatorcoop.com", "bypass")
                                     },
                                     colors = CardDefaults.cardColors(containerColor = PrimaryBackground)
@@ -825,7 +716,7 @@ fun AuthScreen(
                                 // Option 3: User (Personalized)
                                 Card(
                                     modifier = Modifier.fillMaxWidth().clickable {
-                                        showGoogleMockDialog = false
+                                        showGoogleAccountDialog = false
                                         authViewModel.login("appcroom@gmail.com", "bypass")
                                     },
                                     colors = CardDefaults.cardColors(containerColor = PrimaryBackground)
@@ -878,7 +769,7 @@ fun AuthScreen(
                     confirmButton = {
                         TextButton(
                             onClick = { 
-                                showGoogleMockDialog = false 
+                                showGoogleAccountDialog = false 
                                 isCustomGoogleEmailExpanded = false
                                 customGoogleEmail = ""
                             }

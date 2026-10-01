@@ -85,15 +85,35 @@ class AnalyticsViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun resetToast() { _toastMessage.value = null }
 
+    private fun escapeCsv(value: String): String {
+        val needsQuotes = value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")
+        val escaped = value.replace("\"", "\"\"")
+        return if (needsQuotes) "\"$escaped\"" else escaped
+    }
+
+    private fun escapeJson(value: String): String {
+        return value.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+    }
+
     fun getExportContent(format: String): String {
         val allEvents = AnalyticsManager.events.value
         return if (format == "JSON") {
-            "[" + allEvents.joinToString(",") { 
-                "{\"event\":\"${it.name}\",\"time\":${it.timestamp}}"
+            "[" + allEvents.joinToString(",") { event ->
+                val propsJson = event.properties.entries.joinToString(",") { (k, v) ->
+                    "\"${escapeJson(k)}\":\"${escapeJson(v.toString())}\""
+                }
+                "{\"event\":\"${escapeJson(event.name)}\",\"timestamp\":${event.timestamp},\"properties\":{$propsJson}}"
             } + "]"
         } else {
-            "Event,Timestamp\n" + allEvents.joinToString("\n") { 
-                "${it.name},${it.timestamp}"
+            "Event,Timestamp,Properties\n" + allEvents.joinToString("\n") { event ->
+                val propsString = event.properties.entries.joinToString(";") { (k, v) -> "$k=$v" }
+                val escapedEvent = escapeCsv(event.name)
+                val escapedProps = escapeCsv(propsString)
+                "$escapedEvent,${event.timestamp},$escapedProps"
             }
         }
     }

@@ -30,6 +30,7 @@ import com.example.data.model.SupportTicket
 import com.example.data.model.UserProfile
 import com.example.ui.theme.*
 import com.example.ui.components.*
+import com.example.ui.feedback.FeedbackManager
 import com.example.ui.viewmodels.SupportViewModel
 import com.example.util.DateTimeUtils
 import java.util.*
@@ -118,10 +119,7 @@ fun SupportCenterScreen(
 
     // Tab index: 0 = Help Desk, 1 = Admin Operations
     var activeMainTab by remember { mutableStateOf(0) }
-    val isAdmin = userProfile?.globalRole == "ADMIN" || userProfile?.systemRole == "ADMIN"
-    
-    // For evaluating features easily, we enable a demo override toggle if not admin
-    var demoAdminMode by remember { mutableStateOf(isAdmin) }
+    val isAdmin = userProfile?.globalRole == "ADMIN" || userProfile?.systemRole == "ADMIN" || userProfile?.systemRole == "PLATFORM_ADMIN"
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -149,40 +147,6 @@ fun SupportCenterScreen(
                 .padding(paddingValues)
                 .background(PrimaryBackground)
         ) {
-            if (isAdmin) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "SaaS Customer Operations Panel",
-                        color = TextSecondary,
-                        fontSize = 11.sp
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "ADMIN MODE",
-                            color = if (demoAdminMode) CrispAmber else TextMuted,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Switch(
-                            checked = demoAdminMode,
-                            onCheckedChange = { demoAdminMode = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = CrispAmber,
-                                checkedTrackColor = CrispAmber.copy(alpha = 0.3f),
-                                uncheckedThumbColor = TextMuted,
-                                uncheckedTrackColor = ColorDivider
-                            ),
-                            modifier = Modifier.scale(0.7f)
-                        )
-                    }
-                }
-            }
             // Main Tab Selector
             TabRow(
                 selectedTabIndex = activeMainTab,
@@ -209,21 +173,21 @@ fun SupportCenterScreen(
                 Tab(
                     selected = activeMainTab == 1,
                     onClick = {
-                        if (demoAdminMode) {
+                        if (isAdmin) {
                             activeMainTab = 1
                         } else {
-                            supportViewModel.upvoteFeatureRequest("non_existent", "trigger_toast_only") // Trigger a toast reminder
+                            FeedbackManager.showWarning("Admin access required for Operations Center")
                         }
                     },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(16.dp), tint = if (demoAdminMode) CrispAmber else TextMuted)
+                            Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(16.dp), tint = if (isAdmin) CrispAmber else TextMuted)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 "Operations Center",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (demoAdminMode) Color.White else TextMuted
+                                color = if (isAdmin) Color.White else TextMuted
                             )
                         }
                     }
@@ -974,10 +938,18 @@ fun TicketItemRow(
 ) {
     val dateStr = com.example.util.DateTimeUtils.formatFull(ticket.createdAt)
     val isCritical = ticket.internalPriority == "CRITICAL"
+    val isHigh = ticket.internalPriority == "HIGH"
 
     Card(
         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-        border = BorderStroke(1.dp, if (isCritical) AccentRed.copy(alpha = 0.5f) else ColorDivider),
+        border = BorderStroke(
+            width = if (isCritical) 1.5.dp else 1.dp,
+            color = when {
+                isCritical -> AccentRed
+                isHigh -> CrispAmber
+                else -> ColorDivider
+            }
+        ),
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -1023,11 +995,21 @@ fun TicketItemRow(
                         modifier = Modifier
                             .background(
                                 when (ticket.internalPriority) {
-                                    "CRITICAL" -> AccentRed.copy(alpha = 0.2f)
-                                    "HIGH" -> CrispAmber.copy(alpha = 0.2f)
+                                    "CRITICAL" -> AccentRed.copy(alpha = 0.25f)
+                                    "HIGH" -> CrispAmber.copy(alpha = 0.25f)
+                                    "MEDIUM" -> AccentBlue.copy(alpha = 0.15f)
                                     else -> SurfaceLightColor
                                 },
                                 RoundedCornerShape(4.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = when (ticket.internalPriority) {
+                                    "CRITICAL" -> AccentRed.copy(alpha = 0.6f)
+                                    "HIGH" -> CrispAmber.copy(alpha = 0.6f)
+                                    else -> Color.Transparent
+                                },
+                                shape = RoundedCornerShape(4.dp)
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
@@ -1036,6 +1018,7 @@ fun TicketItemRow(
                             color = when (ticket.internalPriority) {
                                 "CRITICAL" -> AccentRed
                                 "HIGH" -> CrispAmber
+                                "MEDIUM" -> AccentBlue
                                 else -> TextSecondary
                             },
                             fontSize = 8.sp,

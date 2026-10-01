@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -108,9 +109,11 @@ fun TeamSpaceScreen(
     val calendarItems by viewModel.activeCalendarItems.collectAsState()
     val allUsers by viewModel.allUsers.collectAsState()
     val currentUserProfile by viewModel.currentUserProfile.collectAsState()
+    val haptics = LocalHapticFeedback.current
 
     var activeTab by remember { mutableStateOf("BOARD") } // "BOARD", "CALENDAR"
     var showCreateTaskDialog by remember { mutableStateOf(false) }
+    var taskCreationLane by remember { mutableStateOf("IDEAS") }
     var selectedTask by remember { mutableStateOf<ProductionTask?>(null) }
     var showSaveTemplateDialog by remember { mutableStateOf(false) }
     var showApplyTemplateDialog by remember { mutableStateOf(false) }
@@ -312,35 +315,55 @@ fun TeamSpaceScreen(
                                                         )
                                                         
                                                         if (canModify) {
-                                                            Spacer(modifier = Modifier.height(DS.Space12))
+                                                            Spacer(modifier = Modifier.height(DS.Space8))
                                                             Row(
-                                                                horizontalArrangement = Arrangement.spacedBy(DS.Space8),
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
                                                                 verticalAlignment = Alignment.CenterVertically
                                                             ) {
-                                                                val prevIndex = lanes.indexOf(lane) - 1
-                                                                if (prevIndex >= 0) {
-                                                                    val prevLane = lanes[prevIndex]
-                                                                    IconButton(
-                                                                        onClick = { viewModel.moveTaskLane(task.id, prevLane, userId) },
-                                                                        modifier = Modifier
-                                                                            .background(Color.White.copy(alpha = 0.05f), CircleShape)
-                                                                            .size(28.dp)
-                                                                    ) {
-                                                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Move Left", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                                                                Row(
+                                                                    horizontalArrangement = Arrangement.spacedBy(DS.Space4),
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    val prevIndex = lanes.indexOf(lane) - 1
+                                                                    if (prevIndex >= 0) {
+                                                                        val prevLane = lanes[prevIndex]
+                                                                        IconButton(
+                                                                            onClick = { 
+                                                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                                                viewModel.moveTaskLane(task.id, prevLane, userId) 
+                                                                            },
+                                                                            modifier = Modifier
+                                                                                .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                                                                                .size(24.dp)
+                                                                        ) {
+                                                                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Move Left", tint = TextSecondary, modifier = Modifier.size(12.dp))
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    val nextIndex = lanes.indexOf(lane) + 1
+                                                                    if (nextIndex < lanes.size) {
+                                                                        val nextLane = lanes[nextIndex]
+                                                                        IconButton(
+                                                                            onClick = { 
+                                                                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                                                viewModel.moveTaskLane(task.id, nextLane, userId) 
+                                                                            },
+                                                                            modifier = Modifier
+                                                                                .background(laneColor.copy(alpha = 0.15f), CircleShape)
+                                                                                .size(24.dp)
+                                                                        ) {
+                                                                            Icon(Icons.AutoMirrored.Filled.ArrowForward, "Move Right", tint = laneColor, modifier = Modifier.size(12.dp))
+                                                                        }
                                                                     }
                                                                 }
-                                                                
-                                                                val nextIndex = lanes.indexOf(lane) + 1
-                                                                if (nextIndex < lanes.size) {
-                                                                    val nextLane = lanes[nextIndex]
-                                                                    IconButton(
-                                                                        onClick = { viewModel.moveTaskLane(task.id, nextLane, userId) },
-                                                                        modifier = Modifier
-                                                                            .background(laneColor.copy(alpha = 0.1f), CircleShape)
-                                                                            .size(28.dp)
-                                                                    ) {
-                                                                        Icon(Icons.AutoMirrored.Filled.ArrowForward, "Move Right", tint = laneColor, modifier = Modifier.size(14.dp))
-                                                                    }
+
+                                                                // Simplification 4: Contextual Task Threading button
+                                                                IconButton(
+                                                                    onClick = { selectedTask = task },
+                                                                    modifier = Modifier.size(24.dp)
+                                                                ) {
+                                                                    Icon(Icons.Outlined.ChatBubbleOutline, "Task Discussion", tint = AccentBlue, modifier = Modifier.size(14.dp))
                                                                 }
                                                             }
                                                         }
@@ -349,7 +372,7 @@ fun TeamSpaceScreen(
                                             }
                                         }
                                         
-                                        if (lane == "IDEAS" && canModify) {
+                                        if (canModify) {
                                             Spacer(modifier = Modifier.height(DS.Space12))
                                             FeatureGate(
                                                 flagKey = "TASK_CREATION",
@@ -363,15 +386,18 @@ fun TeamSpaceScreen(
                                                 }
                                             ) {
                                                 Button(
-                                                    onClick = { showCreateTaskDialog = true },
-                                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                                    onClick = { 
+                                                        taskCreationLane = lane
+                                                        showCreateTaskDialog = true 
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth().height(44.dp),
                                                     colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
                                                     shape = DS.RadiusMedium,
                                                     border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f))
                                                 ) {
-                                                    Icon(Icons.Default.Add, null, tint = AccentRed, modifier = Modifier.size(18.dp))
-                                                    Spacer(modifier = Modifier.width(DS.Space8))
-                                                    Text("New Task", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                                    Icon(Icons.Default.Add, null, tint = laneColor, modifier = Modifier.size(16.dp))
+                                                    Spacer(modifier = Modifier.width(DS.Space6))
+                                                    Text("Add to $lane", color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 }
                                             }
                                         }
@@ -403,7 +429,7 @@ fun TeamSpaceScreen(
             containerColor = SurfaceColor,
             title = { Text("Launch Shared Task", color = Color.White, fontWeight = FontWeight.Black) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     OutlinedTextField(
                         value = tTitle,
                         onValueChange = { tTitle = it },
@@ -415,18 +441,38 @@ fun TeamSpaceScreen(
                         value = tBody,
                         onValueChange = { tBody = it },
                         label = { Text("Description") },
-                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        modifier = Modifier.fillMaxWidth().height(90.dp),
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AccentRed)
                     )
+                    Text("Target Kanban Lane", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        lanes.forEach { l ->
+                            FilterChip(
+                                selected = taskCreationLane == l,
+                                onClick = { taskCreationLane = l },
+                                label = { Text(l, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.submitTask(tTitle, tBody, "PRODUCTION_READY", userId)
+                        viewModel.submitTask(tTitle, tBody, "PRODUCTION_READY", userId, kanbanLane = taskCreationLane)
                         showCreateTaskDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                    enabled = tTitle.isNotBlank()
                 ) {
                     Text("Deploy Task")
                 }

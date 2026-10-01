@@ -190,8 +190,8 @@ interface ProductionTaskDao {
     @Query("SELECT * FROM production_tasks WHERE workspaceId = :workspaceId AND stateScope = 'PRODUCTION_READY' ORDER BY createdAt DESC")
     fun getProductionReadyTasks(workspaceId: String): Flow<List<ProductionTask>>
 
-    @Query("SELECT * FROM production_tasks WHERE workspaceId = :workspaceId AND creatorId = :userId AND stateScope = 'ROUGH_SANDBOX' ORDER BY createdAt DESC")
-    fun getRoughSandboxTasks(workspaceId: String, userId: String): Flow<List<ProductionTask>>
+    @Query("SELECT * FROM production_tasks WHERE workspaceId = :workspaceId AND creatorId = :userId AND stateScope = 'PRIVATE_DRAFT' ORDER BY createdAt DESC")
+    fun getPrivateDraftTasks(workspaceId: String, userId: String): Flow<List<ProductionTask>>
 
     @Query("SELECT * FROM production_tasks WHERE id = :id")
     fun getTaskById(id: String): Flow<ProductionTask?>
@@ -208,8 +208,8 @@ interface ProductionTaskDao {
     @Query("DELETE FROM production_tasks WHERE id = :id")
     suspend fun deleteTaskById(id: String)
 
-    @Query("DELETE FROM production_tasks WHERE creatorId = :userId AND stateScope = 'ROUGH_SANDBOX'")
-    suspend fun deleteRoughSandboxTasks(userId: String)
+    @Query("DELETE FROM production_tasks WHERE creatorId = :userId AND stateScope = 'PRIVATE_DRAFT'")
+    suspend fun deletePrivateDraftTasks(userId: String)
 
     @Query("""
         SELECT * FROM production_tasks 
@@ -883,6 +883,70 @@ interface WorkspaceEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvent(event: WorkspaceEvent)
 }
+
+@Dao
+interface PersonalNoteDao {
+    @Query("SELECT * FROM personal_notes WHERE userId = :userId ORDER BY timestamp DESC")
+    fun getNotesForUser(userId: String): Flow<List<PersonalNote>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNote(note: PersonalNote)
+
+    @Query("DELETE FROM personal_notes WHERE id = :id")
+    suspend fun deleteNote(id: String)
+}
+
+@Dao
+interface CommunityLikeDao {
+    @Query("SELECT * FROM community_likes WHERE userId = :userId AND postId = :postId AND interactionType = :interactionType LIMIT 1")
+    suspend fun getLike(userId: String, postId: String, interactionType: String): CommunityLikeEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLike(like: CommunityLikeEntity)
+
+    @Query("DELETE FROM community_likes WHERE userId = :userId AND postId = :postId AND interactionType = :interactionType")
+    suspend fun deleteLike(userId: String, postId: String, interactionType: String)
+
+    @Query("SELECT COUNT(*) FROM community_likes WHERE postId = :postId AND interactionType = :interactionType")
+    fun getInteractionCountFlow(postId: String, interactionType: String): Flow<Int>
+}
+
+@Dao
+interface WorkspaceInviteDao {
+    @Query("SELECT * FROM workspace_invites WHERE workspaceId = :workspaceId ORDER BY createdAt DESC")
+    fun getInvitesForWorkspace(workspaceId: String): Flow<List<WorkspaceInviteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInvite(invite: WorkspaceInviteEntity)
+
+    @Query("SELECT * FROM workspace_invites WHERE inviteCode = :code LIMIT 1")
+    suspend fun getInviteByCode(code: String): WorkspaceInviteEntity?
+}
+
+@Dao
+interface SearchFilterDao {
+    @Query("SELECT * FROM search_filters WHERE userId = :userId ORDER BY timestamp DESC")
+    fun getFiltersForUser(userId: String): Flow<List<SearchFilterEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFilter(filter: SearchFilterEntity)
+
+    @Query("DELETE FROM search_filters WHERE id = :id")
+    suspend fun deleteFilter(id: String)
+}
+
+@Dao
+interface RoleConfigurationDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRoleConfig(config: RoleConfigurationEntity)
+
+    @Query("SELECT * FROM role_configurations WHERE workspaceId = :workspaceId")
+    fun getRoleConfigsForWorkspace(workspaceId: String): Flow<List<RoleConfigurationEntity>>
+
+    @Query("SELECT * FROM role_configurations WHERE id = :id LIMIT 1")
+    suspend fun getRoleConfigById(id: String): RoleConfigurationEntity?
+}
+
 
 
 

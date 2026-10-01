@@ -48,14 +48,25 @@ import com.example.data.model.*
         FounderNote::class,
         WorkspaceAsset::class,
         Deliverable::class,
-        WorkspaceEvent::class
+        WorkspaceEvent::class,
+        PersonalNote::class,
+        CommunityLikeEntity::class,
+        WorkspaceInviteEntity::class,
+        SearchFilterEntity::class,
+        RoleConfigurationEntity::class
     ],
     version = 36,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun personalNoteDao(): PersonalNoteDao
+    abstract fun communityLikeDao(): CommunityLikeDao
+    abstract fun workspaceInviteDao(): WorkspaceInviteDao
+    abstract fun searchFilterDao(): SearchFilterDao
+    abstract fun roleConfigurationDao(): RoleConfigurationDao
     abstract fun founderNoteDao(): FounderNoteDao
+
     abstract fun workspaceAssetDao(): WorkspaceAssetDao
     abstract fun deliverableDao(): DeliverableDao
     abstract fun workspaceEventDao(): WorkspaceEventDao

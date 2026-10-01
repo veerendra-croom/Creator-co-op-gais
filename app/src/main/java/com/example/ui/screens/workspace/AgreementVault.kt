@@ -45,6 +45,7 @@ fun AgreementVault(
     val activeAgreement by viewModel.getActiveAgreement(workspaceId).collectAsState(initial = null)
     val acks by viewModel.getAcknowledgments(activeAgreement?.id).collectAsState(initial = emptyList())
     val hasAcked = acks.any { it.userId == userId }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val defaultPreamble = "This Co-Op Production Contract is entered into secure block registers on this day, governing intellectual properties and compliance standards in Shard #$workspaceId."
     val defaultScope = "Collaborators shall execute assigned production timeline units in accordance with Kanban milestones. Milestone completion is validated via decentralized peer review."
@@ -145,7 +146,16 @@ fun AgreementVault(
 
         val currentAgreement = activeAgreement
         if (currentAgreement != null) {
-            val sealHash = currentAgreement.contentText.hashCode().toString().take(8).uppercase()
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val sealHash = remember(currentAgreement.id, currentAgreement.version, currentAgreement.contentText) {
+                try {
+                    val saltedPayload = "COOP_CONTRACT_V${currentAgreement.version}_WS_${currentAgreement.workspaceId}_ID_${currentAgreement.id}_TS_${currentAgreement.createdAt}_${currentAgreement.contentText}"
+                    val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(saltedPayload.toByteArray())
+                    bytes.joinToString("") { "%02x".format(it) }.take(16).uppercase()
+                } catch (e: Exception) {
+                    "${currentAgreement.workspaceId}_${currentAgreement.id}".hashCode().toString().take(12).uppercase()
+                }
+            }
             Row(
                 modifier = if (globalViewModel != null) Modifier
                     .fillMaxWidth()
@@ -158,28 +168,58 @@ fun AgreementVault(
                     .background(AccentBlue.copy(alpha = 0.1f), DS.RadiusMedium)
                     .border(1.dp, AccentBlue.copy(alpha = 0.25f), DS.RadiusMedium)
                     .padding(DS.Space12),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = null,
-                    tint = AccentBlue,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(DS.Space12))
-                Column {
-                    Text(
-                        text = "DECENTRALIZED CO-OP SEAL SIGNED",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = AccentBlue,
+                        modifier = Modifier.size(20.dp)
                     )
-                    Text(
-                        text = "Contract Hash ID: SHA-256#$sealHash • ${acks.size} signature(s) compiled.",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.labelSmall
-                    )
+                    Spacer(modifier = Modifier.width(DS.Space12))
+                    Column {
+                        Text(
+                            text = "DECENTRALIZED CO-OP SEAL SIGNED",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Hash: SHA256#$sealHash • ${acks.size} signature(s)",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Contract Digest", "SHA256#$sealHash")
+                            clipboard.setPrimaryClip(clip)
+                            android.widget.Toast.makeText(context, "Contract Hash Copied to Clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Hash", tint = AccentBlue, modifier = Modifier.size(14.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Co-Op Agreement Ledger Hash")
+                                putExtra(android.content.Intent.EXTRA_TEXT, "Co-Op Agreement Digest: SHA256#$sealHash\nSigned by ${acks.size} members.")
+                            }
+                            context.startActivity(android.content.Intent.createChooser(intent, "Share Agreement Hash"))
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share Contract", tint = NeonEmerald, modifier = Modifier.size(14.dp))
+                    }
                 }
             }
         } else {
@@ -321,6 +361,111 @@ fun AgreementVault(
                 statusColor = NeonEmerald
             )
 
+            if (isLead) {
+                var leadSlider by remember { mutableStateOf(40f) }
+                var editorSlider by remember { mutableStateOf(30f) }
+                var vfxSlider by remember { mutableStateOf(30f) }
+                
+                LaunchedEffect(revenue) {
+                    val compliance = validateSplitSum(revenue)
+                    if (compliance.values.size == 3) {
+                        leadSlider = compliance.values[0].toFloat()
+                        editorSlider = compliance.values[1].toFloat()
+                        vfxSlider = compliance.values[2].toFloat()
+                    }
+                }
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    shape = DS.RadiusLarge,
+                    border = BorderStroke(1.dp, ColorDivider)
+                ) {
+                    Column(modifier = Modifier.padding(DS.Space16), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "ESCROW REVENUE ALLOCATION INTERFACE",
+                            color = CrispAmber,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        
+                        Text(
+                            text = "As the Lead Creator, you can adjust the dynamic revenue split slider allocations below to automatically draft the contract.",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                        
+                        Column {
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Lead Director Share", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("${leadSlider.toInt()}%", color = CrispAmber, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                            }
+                            Slider(
+                                value = leadSlider,
+                                onValueChange = { leadSlider = it },
+                                valueRange = 0f..100f,
+                                colors = SliderDefaults.colors(thumbColor = CrispAmber, activeTrackColor = CrispAmber)
+                            )
+                        }
+                        
+                        Column {
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Editors Share", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("${editorSlider.toInt()}%", color = CrispAmber, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                            }
+                            Slider(
+                                value = editorSlider,
+                                onValueChange = { editorSlider = it },
+                                valueRange = 0f..100f,
+                                colors = SliderDefaults.colors(thumbColor = CrispAmber, activeTrackColor = CrispAmber)
+                            )
+                        }
+                        
+                        Column {
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("VFX Specialists Share", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("${vfxSlider.toInt()}%", color = CrispAmber, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                            }
+                            Slider(
+                                value = vfxSlider,
+                                onValueChange = { vfxSlider = it },
+                                valueRange = 0f..100f,
+                                colors = SliderDefaults.colors(thumbColor = CrispAmber, activeTrackColor = CrispAmber)
+                            )
+                        }
+                        
+                        val totalSum = leadSlider.toInt() + editorSlider.toInt() + vfxSlider.toInt()
+                        val isSumCompliant = totalSum == 100
+                        
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Total Allocated: $totalSum% ${if (isSumCompliant) "(Valid)" else "(Must equal 100%)"}",
+                                color = if (isSumCompliant) NeonEmerald else AccentRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            Button(
+                                onClick = {
+                                    viewModel.updateSplits(workspaceId, leadSlider.toInt(), editorSlider.toInt(), vfxSlider.toInt())
+                                },
+                                enabled = isSumCompliant,
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
+                                shape = DS.RadiusSmall,
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text("SAVE SPLITS", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
             // --- SIGNATURE WORKSPACE MEMBERS STATUS ---
             Text(
                 text = "SIGNATORY DECENTRALIZED RECORD",
@@ -428,7 +573,13 @@ fun AgreementVault(
                                 delay(100)
                                 signatureProgress += 0.05f
                             }
-                            val hash = currentAgreement?.contentText?.hashCode()?.toString() ?: ""
+                            val hash = try {
+                                val salted = "SIG_V${currentAgreement?.version}_WS_${currentAgreement?.workspaceId}_AGR_${currentAgreement?.id}_U_${userId}_${currentAgreement?.contentText ?: ""}"
+                                val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(salted.toByteArray())
+                                bytes.joinToString("") { "%02x".format(it) }
+                            } catch (e: Exception) {
+                                "${currentAgreement?.id}_$userId".hashCode().toString()
+                            }
                             currentAgreement?.let {
                                 viewModel.acknowledgeAgreement(it.id, hash, userId)
                             }
@@ -452,7 +603,7 @@ fun AgreementVault(
         } else {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DS.Space12)) {
                 Button(
-                    onClick = { viewModel.exportAgreementAsPDF() },
+                    onClick = { viewModel.exportAgreementAsPDF(context, activeAgreement?.contentText ?: templateText, "Workspace Shard $workspaceId Agreement") },
                     modifier = Modifier
                         .weight(1.5f)
                         .height(52.dp),

@@ -12,7 +12,7 @@ sealed class SyncState {
     object PendingLocalChanges : SyncState()
     
     @kotlinx.serialization.Serializable
-    object OfflineSandbox : SyncState()
+    object Offline : SyncState()
     
     @kotlinx.serialization.Serializable
     object Error : SyncState()

@@ -1053,7 +1053,7 @@ fun CohortDirectoryView(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        listOf("All", "Contacted", "Interested", "Scheduled Demo", "Active User").take(4).forEach { stat ->
+                        listOf("All", "Contacted", "Interested", "Scheduled Walkthrough", "Active User").take(4).forEach { stat ->
                             val isSelected = statusFilter == stat
                             Box(
                                 modifier = Modifier
@@ -1368,6 +1368,7 @@ fun CreatorCrmDetailDialog(
 
     // Follow up creation state
     var newTaskText by remember { mutableStateOf("") }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     // Parse tasks list
     val tasksList = remember(record.followUpTasksJson) {
@@ -1447,7 +1448,7 @@ fun CreatorCrmDetailDialog(
 
                                 Text("FOLLOW-UP PIPELINE STATUS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    listOf("Contacted", "Interested", "Scheduled Demo", "Active User", "Churned").forEach { stat ->
+                                    listOf("Contacted", "Interested", "Scheduled Walkthrough", "Active User", "Churned").forEach { stat ->
                                         val isSelected = statusState == stat
                                         Box(
                                             modifier = Modifier
@@ -1710,8 +1711,7 @@ fun CreatorCrmDetailDialog(
                     // Delete Button
                     Button(
                         onClick = {
-                            crmViewModel.deleteCohortUser(record.id)
-                            onDismiss()
+                            showDeleteConfirmDialog = true
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                         modifier = Modifier.weight(1f).testTag("delete_cohort_member"),
@@ -1744,6 +1744,32 @@ fun CreatorCrmDetailDialog(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            containerColor = SurfaceColor,
+            title = { Text("Remove Creator Record?", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to remove '${record.displayName}' from the Founder CRM cohort register? This action cannot be undone.", color = TextSecondary) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        crmViewModel.deleteCohortUser(record.id)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                ) {
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
     }
 }
 

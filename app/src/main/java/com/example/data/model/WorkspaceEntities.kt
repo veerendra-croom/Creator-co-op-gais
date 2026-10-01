@@ -104,3 +104,30 @@ data class WorkspaceEvent(
     val endTime: Long = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Serializable
+@Entity(tableName = "workspace_invites")
+data class WorkspaceInviteEntity(
+    @PrimaryKey val id: String,
+    val workspaceId: String,
+    val inviteCode: String,
+    val inviteeEmail: String,
+    val roleTitle: String,
+    val sha256Token: String,
+    val expirationTimestamp: Long,
+    val isUsed: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(tableName = "role_configurations")
+data class RoleConfigurationEntity(
+    @PrimaryKey val id: String,
+    val workspaceId: String,
+    val roleTitle: String,
+    val compensationType: String, // "Rev Share", "One-off Task", "Full Time", "Contract"
+    val description: String = "",
+    val requirements: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+

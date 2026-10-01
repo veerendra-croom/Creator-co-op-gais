@@ -1,4 +1,5 @@
 package com.example.data.repository
+import com.example.data.network.ExternalIntegrationsClient
 
 import com.example.data.local.*
 import com.example.data.model.*
@@ -32,7 +33,13 @@ data class UserDataExport(
     val exportTimestamp: Long
 )
 
-class AppRepository(private val db: AppDatabase, private val context: android.content.Context? = null) {
+
+
+class AppRepository(
+    private val db: AppDatabase, 
+    private val context: android.content.Context? = null,
+    val externalClient: ExternalIntegrationsClient? = null
+) {
     private val json = Json { 
         ignoreUnknownKeys = true
         prettyPrint = true
@@ -95,6 +102,12 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     val workspaceAssetDao = db.workspaceAssetDao()
     val deliverableDao = db.deliverableDao()
     val workspaceEventDao = db.workspaceEventDao()
+    
+    val personalNoteDao = db.personalNoteDao()
+    val communityLikeDao = db.communityLikeDao()
+    val workspaceInviteDao = db.workspaceInviteDao()
+    val searchFilterDao = db.searchFilterDao()
+    val roleConfigurationDao = db.roleConfigurationDao()
  
     init {
         // Pre-populate default feature flags
@@ -771,7 +784,7 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     fun getProductionTasks(workspaceId: String) = productionTaskDao.getProductionReadyTasks(workspaceId)
     fun getAllTasksForUser(userId: String) = productionTaskDao.getAllTasksForUser(userId)
     fun getAllProductionTasksFlow() = productionTaskDao.getAllProductionTasks()
-    fun getRoughSandboxTasks(workspaceId: String, userId: String) = productionTaskDao.getRoughSandboxTasks(workspaceId, userId)
+    fun getPrivateDraftTasks(workspaceId: String, userId: String) = productionTaskDao.getPrivateDraftTasks(workspaceId, userId)
     fun getTaskById(id: String) = productionTaskDao.getTaskById(id)
     fun getMessagesForWorkspace(workspaceId: String) = messageDao.getMessagesForWorkspace(workspaceId)
     fun getDMsForWorkspace(workspaceId: String, myId: String) = messageDao.getDMsForWorkspace(workspaceId, myId)
@@ -1130,8 +1143,8 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
 
     suspend fun removeMember(workspaceId: String, userId: String) {
         workspaceMemberDao.deleteMember(workspaceId, userId)
-        // Clean up private sandbox tasks for the removed member
-        val tasks = productionTaskDao.getRoughSandboxTasks(workspaceId, userId).firstOrNull() ?: emptyList()
+        // Clean up private draft tasks for the removed member
+        val tasks = productionTaskDao.getPrivateDraftTasks(workspaceId, userId).firstOrNull() ?: emptyList()
         tasks.forEach { productionTaskDao.deleteTaskById(it.id) }
     }
 
@@ -1180,145 +1193,10 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
         }
     }
 
-    suspend fun getDemoSandboxPreference(): Boolean {
-        val setting = userSettingsDao.getSetting("system", "demo_sandbox_mode")
-        // Defaults to true for initial testing and demo tours, but user can toggle to false for clean production database
-        return setting == null || setting == "true"
-    }
-
-    suspend fun setDemoSandboxPreference(enabled: Boolean) {
-        userSettingsDao.setSetting(
-            UserSetting(
-                id = "system_demo_sandbox_mode",
-                userId = "system",
-                key = "demo_sandbox_mode",
-                value = enabled.toString()
-            )
-        )
-    }
-
-    suspend fun clearSandboxData() {
-        userDao.deleteUserById("admin_seed")
-        userDao.deleteUserById("DemoUser")
-        workspaceDao.deleteWorkspaceById("ws_youtube_main")
-        projectProposalDao.deleteProjectProposalById("proj_001")
-        projectProposalDao.deleteProjectProposalById("proj_002")
-    }
-
-    suspend fun prepopulateIfEmpty(forceSeedDemo: Boolean? = null) {
-        val isTest = try {
-            Class.forName("org.robolectric.Robolectric") != null
-        } catch (e: Throwable) {
-            false
-        }
-        val shouldSeedDemo = forceSeedDemo ?: (isTest || getDemoSandboxPreference())
-        if (shouldSeedDemo && userDao.getAllUsers().firstOrNull()?.isEmpty() == true) {
-            val myId = "admin_seed"
-            val me = UserProfile(
-                id = myId,
-                email = "admin@creatorcoop.com",
-                displayName = "Platform Admin",
-                avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
-                globalRole = "ADMIN",
-                systemRole = "PLATFORM_ADMIN",
-                primarySpecialty = "Platform Governance",
-                isVerifiedPro = true,
-                deviceId = "device_admin"
-            )
-            userDao.insertUser(me)
-
-            val alex = UserProfile(
-                id = "DemoUser",
-                email = "alex.mercer@gmail.com",
-                displayName = "Alex Mercer",
-                avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-                globalRole = "APP_USER",
-                primarySpecialty = "Visual Storytelling",
-                isVerifiedPro = true,
-                bio = "Lead Visual Storyteller & Script Blueprint Architect | 10M+ Combined Views",
-                referralCode = "ALEX-7777",
-                reputationScore = 98,
-                reliabilityBadge = "Platinum",
-                verificationLevel = "L3 Expert Verified",
-                deviceId = "device_alex"
-            )
-            userDao.insertUser(alex)
-
-            val workspaceId = "ws_youtube_main"
-            val mainWorkspace = Workspace(
-                id = workspaceId,
-                name = "TechPulse Main Channel",
-                platformType = "YOUTUBE",
-                createdBy = myId,
-                createdAt = System.currentTimeMillis()
-            )
-            workspaceDao.insertWorkspace(mainWorkspace)
-
-            workspaceMemberDao.insertMember(WorkspaceMember(
-                id = UUID.randomUUID().toString(),
-                workspaceId = workspaceId,
-                userId = myId,
-                assignedRoleTitle = "Lead Creator",
-                canModifyProduction = true
-            ))
-
-            productionTaskDao.insertTask(ProductionTask(
-                id = UUID.randomUUID().toString(),
-                workspaceId = workspaceId,
-                creatorId = myId,
-                title = "Future of AI Documentary",
-                contentBody = "Exploring how AI affects future careers.",
-                stateScope = "PRODUCTION_READY",
-                kanbanLane = "SCRIPTING",
-                createdAt = System.currentTimeMillis()
-            ))
-
-            productionTaskDao.insertTask(ProductionTask(
-                id = UUID.randomUUID().toString(),
-                workspaceId = workspaceId,
-                creatorId = myId,
-                title = "Intro Draft",
-                contentBody = "Start with video of an empty room...",
-                stateScope = "ROUGH_SANDBOX",
-                createdAt = System.currentTimeMillis()
-            ))
-
-            messageDao.insertMessage(Message(
-                id = UUID.randomUUID().toString(),
-                workspaceId = workspaceId,
-                senderId = "system",
-                senderName = "Welcome Bot",
-                messageBody = "Workspace started. Welcome!",
-                timestamp = System.currentTimeMillis()
-            ))
-
-            val p1 = ProjectProposal(
-                id = "proj_001",
-                title = "TechPulse Syndicate",
-                niche = "Tech",
-                brief = "Creating a daily rapid-production team for our technical explainers. Looking for editors who can deliver high retention edits. Apply with portfolio links to view.",
-                authorId = "user_tech_pulse",
-                authorName = "Alex Riviera",
-                createdAt = System.currentTimeMillis()
-            )
-            val p2 = ProjectProposal(
-                id = "proj_002",
-                title = "Cosmic Chronicles",
-                niche = "Education",
-                brief = "Forming a documentary-style video production team covering astronomy. Searching for a detail-oriented scriptwriter.",
-                authorId = "user_cosmic",
-                authorName = "Elara Nova",
-                createdAt = System.currentTimeMillis() - 3600000
-            )
-            projectProposalDao.insertProjectProposal(p1)
-            projectProposalDao.insertProjectProposal(p2)
-        }
-    }
-
     suspend fun deleteMyAccountCascade(userId: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            // 1. Delete Rough Sandbox tasks
-            productionTaskDao.deleteRoughSandboxTasks(userId)
+            // 1. Delete Private Draft tasks
+            productionTaskDao.deletePrivateDraftTasks(userId)
             
             // 2. Anonymize shared production-ready team task contributions
             productionTaskDao.anonymizeProductionTasks(userId)
@@ -1992,6 +1870,32 @@ class AppRepository(private val db: AppDatabase, private val context: android.co
     fun getAllAgreementsFlow(): Flow<List<TeamAgreement>> = agreementDao.getAllAgreementsFlow()
     fun getAllCommentsFlow(): Flow<List<Comment>> = commentDao.getAllCommentsFlow()
     fun getAllWorkspaceMembersFlow(): Flow<List<WorkspaceMember>> = workspaceMemberDao.getAllMembersFlow()
+
+    // Personal Notes
+    fun getPersonalNotesForUser(userId: String): Flow<List<PersonalNote>> = personalNoteDao.getNotesForUser(userId)
+    suspend fun insertPersonalNote(note: PersonalNote) = personalNoteDao.insertNote(note)
+    suspend fun deletePersonalNote(id: String) = personalNoteDao.deleteNote(id)
+
+    // Community Likes
+    suspend fun getLike(userId: String, postId: String, type: String): CommunityLikeEntity? = communityLikeDao.getLike(userId, postId, type)
+    suspend fun insertLike(like: CommunityLikeEntity) = communityLikeDao.insertLike(like)
+    suspend fun deleteLike(userId: String, postId: String, type: String) = communityLikeDao.deleteLike(userId, postId, type)
+    fun getLikeCountFlow(postId: String, type: String): Flow<Int> = communityLikeDao.getInteractionCountFlow(postId, type)
+
+    // Workspace Invites
+    fun getInvitesForWorkspace(workspaceId: String): Flow<List<WorkspaceInviteEntity>> = workspaceInviteDao.getInvitesForWorkspace(workspaceId)
+    suspend fun insertWorkspaceInvite(invite: WorkspaceInviteEntity) = workspaceInviteDao.insertInvite(invite)
+    suspend fun getInviteByCode(code: String): WorkspaceInviteEntity? = workspaceInviteDao.getInviteByCode(code)
+
+    // Search Filters
+    fun getSearchFiltersForUser(userId: String): Flow<List<SearchFilterEntity>> = searchFilterDao.getFiltersForUser(userId)
+    suspend fun insertSearchFilter(filter: SearchFilterEntity) = searchFilterDao.insertFilter(filter)
+    suspend fun deleteSearchFilter(id: String) = searchFilterDao.deleteFilter(id)
+
+    // Role Configurations
+    fun getRoleConfigsForWorkspace(workspaceId: String): Flow<List<RoleConfigurationEntity>> = roleConfigurationDao.getRoleConfigsForWorkspace(workspaceId)
+    suspend fun insertRoleConfig(config: RoleConfigurationEntity) = roleConfigurationDao.insertRoleConfig(config)
+    suspend fun getRoleConfigById(id: String): RoleConfigurationEntity? = roleConfigurationDao.getRoleConfigById(id)
 
     suspend fun clearUserDataOnLogout() = withContext(Dispatchers.IO) {
         try {

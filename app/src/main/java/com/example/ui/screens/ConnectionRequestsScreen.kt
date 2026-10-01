@@ -224,11 +224,11 @@ fun ConnectionRequestItem(
             }
             if (isIncoming) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = onAccept, modifier = Modifier.size(36.dp).background(AccentBlue, CircleShape)) {
-                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = onAccept, modifier = Modifier.size(48.dp).background(AccentBlue, CircleShape)) {
+                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(24.dp))
                     }
-                    IconButton(onClick = onDecline, modifier = Modifier.size(36.dp).background(SurfaceColor, CircleShape).border(1.dp, ColorDivider, CircleShape)) {
-                        Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = onDecline, modifier = Modifier.size(48.dp).background(SurfaceColor, CircleShape).border(1.dp, ColorDivider, CircleShape)) {
+                        Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(24.dp))
                     }
                 }
             } else {

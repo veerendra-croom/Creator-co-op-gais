@@ -82,12 +82,7 @@ fun AppNavHost(
             if (showStandaloneOnboarding) {
                 OnboardingScreen(
                     globalViewModel = globalViewModel,
-                    onComplete = { showStandaloneOnboarding = false },
-                    onLaunchDemo = {
-                        showStandaloneOnboarding = false
-                        authViewModel.launchDemoMode(asAdmin = false)
-                        globalViewModel.replayTour("demo_user", "dashboard_tour")
-                    }
+                    onComplete = { showStandaloneOnboarding = false }
                 )
             } else {
                 LandingScreen(
@@ -98,18 +93,6 @@ fun AppNavHost(
                     },
                     onNavigateToSignUp = {
                         navController.navigate(Screen.Auth("REGISTER"))
-                    },
-                    onLaunchUserDemo = {
-                        authViewModel.launchDemoMode(asAdmin = false)
-                        globalViewModel.replayTour("demo_user", "dashboard_tour")
-                    },
-                    onLaunchAdminDemo = {
-                        authViewModel.launchDemoMode(asAdmin = true)
-                        globalViewModel.replayTour("demo_admin", "founder_command_tour")
-                    },
-                    onLaunchFullDemo = {
-                        authViewModel.launchDemoMode(asAdmin = false)
-                        globalViewModel.replayTour("demo_user", "dashboard_tour")
                     },
                     onViewOnboarding = {
                         showStandaloneOnboarding = true
@@ -128,10 +111,6 @@ fun AppNavHost(
                         popUpTo(Screen.Landing) { inclusive = true }
                         launchSingleTop = true
                     }
-                },
-                onLaunchDemo = {
-                    authViewModel.launchDemoMode(asAdmin = false)
-                    globalViewModel.replayTour("demo_user", "dashboard_tour")
                 }
             )
         }

@@ -456,7 +456,17 @@ fun PortfolioItem(title: String) {
         }
         val context = androidx.compose.ui.platform.LocalContext.current
         IconButton(onClick = {
-            android.widget.Toast.makeText(context, "Opening asset: $title", android.widget.Toast.LENGTH_SHORT).show()
+            val viewIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://youtube.com/hashtag/creatorcoop"))
+            try {
+                context.startActivity(viewIntent)
+            } catch (e: Exception) {
+                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, title)
+                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out our published masterpiece on Creator Co-Op: $title\nhttps://creatorcoop.app/masterpieces")
+                }
+                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Masterpiece"))
+            }
         }, modifier = Modifier.size(48.dp)) {
             Icon(Icons.Default.Launch, contentDescription = "View", tint = AccentBlue, modifier = Modifier.size(20.dp))
         }

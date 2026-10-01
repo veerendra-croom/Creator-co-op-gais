@@ -136,7 +136,7 @@ fun CommCenterScreen(
                 when (targetTab) {
                     0 -> CampaignManagerTab(
                         announcements = announcements,
-                        onSimulateInteraction = { id, type -> viewModel.simulateUserInteraction(id, type) },
+                        
                         onUpdateStatus = { id, status -> viewModel.updateAnnouncementStatus(id, status) },
                         onDelete = { id -> viewModel.deleteAnnouncement(id) }
                     )
@@ -164,7 +164,6 @@ fun CommCenterScreen(
 @Composable
 fun CampaignManagerTab(
     announcements: List<Announcement>,
-    onSimulateInteraction: (String, String) -> Unit,
     onUpdateStatus: (String, String) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -210,7 +209,6 @@ fun CampaignManagerTab(
             items(announcements, key = { it.id }) { ann ->
                 AnnouncementCampaignCard(
                     ann = ann,
-                    onSimulateInteraction = onSimulateInteraction,
                     onUpdateStatus = onUpdateStatus,
                     onDelete = onDelete
                 )
@@ -280,7 +278,6 @@ fun CommCenterHeroBanner() {
 @Composable
 fun AnnouncementCampaignCard(
     ann: Announcement,
-    onSimulateInteraction: (String, String) -> Unit,
     onUpdateStatus: (String, String) -> Unit,
     onDelete: (String) -> Unit
 ) {
@@ -488,37 +485,6 @@ fun AnnouncementCampaignCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Interactive simulation actions
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Simulate:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
-                    
-                    IconButton(
-                        onClick = { onSimulateInteraction(ann.id, "OPEN") },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("simulate_open_${ann.id}")
-                    ) {
-                        Icon(Icons.Default.Visibility, contentDescription = "Simulate Open", tint = AccentBlue, modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(
-                        onClick = { onSimulateInteraction(ann.id, "CLICK") },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("simulate_click_${ann.id}")
-                    ) {
-                        Icon(Icons.Default.AdsClick, contentDescription = "Simulate Click", tint = NeonEmerald, modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(
-                        onClick = { onSimulateInteraction(ann.id, "DISMISS") },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("simulate_dismiss_${ann.id}")
-                    ) {
-                        Icon(Icons.Default.Cancel, contentDescription = "Simulate Dismiss", tint = AccentRed, modifier = Modifier.size(16.dp))
-                    }
-                }
 
                 // Management actions
                 Row(

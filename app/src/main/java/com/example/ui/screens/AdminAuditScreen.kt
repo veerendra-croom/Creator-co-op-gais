@@ -448,16 +448,25 @@ fun AdminAuditScreen(
                 Row {
                     TextButton(
                         onClick = {
-                            val sendIntent = android.content.Intent().apply {
-                                action = android.content.Intent.ACTION_SEND
-                                putExtra(android.content.Intent.EXTRA_TEXT, exportDataString)
-                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Creator Co-Op Audit Ledger Export ($exportFormat)")
-                                type = "text/plain"
+                            try {
+                                val sendIntent = android.content.Intent().apply {
+                                    action = android.content.Intent.ACTION_SEND
+                                    putExtra(android.content.Intent.EXTRA_TEXT, exportDataString)
+                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "Creator Co-Op Audit Ledger Export ($exportFormat)")
+                                    type = "text/plain"
+                                }
+                                val shareIntent = android.content.Intent.createChooser(sendIntent, "Export Audit Ledger")
+                                shareIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                context.startActivity(shareIntent)
+                                showExportDialog = false
+                                com.example.ui.feedback.FeedbackManager.showSuccess("Audit Ledger $exportFormat exported.")
+                            } catch (e: Exception) {
+                                val clipboardManager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("Creator Co-op Audit Ledger", exportDataString)
+                                clipboardManager.setPrimaryClip(clip)
+                                showExportDialog = false
+                                com.example.ui.feedback.FeedbackManager.showSuccess("Share unavailable. Data copied to clipboard.")
                             }
-                            val shareIntent = android.content.Intent.createChooser(sendIntent, "Export Audit Ledger")
-                            context.startActivity(shareIntent)
-                            showExportDialog = false
-                            com.example.ui.feedback.FeedbackManager.showSuccess("Audit Ledger $exportFormat exported.")
                         }
                     ) {
                         Text("SHARE / EXPORT", fontWeight = FontWeight.Bold, color = NeonEmerald)

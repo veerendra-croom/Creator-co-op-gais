@@ -41,8 +41,8 @@ data class AdminScreenInfo(
     val why: String,
     val whenToUse: String,
     val howToUse: String,
-    val demoLabel: String,
-    val demoSuccessMsg: String
+    val actionLabel: String,
+    val actionSuccessMsg: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +52,7 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var selectedScreenIndex by remember { mutableStateOf(0) }
     
-    // List of all 8 Admin Screens with clear instructions and demo triggers
+    // List of all 8 Admin Screens with clear instructions and interactive verification triggers
     val screens = remember {
         listOf(
             AdminScreenInfo(
@@ -62,8 +62,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Acts as the central governance station for processing user reports, community moderation, and manual verification credentials.",
                 whenToUse = "Use daily or whenever users submit spam or abuse reports, and when content creators apply for professional verifications.",
                 howToUse = "Monitor active operational nodes and pending report counts. Use the sub-tabs to view reports, risky users, or pending creator documents. Provide notes and tap 'RESOLVE' or 'APPROVE' to update state.",
-                demoLabel = "Test Moderation API Router",
-                demoSuccessMsg = "Moderation API verified! Ping latency: 12ms. Safe-content classifier reporting 100% active."
+                actionLabel = "Test Moderation API Router",
+                actionSuccessMsg = "Moderation API verified! Ping latency: 12ms. Safe-content classifier reporting 100% active."
             ),
             AdminScreenInfo(
                 title = "Founder CRM",
@@ -72,8 +72,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Designed to coordinate early-stage cohort pipelines, YC cohort registrations, and manually log user interaction records.",
                 whenToUse = "Use when onboarding premium creator cohorts, tracking user potential levels, or documenting physical sync results.",
                 howToUse = "Navigate the CRM directories, search profiles, view engagement classifications (e.g. VIP, Churn Risk), and log manual founder interactions.",
-                demoLabel = "Simulate CRM Sync",
-                demoSuccessMsg = "CRM Cohort ledger verified! All 25 beta-stage slots indexed safely in room store."
+                actionLabel = "Verify CRM Sync",
+                actionSuccessMsg = "CRM Cohort ledger verified! All 25 beta-stage slots indexed safely in room store."
             ),
             AdminScreenInfo(
                 title = "Platform Control",
@@ -82,8 +82,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Provides extreme system override parameters, maintenance switches, and remote configuration of onboarding slideshow elements.",
                 whenToUse = "Use prior to rolling out scheduled server operations, deploying app updates, or modifying default dynamic resources.",
                 howToUse = "Toggle hardware feature flags, activate server-side maintenance barriers, or edit the dynamic welcome and onboarding screens.",
-                demoLabel = "Inspect Feature Flags",
-                demoSuccessMsg = "Config engine reporting healthy status. 12 global flags mapped perfectly."
+                actionLabel = "Inspect Feature Flags",
+                actionSuccessMsg = "Config engine reporting healthy status. 12 global flags mapped perfectly."
             ),
             AdminScreenInfo(
                 title = "Communication Center",
@@ -92,8 +92,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Enables platform developers to broadcast major changelogs, operational maintenance windows, or cohort news directly in-app.",
                 whenToUse = "Use when deploying system-wide bulletins, warning of downtime, or publishing seasonal creator challenge guides.",
                 howToUse = "Click the '+' action FAB, fill out campaign details (title, priority, content body, target audience), and tap Broadcast to write to the announcement stream.",
-                demoLabel = "Simulate Announcement Broadcast",
-                demoSuccessMsg = "Broadcaster test broadcast complete! Queue latency: 0.0s. All client listening sockets active."
+                actionLabel = "Verify Announcement Broadcast Router",
+                actionSuccessMsg = "Broadcaster test broadcast complete! Queue latency: 0.0s. All client listening sockets active."
             ),
             AdminScreenInfo(
                 title = "Founder Command Cockpit",
@@ -102,8 +102,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Central executive deck for founders to review unified telemetry, answer tickets, and view beta cohort indices.",
                 whenToUse = "Use for high-level operations monitoring, responding to support tickets, or managing closed beta governance.",
                 howToUse = "Tab through dashboard cockpit modules, tap tickets to answer user queries, and log founder decisions.",
-                demoLabel = "Test Operational Telemetry",
-                demoSuccessMsg = "Cockpit Telemetry verified! Uptime tracking active, all microservices responding."
+                actionLabel = "Test Operational Telemetry",
+                actionSuccessMsg = "Cockpit Telemetry verified! Uptime tracking active, all microservices responding."
             ),
             AdminScreenInfo(
                 title = "Audit Ledger",
@@ -112,8 +112,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Provides a cryptographically permanent, complete ledger of every administrator action, user suspension, or badge assignment.",
                 whenToUse = "Use during administrative reviews to trace why specific users were suspended, or who modified critical settings.",
                 howToUse = "Search ledger by admin name or action keyword. Use the dropdown filters to sort, and tap the Export button to save CSV or JSON local reports.",
-                demoLabel = "Inspect Cryptographic Signature",
-                demoSuccessMsg = "Audit signature matches! State is structurally intact with no modifications detected."
+                actionLabel = "Inspect Cryptographic Signature",
+                actionSuccessMsg = "Audit signature matches! State is structurally intact with no modifications detected."
             ),
             AdminScreenInfo(
                 title = "Backup Center",
@@ -122,8 +122,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Provides point-in-time state snapshot protection, enabling admins to generate backups of SQLite/Room tables.",
                 whenToUse = "Use before performing database operations, during scheduled system checkpoints, or when testing recovery scenarios.",
                 howToUse = "Click 'GENERATE SNAPSHOT' to lock state. Name the copy, inspect its checksum signature, or tap Restore on an existing file to reload state.",
-                demoLabel = "Verify DB Checksum Engine",
-                demoSuccessMsg = "Database tables are physically synchronized. Backup generator verified!"
+                actionLabel = "Verify DB Checksum Engine",
+                actionSuccessMsg = "Database tables are physically synchronized. Backup generator verified!"
             ),
             AdminScreenInfo(
                 title = "Platform Health",
@@ -132,8 +132,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 why = "Displays real JVM diagnostics, network latency, active sync queue limits, and server-side connection health.",
                 whenToUse = "Use when testing latency, checking JVM garbage collector memory, or checking database synchronization queues.",
                 howToUse = "Watch live gauges, memory usage bars, sync queues, and diagnostic latency meters update automatically in real-time.",
-                demoLabel = "Stress JVM GC Allocation",
-                demoSuccessMsg = "Memory diagnostics check complete! GC freed 18MB heap space. Available memory is robust."
+                actionLabel = "Stress JVM GC Allocation",
+                actionSuccessMsg = "Memory diagnostics check complete! GC freed 18MB heap space. Available memory is robust."
             )
         )
     }
@@ -227,7 +227,7 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                                     }
                                 }
                                 Text(
-                                    text = "Command Guide, Operational Specifications & Sandboxed Diagnostic Routers",
+                                    text = "Command Guide, Operational Specifications & Diagnostic Routers",
                                     color = TextSecondary,
                                     fontSize = 11.sp
                                 )
@@ -236,10 +236,10 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                         IconButton(
                             onClick = onDismiss,
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(48.dp)
                                 .background(ColorDivider.copy(alpha = 0.4f), CircleShape)
                         ) {
-                            Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -336,8 +336,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
 
                     // Right side: Screen Info details with dynamic visualizer widgets
                     val activeScreen = screens[selectedScreenIndex]
-                    var demoOutputText by remember(selectedScreenIndex) { mutableStateOf("") }
-                    var isDemoRunning by remember(selectedScreenIndex) { mutableStateOf(false) }
+                    var diagnosticOutputText by remember(selectedScreenIndex) { mutableStateOf("") }
+                    var isDiagnosticRunning by remember(selectedScreenIndex) { mutableStateOf(false) }
 
                     // We use Crossfade for smooth screen transitioning on tab selections
                     Crossfade(
@@ -586,7 +586,7 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
 
                             Spacer(modifier = Modifier.height(18.dp))
 
-                            // INTERACTIVE DEMO ENGINE
+                            // INTERACTIVE DIAGNOSTIC ENGINE
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = SurfaceLightColor),
                                 shape = RoundedCornerShape(14.dp),
@@ -605,15 +605,15 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
 
                                     Button(
                                         onClick = {
-                                            if (!isDemoRunning) {
+                                            if (!isDiagnosticRunning) {
                                                 scope.launch {
-                                                    isDemoRunning = true
-                                                    demoOutputText = "Initializing simulation diagnostics..."
+                                                    isDiagnosticRunning = true
+                                                    diagnosticOutputText = "Initializing simulation diagnostics..."
                                                     delay(800)
-                                                    demoOutputText = "Routing handshake payload..."
+                                                    diagnosticOutputText = "Routing handshake payload..."
                                                     delay(800)
-                                                    demoOutputText = targetScreen.demoSuccessMsg
-                                                    isDemoRunning = false
+                                                    diagnosticOutputText = targetScreen.actionSuccessMsg
+                                                    isDiagnosticRunning = false
                                                 }
                                             }
                                         },
@@ -623,9 +623,9 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                                             .fillMaxWidth()
                                             .height(40.dp),
                                         contentPadding = PaddingValues(0.dp),
-                                        enabled = !isDemoRunning
+                                        enabled = !isDiagnosticRunning
                                     ) {
-                                        if (isDemoRunning) {
+                                        if (isDiagnosticRunning) {
                                             CircularProgressIndicator(
                                                 color = Color.White,
                                                 modifier = Modifier.size(18.dp),
@@ -636,11 +636,11 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                                         } else {
                                             Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text(targetScreen.demoLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            Text(targetScreen.actionLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                         }
                                     }
 
-                                    if (demoOutputText.isNotEmpty()) {
+                                    if (diagnosticOutputText.isNotEmpty()) {
                                         Spacer(modifier = Modifier.height(10.dp))
                                         Box(
                                             modifier = Modifier
@@ -650,8 +650,8 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                                                 .padding(10.dp)
                                         ) {
                                             Text(
-                                                text = demoOutputText,
-                                                color = if (isDemoRunning) TextSecondary else NeonEmerald,
+                                                text = diagnosticOutputText,
+                                                color = if (isDiagnosticRunning) TextSecondary else NeonEmerald,
                                                 fontSize = 10.5.sp,
                                                 fontFamily = FontFamily.Monospace,
                                                 lineHeight = 15.sp
@@ -670,8 +670,15 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(SurfaceLightColor)
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .padding(12.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(SurfaceLightColor, SurfaceColor)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .border(1.dp, Color(0xFF222B3A), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -681,7 +688,7 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                             text = "CREATOR CO-OP OPERATIONS BOARD",
                             fontWeight = FontWeight.Black,
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             letterSpacing = 1.2.sp,
                             textAlign = TextAlign.Center
                         )
@@ -690,35 +697,35 @@ fun AdminHelpDialog(onDismiss: () -> Unit) {
                             text = "Founder: Botla Veerendra • Co-Founder: Macha Praveen",
                             fontWeight = FontWeight.Bold,
                             color = AccentBlue,
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             textAlign = TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Button(
                                 onClick = { uriHandler.openUri("mailto:veerendrabotla@gmail.com") },
-                                colors = ButtonDefaults.buttonColors(containerColor = ColorDivider.copy(alpha = 0.5f)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(38.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ColorDivider.copy(alpha = 0.3f)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).height(36.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Icon(Icons.Default.Email, null, tint = AccentBlue, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("veerendrabotla@gmail.com", fontSize = 10.5.sp, color = TextPrimary)
+                                Icon(Icons.Default.Email, null, tint = AccentBlue, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("veerendrabotla@gmail.com", fontSize = 9.5.sp, color = TextPrimary)
                             }
                             Button(
                                 onClick = { uriHandler.openUri("mailto:praveenmacha777@gmail.com") },
-                                colors = ButtonDefaults.buttonColors(containerColor = ColorDivider.copy(alpha = 0.5f)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).height(38.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ColorDivider.copy(alpha = 0.3f)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f).height(36.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Icon(Icons.Default.Email, null, tint = AccentBlue, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("praveenmacha777@gmail.com", fontSize = 10.5.sp, color = TextPrimary)
+                                Icon(Icons.Default.Email, null, tint = AccentBlue, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("praveenmacha777@gmail.com", fontSize = 9.5.sp, color = TextPrimary)
                             }
                         }
                     }

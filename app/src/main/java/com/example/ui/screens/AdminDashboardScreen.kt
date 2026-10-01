@@ -159,7 +159,27 @@ fun AdminDashboardScreen(
 
                 Button(
                     onClick = {
-                        FeedbackManager.showSuccess("Exported system audit & telemetry logs as CSV")
+                        val csvContent = buildString {
+                            appendLine("CreatedAt,Action,ActionTaken,AdminID,TargetUserID,Reason")
+                            userLogs.forEach { log ->
+                                appendLine("${log.createdAt},${log.action},${log.actionTaken},${log.adminId},${log.targetUserId},\"${log.reason.replace("\"", "'")}\"")
+                            }
+                        }
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("Audit Logs CSV", csvContent)
+                        clipboard.setPrimaryClip(clip)
+
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/csv"
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Co-Op Governance Audit Logs.csv")
+                            putExtra(android.content.Intent.EXTRA_TEXT, csvContent)
+                        }
+                        try {
+                            context.startActivity(android.content.Intent.createChooser(intent, "Share Audit CSV"))
+                        } catch (e: Exception) {
+                            // Fallback to clipboard notification
+                        }
+                        FeedbackManager.showSuccess("Exported ${userLogs.size} audit records to CSV & Clipboard!")
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
                     shape = RoundedCornerShape(12.dp),

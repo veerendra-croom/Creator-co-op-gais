@@ -42,6 +42,11 @@ fun ReferTeammateScreen(
     val context = LocalContext.current
     var friendCode by remember { mutableStateOf("") }
     val referralsCount by remember(userProfile.id) { globalViewModel.getSuccessfulReferralCount(userProfile.id) }.collectAsState(initial = 0)
+    var alreadyRedeemed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(userProfile.id) {
+        alreadyRedeemed = globalViewModel.hasAppliedReferralCode(userProfile.id)
+    }
 
     // Ensure referral code is generated on screen enter if missing
     LaunchedEffect(userProfile) {
@@ -285,49 +290,72 @@ fun ReferTeammateScreen(
                         HorizontalDivider(color = ColorDivider)
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Text(
-                            text = "Were you invited by someone?",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = friendCode,
-                            onValueChange = { friendCode = it.uppercase() },
-                            textStyle = TextStyle(color = Color.White),
-                            placeholder = { Text("Enter invite code...", color = TextMuted) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("friend_referral_input"),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = AccentBlue,
-                                unfocusedBorderColor = ColorDivider,
-                                cursorColor = AccentBlue
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                if (friendCode.isNotBlank()) {
-                                    globalViewModel.applyReferralCode(userProfile.id, friendCode)
-                                    friendCode = ""
-                                } else {
-                                    Toast.makeText(context, "Please enter a valid code", Toast.LENGTH_SHORT).show()
+                        if (alreadyRedeemed) {
+                            Surface(
+                                color = NeonEmerald.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, NeonEmerald.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(20.dp))
+                                    Column {
+                                        Text("Referral Pass Active", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text("You have already redeemed an invitation pass on this account.", color = TextSecondary, fontSize = 11.sp)
+                                    }
                                 }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("apply_referral_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("REDEEM REFERRAL CODE", fontWeight = FontWeight.Black, color = Color.White)
+                            }
+                        } else {
+                            Text(
+                                text = "Were you invited by someone?",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = friendCode,
+                                onValueChange = { friendCode = it.uppercase() },
+                                textStyle = TextStyle(color = Color.White),
+                                placeholder = { Text("Enter invite code...", color = TextMuted) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("friend_referral_input"),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = AccentBlue,
+                                    unfocusedBorderColor = ColorDivider,
+                                    cursorColor = AccentBlue
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    if (friendCode.isNotBlank()) {
+                                        globalViewModel.applyReferralCode(userProfile.id, friendCode)
+                                        friendCode = ""
+                                        // re-check state
+                                        alreadyRedeemed = true
+                                    } else {
+                                        Toast.makeText(context, "Please enter a valid code", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("apply_referral_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("REDEEM REFERRAL CODE", fontWeight = FontWeight.Black, color = Color.White)
+                            }
                         }
                     }
                 }

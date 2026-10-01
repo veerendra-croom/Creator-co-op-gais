@@ -72,6 +72,8 @@ fun WorkspaceOverview(
     var selectedTaskForDetails by remember { mutableStateOf<ProductionTask?>(null) }
     var showUploadAssetDialog by remember { mutableStateOf(false) }
     var selectedDeliverableForReview by remember { mutableStateOf<Deliverable?>(null) }
+    var showCommandPalette by remember { mutableStateOf(false) }
+    var commandPaletteQuery by remember { mutableStateOf("") }
 
     // Helpers to parse rich task data
     val parseDueDate: (String) -> Long? = { body ->
@@ -161,6 +163,18 @@ fun WorkspaceOverview(
             title = workspace.name,
             subtitle = "${workspace.platformType} • ${if (workspace.isArchived) "Archived" else "Active"}",
             action = {
+                // Command Palette Launcher (Cmd / Ctrl + K)
+                IconButton(
+                    onClick = { showCommandPalette = true },
+                    modifier = Modifier
+                        .background(AccentBlue.copy(alpha = 0.15f), DS.RadiusMedium)
+                        .border(1.dp, AccentBlue.copy(alpha = 0.6f), DS.RadiusMedium)
+                        .size(40.dp)
+                        .testTag("workspace_command_palette_button")
+                ) {
+                    Icon(Icons.Default.Search, "Command Palette Quick Switcher", tint = AccentBlue)
+                }
+
                 IconButton(
                     onClick = { showPDFDialog = true },
                     modifier = Modifier
@@ -182,6 +196,109 @@ fun WorkspaceOverview(
                 }
             }
         )
+
+        // Simplification 3: Workspace Hero Stat Bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Stat 1: Active Tasks & Health
+            Surface(
+                color = SurfaceColor,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, ColorDivider),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onGoToTasks() }
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("TASKS", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (overdueTasksCount > 0) AccentRed else NeonEmerald)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${activeTasks.size}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    Text("${productionHealthIndex}% Health", color = if (productionHealthIndex > 70) NeonEmerald else CrispAmber, fontSize = 10.sp)
+                }
+            }
+
+            // Stat 2: Pending Deliverables
+            Surface(
+                color = SurfaceColor,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, ColorDivider),
+                modifier = Modifier.weight(1f)
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("DELIVERABLES", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                        Icon(Icons.Default.Inventory, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(12.dp))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${activeDeliverables.size}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    Text("${pendingApprovalsCount} Pending", color = TextSecondary, fontSize = 10.sp)
+                }
+            }
+
+            // Stat 3: Pipeline Assets
+            Surface(
+                color = SurfaceColor,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, ColorDivider),
+                modifier = Modifier.weight(1f)
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("ASSETS", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                        Icon(Icons.Default.Folder, contentDescription = null, tint = CrispAmber, modifier = Modifier.size(12.dp))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${activeAssets.size}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    Text("In Pipeline", color = TextSecondary, fontSize = 10.sp)
+                }
+            }
+
+            // Stat 4: Team Members Online
+            Surface(
+                color = SurfaceColor,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, ColorDivider),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onGoToTeam() }
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("TEAM", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                        Icon(Icons.Default.Group, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(12.dp))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${activeMembers.size}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    Text("${onlineCount} Online", color = NeonEmerald, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
 
         // --- 2. Workspace Overview Header Banner ---
         Card(
@@ -568,7 +685,12 @@ fun WorkspaceOverview(
                             modifier = Modifier
                                 .width(200.dp)
                                 .clickable {
-                                    android.widget.Toast.makeText(context, "Downloading: ${asset.fileName}", android.widget.Toast.LENGTH_SHORT).show()
+                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(android.content.Intent.EXTRA_SUBJECT, "Download Asset: ${asset.fileName}")
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "Shared Creator Co-Op Asset Resource:\nName: ${asset.fileName}\nType: ${asset.fileType.uppercase()}\nUploader: ${asset.uploaderId}\nLink: https://creatorcoop.app/assets/${asset.id}")
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Download/Open ${asset.fileName}"))
                                 },
                             colors = CardDefaults.cardColors(containerColor = SurfaceColor),
                             shape = DS.RadiusMedium,
@@ -786,6 +908,139 @@ fun WorkspaceOverview(
                 }
             }
         }
+    }
+
+    if (showCommandPalette) {
+        AlertDialog(
+            onDismissRequest = { showCommandPalette = false },
+            containerColor = SurfaceColor,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = AccentBlue)
+                    Text("Workspace Quick Command Palette", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = commandPaletteQuery,
+                        onValueChange = { commandPaletteQuery = it },
+                        placeholder = { Text("Jump to task, file, channel, or member...", color = TextSecondary, fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentBlue,
+                            unfocusedBorderColor = ColorDivider,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("command_palette_search_input")
+                    )
+
+                    Text("QUICK JUMP SUGGESTIONS", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // Quick Action 1: Tasks
+                        Surface(
+                            onClick = {
+                                showCommandPalette = false
+                                onGoToTasks()
+                            },
+                            color = SurfaceLightColor,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Task, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+                                    Text("Go to Kanban Production Tasks", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Text("${activeTasks.size} tasks", color = TextSecondary, fontSize = 10.sp)
+                            }
+                        }
+
+                        // Quick Action 2: Chat
+                        Surface(
+                            onClick = {
+                                showCommandPalette = false
+                                onGoToChat()
+                            },
+                            color = SurfaceLightColor,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Chat, contentDescription = null, tint = NeonEmerald, modifier = Modifier.size(16.dp))
+                                    Text("Open Workspace Chat Channels", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Text("#general", color = TextSecondary, fontSize = 10.sp)
+                            }
+                        }
+
+                        // Quick Action 3: Agreement Vault
+                        Surface(
+                            onClick = {
+                                showCommandPalette = false
+                                onGoToAgreement()
+                            },
+                            color = SurfaceLightColor,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.HistoryEdu, contentDescription = null, tint = CrispAmber, modifier = Modifier.size(16.dp))
+                                    Text("Open Agreement Vault", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Text("Contracts & Splits", color = TextSecondary, fontSize = 10.sp)
+                            }
+                        }
+
+                        // Quick Action 4: Members
+                        Surface(
+                            onClick = {
+                                showCommandPalette = false
+                                onGoToTeam()
+                            },
+                            color = SurfaceLightColor,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Group, contentDescription = null, tint = AccentRed, modifier = Modifier.size(16.dp))
+                                    Text("View Team Roster & Roles", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Text("${activeMembers.size} members", color = TextSecondary, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCommandPalette = false }) {
+                    Text("Close", color = TextSecondary)
+                }
+            }
+        )
     }
 
     if (showPDFDialog) {

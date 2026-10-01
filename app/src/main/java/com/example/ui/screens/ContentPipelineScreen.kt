@@ -135,12 +135,13 @@ fun ContentPipelineScreen(
             val filteredTasks = activeTasks.filter { task ->
                 searchQuery.isBlank() || task.title.contains(searchQuery, ignoreCase = true) || task.contentBody.contains(searchQuery, ignoreCase = true)
             }
-            // Group tasks by their pipeline stages based on kanbanLane mapping
-            val ideationTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("TODO", "IDEAS") }
-            val scriptingTasks = filteredTasks.filter { it.kanbanLane.uppercase() == "SCRIPTING" }
-            val filmingTasks = filteredTasks.filter { it.kanbanLane.uppercase() == "FILMING" }
-            val editingTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("IN_PROGRESS", "EDITING") }
-            val publishingTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("DONE", "PUBLISHED", "PUBLISH") }
+            // Group tasks by their pipeline stages based on standard kanbanLane mapping
+            val ideationTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("TODO", "IDEAS", "RESEARCH") }
+            val scriptingTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("SCRIPT", "SCRIPTING") }
+            val filmingTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("RECORD", "RECORDING", "FILMING") }
+            val editingTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("EDIT", "EDITING", "IN_PROGRESS") }
+            val reviewTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("REVIEW", "IN_REVIEW") }
+            val publishingTasks = filteredTasks.filter { it.kanbanLane.uppercase() in listOf("PUBLISH", "PUBLISHED", "DONE", "COMPLETED") }
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -151,7 +152,7 @@ fun ContentPipelineScreen(
                     PipelineStageColumn(
                         stageName = "IDEATION",
                         items = ideationTasks,
-                        onAddTaskClick = { showAddItemDialogForStage = "TODO" },
+                        onAddTaskClick = { showAddItemDialogForStage = "IDEAS" },
                         onTaskClick = { selectedTaskToMove = it; showMoveMenu = true }
                     )
                 }
@@ -159,15 +160,15 @@ fun ContentPipelineScreen(
                     PipelineStageColumn(
                         stageName = "SCRIPTING",
                         items = scriptingTasks,
-                        onAddTaskClick = { showAddItemDialogForStage = "SCRIPTING" },
+                        onAddTaskClick = { showAddItemDialogForStage = "SCRIPT" },
                         onTaskClick = { selectedTaskToMove = it; showMoveMenu = true }
                     )
                 }
                 item {
                     PipelineStageColumn(
-                        stageName = "FILMING",
+                        stageName = "RECORDING",
                         items = filmingTasks,
-                        onAddTaskClick = { showAddItemDialogForStage = "FILMING" },
+                        onAddTaskClick = { showAddItemDialogForStage = "RECORD" },
                         onTaskClick = { selectedTaskToMove = it; showMoveMenu = true }
                     )
                 }
@@ -175,7 +176,15 @@ fun ContentPipelineScreen(
                     PipelineStageColumn(
                         stageName = "EDITING",
                         items = editingTasks,
-                        onAddTaskClick = { showAddItemDialogForStage = "EDITING" },
+                        onAddTaskClick = { showAddItemDialogForStage = "EDIT" },
+                        onTaskClick = { selectedTaskToMove = it; showMoveMenu = true }
+                    )
+                }
+                item {
+                    PipelineStageColumn(
+                        stageName = "REVIEW",
+                        items = reviewTasks,
+                        onAddTaskClick = { showAddItemDialogForStage = "REVIEW" },
                         onTaskClick = { selectedTaskToMove = it; showMoveMenu = true }
                     )
                 }
@@ -183,7 +192,7 @@ fun ContentPipelineScreen(
                     PipelineStageColumn(
                         stageName = "PUBLISHING",
                         items = publishingTasks,
-                        onAddTaskClick = { showAddItemDialogForStage = "DONE" },
+                        onAddTaskClick = { showAddItemDialogForStage = "PUBLISH" },
                         onTaskClick = { selectedTaskToMove = it; showMoveMenu = true }
                     )
                 }
@@ -221,11 +230,8 @@ fun ContentPipelineScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val stage = showAddItemDialogForStage ?: "TODO"
+                        val stage = showAddItemDialogForStage ?: "IDEAS"
                         if (newItemTitle.isNotBlank()) {
-                            // Since submitTask is available, we submit a task
-                            // Submit task creates a task under PRODUCTION_READY, and defaults to TODO or IDEAS
-                            // To make sure it lands in the right stage, let's create it.
                             workspaceViewModel.submitTask(
                                 title = newItemTitle,
                                 body = "Pipeline brief for $newItemTitle",
@@ -233,8 +239,6 @@ fun ContentPipelineScreen(
                                 userId = userId,
                                 kanbanLane = stage
                             )
-                            // We will also move it if it's not the initial 'TODO' stage
-                            // Our UI and flow are fully coupled with Database state!
                         }
                         showAddItemDialogForStage = null
                         newItemTitle = ""
@@ -265,11 +269,12 @@ fun ContentPipelineScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Select target production pipeline column for '${task.title}':", color = TextSecondary, fontSize = 12.sp)
                     listOf(
-                        "IDEATION" to "TODO",
-                        "SCRIPTING" to "SCRIPTING",
-                        "FILMING" to "FILMING",
-                        "EDITING" to "EDITING",
-                        "PUBLISHING" to "DONE"
+                        "IDEATION" to "IDEAS",
+                        "SCRIPTING" to "SCRIPT",
+                        "RECORDING" to "RECORD",
+                        "EDITING" to "EDIT",
+                        "REVIEW" to "REVIEW",
+                        "PUBLISHING" to "PUBLISH"
                     ).forEach { (label, lane) ->
                         Button(
                             onClick = {

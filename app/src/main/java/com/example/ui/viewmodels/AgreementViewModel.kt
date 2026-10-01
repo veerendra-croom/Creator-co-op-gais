@@ -81,6 +81,45 @@ class AgreementViewModel constructor(
         }
     }
 
+    fun updateSplits(workspaceId: String, leadPercent: Int, editorPercent: Int, vfxPercent: Int) {
+        viewModelScope.launch {
+            val latest = repository.getLatestAgreement(workspaceId).firstOrNull()
+            val baseContent = latest?.contentText ?: """
+                [PREAMBLE]
+                This Co-Op Production Contract is entered into secure block registers on this day, governing intellectual properties and compliance standards in Shard #$workspaceId.
+                
+                [SCOPE OF WORK]
+                Collaborators shall execute assigned production timeline units in accordance with Kanban milestones. Milestone completion is validated via decentralized peer review.
+                
+                [IP ASSIGNMENT]
+                All generated creative resources, video timeline layers, thumbnail scripts, and associated assets are held in secure Co-Op commons with a joint-ownership allocation model.
+                
+                [REVENUE SPLIT]
+                Gross earnings from published media streams are allocated dynamically based on verified contribution points: Lead Director (40%), Editors (30%), VFX Specialists (30%).
+            """.trimIndent()
+
+            val updatedRevenueLine = "Gross earnings from published media streams are allocated dynamically based on verified contribution points: Lead Director ($leadPercent%), Editors ($editorPercent%), VFX Specialists ($vfxPercent%)."
+            
+            val updatedContent = if (baseContent.contains("[REVENUE SPLIT]")) {
+                val parts = baseContent.split("[REVENUE SPLIT]")
+                parts[0] + "[REVENUE SPLIT]\n" + updatedRevenueLine
+            } else {
+                baseContent + "\n\n[REVENUE SPLIT]\n" + updatedRevenueLine
+            }
+
+            val nextVersion = (latest?.version ?: 1) + 1
+            val agreement = TeamAgreement(
+                id = UUID.randomUUID().toString(),
+                workspaceId = workspaceId,
+                version = nextVersion,
+                contentText = updatedContent,
+                createdAt = System.currentTimeMillis()
+            )
+            repository.createAgreement(agreement)
+            _toastMessage.value = "Revenue splits updated to $leadPercent% / $editorPercent% / $vfxPercent%. Team signatures reset."
+        }
+    }
+
     fun acknowledgeAgreement(agreementId: String, contentHash: String, userId: String) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val agreement = repository.getAgreementById(agreementId) ?: repository.getLatestAgreement(agreementId).firstOrNull()
@@ -88,7 +127,14 @@ class AgreementViewModel constructor(
                 _toastMessage.value = "Error: Agreement record not found."
                 return@launch
             }
-            if (agreement.contentText.hashCode().toString() != contentHash && contentHash != "HASH_ERR" && contentHash.isNotBlank()) {
+            val expectedHash = try {
+                val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(agreement.contentText.toByteArray())
+                bytes.joinToString("") { "%02x".format(it) }
+            } catch (e: Exception) {
+                agreement.contentText.hashCode().toString()
+            }
+
+            if (expectedHash != contentHash && agreement.contentText.hashCode().toString() != contentHash && contentHash != "HASH_ERR" && contentHash.isNotBlank()) {
                 // Check if terms changed
                 _toastMessage.value = "Signature Rejected: Agreement terms were updated. Please review the latest version."
                 return@launch
@@ -180,7 +226,21 @@ class AgreementViewModel constructor(
         }
     }
 
-    fun exportAgreementAsPDF() {
-        _toastMessage.value = "Exporting Agreement as PDF: Document hash verified."
+    fun exportAgreementAsPDF(context: android.content.Context, agreementText: String, title: String = "Co-Op Agreement") {
+        viewModelScope.launch {
+            try {
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TITLE, title)
+                    putExtra(android.content.Intent.EXTRA_TEXT, "--- $title ---\n\n$agreementText")
+                    type = "text/plain"
+                }
+                val chooser = android.content.Intent.createChooser(sendIntent, "Export $title")
+                context.startActivity(chooser)
+                _toastMessage.value = "Agreement exported successfully!"
+            } catch (e: Exception) {
+                _toastMessage.value = "Failed to export: ${e.message}"
+            }
+        }
     }
 }

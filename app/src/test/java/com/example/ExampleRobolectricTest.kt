@@ -218,16 +218,16 @@ class ExampleRobolectricTest {
         )
         repository.insertMember(membership)
 
-        val sandboxTask = ProductionTask(
-            id = "gdpr_sandbox_task",
+        val privateDraftTask = ProductionTask(
+            id = "gdpr_private_draft_task",
             workspaceId = workspaceId,
             creatorId = userId,
             title = "Draft Idea",
             contentBody = "Confidential script drafts",
-            stateScope = "ROUGH_SANDBOX",
+            stateScope = "PRIVATE_DRAFT",
             createdAt = System.currentTimeMillis()
         )
-        repository.insertTask(sandboxTask)
+        repository.insertTask(privateDraftTask)
 
         val sharedTask = ProductionTask(
             id = "gdpr_shared_task",
@@ -252,7 +252,7 @@ class ExampleRobolectricTest {
 
         // Verify initial setup is correct
         assertNotNull(repository.userDao.getUserById(userId).first())
-        assertEquals(1, repository.getRoughSandboxTasks(workspaceId, userId).first().size)
+        assertEquals(1, repository.getPrivateDraftTasks(workspaceId, userId).first().size)
         assertEquals(1, repository.getProductionTasks(workspaceId).first().size)
         assertEquals(1, repository.getMessagesForWorkspace(workspaceId).first().size)
 
@@ -263,8 +263,8 @@ class ExampleRobolectricTest {
         // Assert user profile is deleted from users table
         assertNull(repository.userDao.getUserById(userId).first())
 
-        // Assert sandbox item is permanently wiped
-        assertEquals(0, repository.getRoughSandboxTasks(workspaceId, userId).first().size)
+        // Assert private draft item is permanently wiped
+        assertEquals(0, repository.getPrivateDraftTasks(workspaceId, userId).first().size)
 
         // Assert workspace memberships are completely deleted for this user
         val members = repository.workspaceMemberDao.getMembersForWorkspaceList(workspaceId)

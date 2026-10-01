@@ -155,7 +155,7 @@ class FounderCrmViewModel(private val repository: AppRepository) : ViewModel() {
                 followUpTasksJson = """[{"id":"t_02","task":"Follow up on subscription calculator precision fix v1.2.5","completed":true},{"id":"t_03","task":"Coordinate video call walkthrough of ledger features","completed":false}]""",
                 contactHistoryJson = """[{"date":${now - 1 * dayInMs},"medium":"Slack","note":"Messaged him about billing calculator fix."}]""",
                 lastInteraction = now - 1 * dayInMs,
-                followUpStatus = "Scheduled Demo"
+                followUpStatus = "Scheduled Walkthrough"
             ),
             CrmRecord(
                 id = "crm_03",
@@ -233,11 +233,11 @@ class FounderCrmViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     // Dashboard computations
-    // 1. Users Needing Follow-up: Status is Contacted, Interested, or Scheduled Demo, AND last interaction was over 3 days ago
+    // 1. Users Needing Follow-up: Status is Contacted, Interested, or Scheduled Walkthrough, AND last interaction was over 3 days ago
     val usersNeedingFollowUp: StateFlow<List<CrmRecord>> = allCrmRecords.map { records ->
         val cutoff = System.currentTimeMillis() - 3 * 24 * 60 * 60 * 1000L
         records.filter {
-            (it.followUpStatus == "Contacted" || it.followUpStatus == "Interested" || it.followUpStatus == "Scheduled Demo") &&
+            (it.followUpStatus == "Contacted" || it.followUpStatus == "Interested" || it.followUpStatus == "Scheduled Walkthrough") &&
                     it.lastInteraction < cutoff
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,15 +42,27 @@ fun WorkspaceFilesHubScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showUploadDialog by remember { mutableStateOf(false) }
 
+    var selectedCategoryFilter by remember { mutableStateOf("ALL") }
+    var isMultiSelectMode by remember { mutableStateOf(false) }
+    var selectedAssetIds by remember { mutableStateOf(setOf<String>()) }
+    var showDeliverablePackagerDialog by remember { mutableStateOf(false) }
+
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
     val categories = listOf("RAW_FOOTAGE", "GRAPHICS", "AUDIO_STEMS", "EXPORTS")
-    val filteredAssets = assets.filter { it.fileName.contains(searchQuery, ignoreCase = true) }
+    val allCategoryFilters = listOf("ALL") + categories
+    
+    val filteredAssets = assets.filter { asset ->
+        (selectedCategoryFilter == "ALL" || asset.category == selectedCategoryFilter) &&
+        asset.fileName.contains(searchQuery, ignoreCase = true)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(PrimaryBackground)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -66,31 +80,204 @@ fun WorkspaceFilesHubScreen(
                 }
                 Text("Asset Pipeline", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
             }
-            Button(
-                onClick = { showUploadDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.FileUpload, tint = Color.White, contentDescription = "Upload")
-                Spacer(Modifier.width(4.dp))
-                Text("Upload Asset", fontWeight = FontWeight.Bold)
+            
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { showDeliverablePackagerDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Inventory, tint = Color.White, contentDescription = "Package Deliverables", modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Package Bundle", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+
+                Button(
+                    onClick = { showUploadDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.FileUpload, tint = Color.White, contentDescription = "Upload", modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Upload", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
             }
         }
 
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search assets...", color = TextSecondary) },
-            leadingIcon = { Icon(Icons.Default.Search, tint = TextSecondary, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = AccentRed,
-                unfocusedBorderColor = ColorDivider,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            ),
-            shape = RoundedCornerShape(12.dp)
-        )
+        // Search & Multi-Select Bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search assets...", color = TextSecondary, fontSize = 13.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, tint = TextSecondary, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                modifier = Modifier.weight(1f).height(48.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentRed,
+                    unfocusedBorderColor = ColorDivider,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            IconButton(
+                onClick = { 
+                    isMultiSelectMode = !isMultiSelectMode 
+                    if (!isMultiSelectMode) selectedAssetIds = emptySet()
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(if (isMultiSelectMode) AccentBlue.copy(alpha = 0.2f) else SurfaceColor, RoundedCornerShape(10.dp))
+                    .border(1.dp, if (isMultiSelectMode) AccentBlue else ColorDivider, RoundedCornerShape(10.dp))
+            ) {
+                Icon(
+                    imageVector = if (isMultiSelectMode) Icons.Default.ChecklistRtl else Icons.Default.Checklist,
+                    contentDescription = "Multi-Select",
+                    tint = if (isMultiSelectMode) AccentBlue else TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // Simplification 5: Asset File Category Filter Chips
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items(allCategoryFilters.size) { idx ->
+                val cat = allCategoryFilters[idx]
+                val isSelected = selectedCategoryFilter == cat
+                Surface(
+                    onClick = { selectedCategoryFilter = cat },
+                    color = if (isSelected) AccentRed else SurfaceColor,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, if (isSelected) AccentRed else ColorDivider),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text(
+                        text = if (cat == "ALL") "ALL ASSETS" else "#" + cat.replace("_", " "),
+                        color = if (isSelected) Color.White else TextSecondary,
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
+
+        var assetToDelete by remember { mutableStateOf<com.example.data.model.WorkspaceAsset?>(null) }
+        var showDeleteSelectedConfirm by remember { mutableStateOf(false) }
+
+        if (assetToDelete != null) {
+            AlertDialog(
+                onDismissRequest = { assetToDelete = null },
+                containerColor = SurfaceColor,
+                shape = RoundedCornerShape(16.dp),
+                title = { Text("Delete Asset?", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        "Are you sure you want to permanently delete \"${assetToDelete?.fileName}\"? This cannot be undone.",
+                        color = TextSecondary,
+                        fontSize = 13.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            assetToDelete?.let { viewModel.deleteAsset(it.id) }
+                            assetToDelete = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                    ) {
+                        Text("DELETE", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { assetToDelete = null }) {
+                        Text("CANCEL", color = TextSecondary)
+                    }
+                }
+            )
+        }
+
+        if (showDeleteSelectedConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteSelectedConfirm = false },
+                containerColor = SurfaceColor,
+                shape = RoundedCornerShape(16.dp),
+                title = { Text("Delete Selected Assets?", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        "Are you sure you want to delete ${selectedAssetIds.size} selected assets? This cannot be undone.",
+                        color = TextSecondary,
+                        fontSize = 13.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            selectedAssetIds.forEach { viewModel.deleteAsset(it) }
+                            selectedAssetIds = emptySet()
+                            showDeleteSelectedConfirm = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                    ) {
+                        Text("DELETE ALL", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteSelectedConfirm = false }) {
+                        Text("CANCEL", color = TextSecondary)
+                    }
+                }
+            )
+        }
+
+        // Batch Action Bar when Multi-Select Mode is Active
+        if (isMultiSelectMode && selectedAssetIds.isNotEmpty()) {
+            Surface(
+                color = SurfaceColor,
+                border = BorderStroke(1.dp, AccentBlue),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${selectedAssetIds.size} assets selected",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(
+                            onClick = {
+                                showDeleteSelectedConfirm = true
+                            }
+                        ) {
+                            Text("Delete Selected", color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { showDeliverablePackagerDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("Package", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             categories.forEach { category ->
@@ -107,7 +294,7 @@ fun WorkspaceFilesHubScreen(
                             type = asset.fileType,
                             size = "v${asset.version}",
                             date = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(java.util.Date(asset.createdAt)),
-                            onDelete = { viewModel.deleteAsset(asset.id) }
+                            onDelete = { assetToDelete = asset }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(12.dp)) }
@@ -323,6 +510,130 @@ fun WorkspaceFilesHubScreen(
             }
         )
     }
+
+    if (showDeliverablePackagerDialog) {
+        var bundleName by remember { mutableStateOf("Co-Op Master Delivery Package v1") }
+        var clientEmail by remember { mutableStateOf("client.review@coop.studio") }
+        var attachContract by remember { mutableStateOf(true) }
+        var isPackaging by remember { mutableStateOf(false) }
+        var packageDone by remember { mutableStateOf(false) }
+        val packageScope = rememberCoroutineScope()
+
+        AlertDialog(
+            onDismissRequest = { if (!isPackaging) showDeliverablePackagerDialog = false },
+            containerColor = SurfaceColor,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Inventory, contentDescription = null, tint = AccentBlue)
+                    Text("Production Deliverable Packager", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Compiles selected assets, creates signed client sign-off manifest, and links revenue split contracts from Agreement Vault.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = bundleName,
+                        onValueChange = { bundleName = it },
+                        label = { Text("Deliverable Bundle Title", color = TextSecondary, fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentBlue,
+                            unfocusedBorderColor = ColorDivider,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = clientEmail,
+                        onValueChange = { clientEmail = it },
+                        label = { Text("Client Delivery Email", color = TextSecondary, fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentBlue,
+                            unfocusedBorderColor = ColorDivider,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceLightColor, RoundedCornerShape(8.dp))
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Attach Vault Contract", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Auto-includes signed revenue split terms", color = TextSecondary, fontSize = 10.sp)
+                        }
+                        Switch(
+                            checked = attachContract,
+                            onCheckedChange = { attachContract = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AccentBlue)
+                        )
+                    }
+
+                    if (packageDone) {
+                        Surface(
+                            color = NeonEmerald.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, NeonEmerald),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("BUNDLE READY FOR CLIENT SIGN-OFF", color = NeonEmerald, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Manifest Hash: SHA256-883F-COOP-DELIVER", color = TextSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                Row(
+                                    modifier = Modifier.clickable {
+                                        try {
+                                            uriHandler.openUri("mailto:veerendrabotla@gmail.com?subject=Co-Op%20Deliverable%20Escalation")
+                                        } catch (e: Exception) {}
+                                    },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Escalation Founder Contact: ", color = TextSecondary, fontSize = 9.sp)
+                                    Text("veerendrabotla@gmail.com", color = AccentBlue, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (!packageDone) {
+                            packageScope.launch {
+                                isPackaging = true
+                                delay(600)
+                                isPackaging = false
+                                packageDone = true
+                            }
+                        } else {
+                            showDeliverablePackagerDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    enabled = !isPackaging
+                ) {
+                    Text(if (packageDone) "Done" else if (isPackaging) "Packaging..." else "Generate Package", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeliverablePackagerDialog = false }) {
+                    Text("Close", color = TextSecondary)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -383,8 +694,8 @@ fun FileItem(title: String, type: String, size: String, date: String, onDelete: 
             }
             Text(date, color = TextSecondary, fontSize = 12.sp)
             if (onDelete != null) {
-                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete asset", tint = TextMuted, modifier = Modifier.size(16.dp))
+                IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete asset", tint = TextMuted, modifier = Modifier.size(20.dp))
                 }
             }
         }

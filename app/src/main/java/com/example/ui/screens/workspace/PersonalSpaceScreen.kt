@@ -29,8 +29,7 @@ import com.example.ui.viewmodels.WorkspaceViewModel
 
 @Composable
 fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, userId: String) {
-    val tasks by viewModel.activeTasks.collectAsState()
-    val sandboxTasks = tasks.filter { it.stateScope == "ROUGH_SANDBOX" }
+    val personalNotes by viewModel.getPersonalNotesForUser(userId).collectAsState(initial = emptyList())
     val isAISummarizing by viewModel.isAISummarizing.collectAsState()
     val aiError by viewModel.aiSummarizationError.collectAsState()
     
@@ -58,13 +57,46 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
     var editingTaskId by remember { mutableStateOf<String?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
     var activeAISynthesisTaskId by remember { mutableStateOf<String?>(null) }
+    var noteToDelete by remember { mutableStateOf<com.example.data.model.PersonalNote?>(null) }
 
-    val filteredSandboxTasks = sandboxTasks.filter { task ->
-        val matchesSearch = task.title.contains(searchQuery, ignoreCase = true) || task.contentBody.contains(searchQuery, ignoreCase = true)
+    if (noteToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { noteToDelete = null },
+            containerColor = SurfaceColor,
+            shape = RoundedCornerShape(16.dp),
+            title = { Text("Delete Private Draft?", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Are you sure you want to permanently delete \"${noteToDelete?.title}\"? This action cannot be undone.",
+                    color = TextSecondary,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        noteToDelete?.let { viewModel.deletePersonalNote(it.id) }
+                        noteToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                ) {
+                    Text("DELETE", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { noteToDelete = null }) {
+                    Text("CANCEL", color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    val filteredDraftTasks = personalNotes.filter { note ->
+        val matchesSearch = note.title.contains(searchQuery, ignoreCase = true) || note.content.contains(searchQuery, ignoreCase = true)
         val matchesCategory = if (selectedCategoryFilter == "All") {
             true
         } else {
-            task.title.contains("[$selectedCategoryFilter]", ignoreCase = true)
+            note.category.equals(selectedCategoryFilter, ignoreCase = true)
         }
         matchesSearch && matchesCategory
     }
@@ -74,7 +106,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
             .fillMaxSize()
             .background(PrimaryBackground)
     ) {
-        // Safe private sandbox banner
+        // Safe private draft banner
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -136,6 +168,11 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
         )
 
         // Category tags filter
+        val dynamicCategories = remember(personalNotes) {
+            val fromNotes = personalNotes.map { it.category }
+            (listOf("All", "Hook Idea", "Script Blueprint", "Visual Guide", "Thumbnail Plan") + fromNotes).distinct()
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -143,7 +180,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                 .padding(horizontal = DS.Space16, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            listOf("All", "Hook Idea", "Script Blueprint", "Visual Guide", "Thumbnail Plan").forEach { cat ->
+            dynamicCategories.forEach { cat ->
                 val isSel = selectedCategoryFilter == cat
                 Surface(
                     modifier = Modifier.clickable { selectedCategoryFilter = cat },
@@ -165,12 +202,12 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
         Spacer(modifier = Modifier.height(DS.Space8))
         
         AnimatedContent(
-            targetState = filteredSandboxTasks.isEmpty(),
+            targetState = filteredDraftTasks.isEmpty(),
             transitionSpec = {
                 fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
             },
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            label = "sandbox_content_transition"
+            label = "draft_content_transition"
         ) { isEmpty ->
             if (isEmpty) {
                 Box(
@@ -180,7 +217,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                     contentAlignment = Alignment.Center
                 ) {
                     EmptyState(
-                        message = if (searchQuery.isNotEmpty() || selectedCategoryFilter != "All") "No drafts match your filters." else "Your sandbox drafting pad is currently empty.",
+                        message = if (searchQuery.isNotEmpty() || selectedCategoryFilter != "All") "No drafts match your filters." else "Your private drafting pad is currently empty.",
                         icon = Icons.Default.NoteAdd,
                         actionText = "Create Private Concept Draft",
                         onAction = {
@@ -199,12 +236,8 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                     contentPadding = PaddingValues(vertical = DS.Space16),
                     verticalArrangement = Arrangement.spacedBy(DS.Space16)
                 ) {
-                    items(filteredSandboxTasks, key = { it.id }) { task ->
-                        val categoryText = if (task.title.contains("[")) {
-                            task.title.substringBefore("]").removePrefix("[")
-                        } else {
-                            "CONCEPT"
-                        }
+                    items(filteredDraftTasks, key = { it.id }) { note ->
+                        val categoryText = note.category
                         val categoryColor = when(categoryText.trim().uppercase()) {
                             "HOOK IDEA" -> NeonEmerald
                             "SCRIPT BLUEPRINT" -> CrispAmber
@@ -220,19 +253,10 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                     if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     }
-                                    editingTaskId = task.id
-                                    val titleWithoutCategory = if (task.title.contains("]")) {
-                                        task.title.substringAfter("]").trim()
-                                    } else {
-                                        task.title
-                                    }
-                                    draftTitle = titleWithoutCategory
-                                    draftBody = task.contentBody
-                                    draftCategory = if (task.title.contains("[")) {
-                                        task.title.substringBefore("]").removePrefix("[").trim()
-                                    } else {
-                                        "Hook Idea"
-                                    }
+                                    editingTaskId = note.id
+                                    draftTitle = note.title
+                                    draftBody = note.content
+                                    draftCategory = note.category
                                     showEditDialog = true
                                 },
                             colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -266,19 +290,10 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                                 if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
-                                                editingTaskId = task.id
-                                                val titleWithoutCategory = if (task.title.contains("]")) {
-                                                    task.title.substringAfter("]").trim()
-                                                } else {
-                                                    task.title
-                                                }
-                                                draftTitle = titleWithoutCategory
-                                                draftBody = task.contentBody
-                                                draftCategory = if (task.title.contains("[")) {
-                                                    task.title.substringBefore("]").removePrefix("[").trim()
-                                                } else {
-                                                    "Hook Idea"
-                                                }
+                                                editingTaskId = note.id
+                                                draftTitle = note.title
+                                                draftBody = note.content
+                                                draftCategory = note.category
                                                 showEditDialog = true
                                             },
                                             modifier = Modifier.size(24.dp)
@@ -295,7 +310,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                                 if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
-                                                viewModel.deleteTask(task.id, userId) 
+                                                noteToDelete = note
                                             },
                                             modifier = Modifier.size(24.dp)
                                         ) {
@@ -311,14 +326,8 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                 
                                 Spacer(modifier = Modifier.height(DS.Space8))
                                 
-                                val displayTitle = if (task.title.contains("]")) {
-                                    task.title.substringAfter("]").trim()
-                                } else {
-                                    task.title
-                                 }
-                                
                                 Text(
-                                    text = displayTitle,
+                                    text = note.title,
                                     color = Color.White,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
@@ -327,7 +336,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                 Spacer(modifier = Modifier.height(DS.Space4))
                                 
                                 Text(
-                                    text = task.contentBody,
+                                    text = note.content,
                                     color = TextSecondary,
                                     style = MaterialTheme.typography.bodyMedium,
                                     lineHeight = 18.sp
@@ -367,7 +376,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                                 if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
-                                                viewModel.promoteTaskToProduction(task.id, userId) 
+                                                viewModel.promoteNoteToProduction(note.id, workspaceId, userId) 
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
                                             shape = DS.RadiusSmall,
@@ -388,8 +397,8 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                                 if (com.example.ui.feedback.FeedbackManager.isHapticEnabled) {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 }
-                                                activeAISynthesisTaskId = task.id
-                                                viewModel.promoteTaskToProductionWithAI(task.id, userId) 
+                                                activeAISynthesisTaskId = note.id
+                                                viewModel.promoteNoteToProductionWithAI(note.id, workspaceId, userId) 
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                                             shape = DS.RadiusSmall,
@@ -397,14 +406,14 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                                             modifier = Modifier.height(32.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.AutoAwesome,
+                                                imageVector = Icons.Default.AutoFixHigh,
                                                 contentDescription = null,
                                                 tint = Color.White,
                                                 modifier = Modifier.size(12.dp)
                                             )
                                             Spacer(modifier = Modifier.width(DS.Space4))
                                             Text(
-                                                text = "AI SYNTHESIZE",
+                                                text = "SYNTHESIZE BRIEF",
                                                 color = Color.White,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Black
@@ -471,14 +480,14 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                     if (isAISummarizing) {
                         CircularProgressIndicator(color = AccentBlue)
                         Text(
-                            text = "GEMINI CO-PILOT ENGAGED",
+                            text = "LOCAL BRIEF SYNTHESIZER",
                             color = Color.White,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = "Synthesizing your raw concept notes, scheduling hooks, and designing complete interactive tasks onto the Kanban board...",
+                            text = "Synthesizing your concept notes, scheduling hooks, and structuring production tasks onto the Kanban board ($0 API cost)...",
                             color = TextSecondary,
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -487,14 +496,14 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                     } else if (aiError != null) {
                         Icon(Icons.Default.ErrorOutline, null, tint = AccentRed, modifier = Modifier.size(48.dp))
                         Text(
-                            text = "AI SYNTHESIS FAULT",
+                            text = "SYNTHESIS ALERT",
                             color = Color.White,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = aiError ?: "Security policies or network fault detected.",
+                            text = aiError ?: "Internal synthesis error occurred.",
                             color = TextSecondary,
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -503,20 +512,20 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                         Button(
                             onClick = { 
                                 activeAISynthesisTaskId?.let { tid ->
-                                    viewModel.promoteTaskToProductionWithAI(tid, userId)
+                                    viewModel.promoteNoteToProductionWithAI(tid, workspaceId, userId)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald),
                             modifier = Modifier.fillMaxWidth().height(44.dp).testTag("retry_ai_generation_button"),
                             shape = DS.RadiusMedium
                         ) {
-                            Text("RETRY AI GENERATION", fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("RETRY SYNTHESIS", fontWeight = FontWeight.Bold, color = Color.White)
                         }
 
                         Button(
                             onClick = { 
                                 activeAISynthesisTaskId?.let { tid ->
-                                    viewModel.promoteTaskToProductionWithFallback(tid, userId)
+                                    viewModel.promoteNoteToProductionWithFallback(tid, workspaceId, userId)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
@@ -546,7 +555,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
             containerColor = SurfaceColor,
             title = {
                 Text(
-                    text = "New Private Sandbox Draft",
+                    text = "New Private Draft",
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black
@@ -563,7 +572,7 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Secure local drafting pad. Promote with or without Gemini AI orchestration.",
+                            text = "Secure local drafting pad. Convert to production briefs with deterministic templates.",
                             color = TextSecondary,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.weight(1f)
@@ -647,8 +656,14 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
             confirmButton = {
                 Button(
                     onClick = { 
-                        val formattedTitle = "[$draftCategory] $draftTitle"
-                        viewModel.submitTask(formattedTitle, draftBody, "ROUGH_SANDBOX", userId)
+                        val note = com.example.data.model.PersonalNote(
+                            id = java.util.UUID.randomUUID().toString(),
+                            userId = userId,
+                            title = draftTitle,
+                            content = draftBody,
+                            category = draftCategory
+                        )
+                        viewModel.insertPersonalNote(note)
                         draftTitle = ""
                         draftBody = ""
                         showAddDialog = false 
@@ -753,8 +768,14 @@ fun PersonalSpaceScreen(viewModel: WorkspaceViewModel, workspaceId: String, user
                 Button(
                     onClick = { 
                         editingTaskId?.let { tid ->
-                            val formattedTitle = "[$draftCategory] $draftTitle"
-                            viewModel.updateTask(tid, formattedTitle, draftBody)
+                            val updatedNote = com.example.data.model.PersonalNote(
+                                id = tid,
+                                userId = userId,
+                                title = draftTitle,
+                                content = draftBody,
+                                category = draftCategory
+                            )
+                            viewModel.insertPersonalNote(updatedNote)
                         }
                         showEditDialog = false 
                     },

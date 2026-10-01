@@ -21,6 +21,9 @@ class CommunityFeedViewModel constructor(
     val currentFeedTab = MutableStateFlow("TRENDING")
     val selectedSpaceName = MutableStateFlow("All")
 
+    val trendingPostsList: StateFlow<List<Post>> = repository.trendingPosts
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _isSubmitting = MutableStateFlow(false)
     val isSubmitting: StateFlow<Boolean> = _isSubmitting.asStateFlow()
 
@@ -122,5 +125,37 @@ class CommunityFeedViewModel constructor(
             repository.submitReport(report)
             _toastMessage.value = "Report submitted for moderation review."
         }
+    }
+
+    fun togglePostInteraction(userId: String, postId: String, interactionType: String) {
+        viewModelScope.launch {
+            try {
+                val existing = repository.getLike(userId, postId, interactionType)
+                if (existing != null) {
+                    repository.deleteLike(userId, postId, interactionType)
+                    _toastMessage.value = "Removed $interactionType"
+                } else {
+                    val like = com.example.data.model.CommunityLikeEntity(
+                        id = UUID.randomUUID().toString(),
+                        userId = userId,
+                        postId = postId,
+                        interactionType = interactionType,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    repository.insertLike(like)
+                    _toastMessage.value = "Success: $interactionType registered"
+                }
+            } catch (e: Exception) {
+                _toastMessage.value = "Failed: ${e.message}"
+            }
+        }
+    }
+
+    fun getLikeCountFlow(postId: String, interactionType: String): Flow<Int> {
+        return repository.getLikeCountFlow(postId, interactionType)
+    }
+
+    fun hasLikedFlow(userId: String, postId: String, interactionType: String): Flow<Boolean> = flow {
+        emit(repository.getLike(userId, postId, interactionType) != null)
     }
 }

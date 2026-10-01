@@ -34,7 +34,7 @@ fun BlockedUsersScreen(
 ) {
     val application = LocalContext.current.applicationContext as com.example.CreatorCoopApp
     val repository = remember { application.container.repository }
-    val currentUserId = userProfile?.id ?: "DemoUser"
+    val currentUserId = userProfile?.id.orEmpty()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val creators by repository.getAllUsersFlow().collectAsState(initial = emptyList())

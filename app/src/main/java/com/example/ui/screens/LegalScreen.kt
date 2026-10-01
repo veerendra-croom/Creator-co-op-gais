@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import com.example.ui.theme.*
 
 @Composable
@@ -36,7 +37,12 @@ fun LegalScreen(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("legal_screen_back_button")
+            ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -249,7 +255,7 @@ fun LegalScreen(onBack: () -> Unit) {
                 LegalItem(
                     title = "4. Data Deletion & Cascading Purges",
                     description = "Users maintain full control. Selecting 'Delete My Account' inside account settings " +
-                        "initiates an auto-purge: personal profile listings and private sandbox tasks are wiped immediately, " +
+                        "initiates an auto-purge: personal profile listings and private tasks are wiped immediately, " +
                         "while team chat logs, comments, and workspace tasks are completely anonymized (having " +
                         "your name and ID severed and replaced with generic 'Deleted User' tags)."
                 )

@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserProfile
@@ -44,31 +45,112 @@ fun WorkspaceHub(
     val workspaces by workspaceViewModel.workspaces.collectAsStateWithLifecycle()
     val selectedWorkspace by workspaceViewModel.selectedWorkspace.collectAsStateWithLifecycle()
     val viewMode by workspaceViewModel.workspaceViewMode.collectAsStateWithLifecycle()
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
-    if (viewMode == "LIST" || selectedWorkspace == null) {
-        WorkspaceList(
-            workspaces = workspaces,
-            onSelect = { workspaceViewModel.selectWorkspace(it) },
-            onCreateClick = onNavigateToCreate,
-            onDiscoveryClick = onNavigateToDiscovery
-        )
-    } else {
-        WorkspaceDetailContainer(
-            workspace = selectedWorkspace!!,
-            workspaceViewModel = workspaceViewModel,
-            agreementViewModel = agreementViewModel,
-            chatViewModel = chatViewModel,
-            userId = userId,
-            userProfile = userProfile,
-            globalViewModel = globalViewModel,
-            onBack = { workspaceViewModel.selectWorkspace(null) }
-        )
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWideScreen = maxWidth >= 680.dp || isLandscape
+
+        if (isWideScreen) {
+            // Dual-Pane List-Detail Layout for Horizontal / Wide displays
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 300.dp, max = 380.dp)
+                        .weight(0.38f)
+                        .fillMaxHeight()
+                        .border(BorderStroke(1.dp, ColorDivider))
+                ) {
+                    WorkspaceList(
+                        workspaces = workspaces,
+                        selectedWorkspaceId = selectedWorkspace?.id ?: workspaces.firstOrNull()?.id,
+                        onSelect = { ws ->
+                            workspaceViewModel.selectWorkspace(ws)
+                        },
+                        onCreateClick = onNavigateToCreate,
+                        onDiscoveryClick = onNavigateToDiscovery
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(0.62f)
+                        .fillMaxHeight()
+                ) {
+                    val activeWs = selectedWorkspace ?: workspaces.firstOrNull()
+                    if (activeWs != null) {
+                        WorkspaceDetailContainer(
+                            workspace = activeWs,
+                            workspaceViewModel = workspaceViewModel,
+                            agreementViewModel = agreementViewModel,
+                            chatViewModel = chatViewModel,
+                            userId = userId,
+                            userProfile = userProfile,
+                            globalViewModel = globalViewModel,
+                            showBackButton = false,
+                            onBack = { workspaceViewModel.selectWorkspace(null) }
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(PrimaryBackground)
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(56.dp))
+                                Text(
+                                    text = "SELECT A WORKSPACE",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "Choose a collaborative workspace from the left pane or create a new one to begin.",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Single-Pane Navigation for Standard Portrait Mobile
+            if (viewMode == "LIST" || selectedWorkspace == null) {
+                WorkspaceList(
+                    workspaces = workspaces,
+                    onSelect = { workspaceViewModel.selectWorkspace(it) },
+                    onCreateClick = onNavigateToCreate,
+                    onDiscoveryClick = onNavigateToDiscovery
+                )
+            } else {
+                WorkspaceDetailContainer(
+                    workspace = selectedWorkspace!!,
+                    workspaceViewModel = workspaceViewModel,
+                    agreementViewModel = agreementViewModel,
+                    chatViewModel = chatViewModel,
+                    userId = userId,
+                    userProfile = userProfile,
+                    globalViewModel = globalViewModel,
+                    showBackButton = true,
+                    onBack = { workspaceViewModel.selectWorkspace(null) }
+                )
+            }
+        }
     }
 }
 
 @Composable
 fun WorkspaceList(
     workspaces: List<Workspace>,
+    selectedWorkspaceId: String? = null,
     onSelect: (Workspace) -> Unit,
     onCreateClick: () -> Unit,
     onDiscoveryClick: () -> Unit
@@ -104,7 +186,11 @@ fun WorkspaceList(
                 modifier = Modifier.weight(1f)
             ) {
                 items(workspaces, key = { it.id }) { ws ->
-                    WorkspaceListItem(ws = ws, onSelect = onSelect)
+                    WorkspaceListItem(
+                        ws = ws,
+                        isSelected = ws.id == selectedWorkspaceId,
+                        onSelect = onSelect
+                    )
                 }
             }
         }
@@ -125,7 +211,11 @@ fun WorkspaceList(
 }
 
 @Composable
-fun WorkspaceListItem(ws: Workspace, onSelect: (Workspace) -> Unit) {
+fun WorkspaceListItem(
+    ws: Workspace,
+    isSelected: Boolean = false,
+    onSelect: (Workspace) -> Unit
+) {
     val (platformColor, platformIcon) = when(ws.platformType.uppercase()) {
         "YOUTUBE" -> Pair(MaterialTheme.colorScheme.primary, Icons.Default.PlayArrow)
         "INSTAGRAM" -> Pair(MaterialTheme.colorScheme.error, Icons.Default.CameraAlt)
@@ -134,10 +224,19 @@ fun WorkspaceListItem(ws: Workspace, onSelect: (Workspace) -> Unit) {
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onSelect(ws) },
-        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelect(ws) }
+            .then(
+                if (isSelected) {
+                    Modifier.border(1.5.dp, Brush.horizontalGradient(listOf(AccentBlue, NeonEmerald)), DS.RadiusLarge)
+                } else Modifier
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) SurfaceLightColor else SurfaceColor
+        ),
         shape = DS.RadiusLarge,
-        border = BorderStroke(1.dp, ColorDivider)
+        border = if (!isSelected) BorderStroke(1.dp, ColorDivider) else null
     ) {
         Column(modifier = Modifier.padding(DS.Space16)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -218,6 +317,7 @@ fun WorkspaceDetailContainer(
     userId: String,
     userProfile: UserProfile?,
     globalViewModel: GlobalViewModel? = null,
+    showBackButton: Boolean = true,
     onBack: () -> Unit
 ) {
     LaunchedEffect(userId) {
@@ -247,21 +347,23 @@ fun WorkspaceDetailContainer(
         topBar = {
             Column(modifier = Modifier.background(SurfaceColor)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = {
-                            if (activeModule != "STATE") {
-                                workspaceViewModel.workspaceSubTab.value = "STATE"
-                            } else {
-                                onBack()
-                            }
-                        },
-                        modifier = Modifier
-                            .minimumInteractiveComponentSize()
-                            .testTag("workspace_hub_back_button")
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                    if (showBackButton) {
+                        IconButton(
+                            onClick = {
+                                if (activeModule != "STATE") {
+                                    workspaceViewModel.workspaceSubTab.value = "STATE"
+                                } else {
+                                    onBack()
+                                }
+                            },
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .testTag("workspace_hub_back_button")
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        }
                     }
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f).padding(start = if (showBackButton) 0.dp else 12.dp)) {
                         if (workspace.isSponsored) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Celebration, null, tint = AccentBlue, modifier = Modifier.size(10.dp))
@@ -277,7 +379,7 @@ fun WorkspaceDetailContainer(
                 ScrollableTabRow(
                     selectedTabIndex = when(activeModule) {
                         "STATE" -> 0
-                        "SANDBOX" -> 1
+                        "DRAFTS" -> 1
                         "PRODUCTION" -> 2
                         "CHAT" -> 3
                         "TEAM" -> 4
@@ -290,7 +392,7 @@ fun WorkspaceDetailContainer(
                     indicator = { tabPositions ->
                         val idx = when(activeModule) {
                             "STATE" -> 0
-                            "SANDBOX" -> 1
+                            "DRAFTS" -> 1
                             "PRODUCTION" -> 2
                             "CHAT" -> 3
                             "TEAM" -> 4
@@ -302,7 +404,7 @@ fun WorkspaceDetailContainer(
                     divider = {}
                 ) {
                     Tab(selected = activeModule == "STATE", onClick = { workspaceViewModel.workspaceSubTab.value = "STATE" }, text = { Text("Overview", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
-                    Tab(selected = activeModule == "SANDBOX", onClick = { workspaceViewModel.workspaceSubTab.value = "SANDBOX" }, text = { Text("My Drafts", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
+                    Tab(selected = activeModule == "DRAFTS", onClick = { workspaceViewModel.workspaceSubTab.value = "DRAFTS" }, text = { Text("My Drafts", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
                     Tab(selected = activeModule == "PRODUCTION", onClick = { workspaceViewModel.workspaceSubTab.value = "PRODUCTION" }, text = { Text("Tasks", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
                     Tab(selected = activeModule == "CHAT", onClick = { workspaceViewModel.workspaceSubTab.value = "CHAT" }, text = { Text("Chat", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
                     Tab(selected = activeModule == "TEAM", onClick = { workspaceViewModel.workspaceSubTab.value = "TEAM" }, text = { Text("Team", fontSize = 12.sp, fontWeight = FontWeight.Bold) })
@@ -358,7 +460,7 @@ fun WorkspaceDetailContainer(
                         onGoToTeam = { workspaceViewModel.workspaceSubTab.value = "TEAM" },
                         globalViewModel = globalViewModel
                     )
-                    "SANDBOX" -> PersonalSpaceScreen(workspaceViewModel, workspace.id, userId)
+                    "DRAFTS" -> PersonalSpaceScreen(workspaceViewModel, workspace.id, userId)
                     "PRODUCTION" -> TeamSpaceScreen(
                         viewModel = workspaceViewModel,
                         workspaceId = workspace.id,

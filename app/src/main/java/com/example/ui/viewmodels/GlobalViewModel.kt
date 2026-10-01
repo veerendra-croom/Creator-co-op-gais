@@ -198,22 +198,6 @@ class GlobalViewModel constructor(
     }
     
     val themeMode = MutableStateFlow("SYSTEM") // SYSTEM, LIGHT, DARK
-    val demoSandboxMode = MutableStateFlow(true)
-
-    fun toggleDemoSandboxMode(enabled: Boolean) {
-        viewModelScope.launch {
-            demoSandboxMode.value = enabled
-            repository.setDemoSandboxPreference(enabled)
-            if (enabled) {
-                repository.prepopulateIfEmpty(forceSeedDemo = true)
-                toastMessage.value = "Demo sandbox data loaded."
-            } else {
-                repository.clearSandboxData()
-                toastMessage.value = "Switched to clean production database."
-            }
-        }
-    }
-
     val allAdPlacements = repository.allAdPlacements.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val globalSettings = repository.globalAdSettings.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -281,19 +265,17 @@ class GlobalViewModel constructor(
 
     init {
         viewModelScope.launch {
-            demoSandboxMode.value = repository.getDemoSandboxPreference()
             syncState.value = SyncState.Syncing
-            repository.prepopulateIfEmpty()
             try {
                 if (SupabaseConfig.isNetworkAvailable(application) &&
                     !SupabaseConfig.supabaseUrl.contains("your-project")) {
                     SupabaseSynchronizer.syncDownEverything(application, repository)
                     syncState.value = SyncState.Synced
                 } else {
-                    syncState.value = SyncState.OfflineSandbox
+                    syncState.value = SyncState.Synced
                 }
             } catch (e: Throwable) {
-                syncState.value = SyncState.OfflineSandbox
+                syncState.value = SyncState.Synced
             }
 
             // Real-time subscriptions
@@ -710,7 +692,7 @@ class GlobalViewModel constructor(
                 toastMessage.value = "Synchronization complete!"
             } catch (e: Exception) {
                 android.util.Log.e("GlobalViewModel", "Manual synchronization failed", e)
-                syncState.value = SyncState.OfflineSandbox
+                syncState.value = SyncState.Offline
                 toastMessage.value = "Sync failed: ${e.localizedMessage ?: "Offline Mode"}"
             } finally {
                 isSyncActive.value = false

@@ -41,7 +41,7 @@ fun DirectMessagesScreen(
     chatViewModel: com.example.ui.viewmodels.ChatViewModel,
     userProfile: UserProfile?
 ) {
-    val currentUserId = userProfile?.id ?: "DemoUser"
+    val currentUserId = userProfile?.id.orEmpty()
 
     val creators by chatViewModel.creatorsFlow.collectAsState(initial = emptyList())
     val allDMs by chatViewModel.getDMsForUser(currentUserId).collectAsState(initial = emptyList())
@@ -134,15 +134,16 @@ fun DirectMessagesScreen(
                         }
 
                         // Quick Action Buttons
+                        val dmChannelId = "dm_${listOf(currentUserId, activeTargetUser.id).sorted().joinToString("_")}"
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             IconButton(
                                 onClick = {
                                     chatViewModel.sendDirectMessage(
-                                        workspaceId = "dm_general",
+                                        workspaceId = dmChannelId,
                                         recipientId = activeTargetUser.id,
                                         text = "📌 WORKSPACE INVITE: Hey @${activeTargetUser.username}, I'd like to invite you to collaborate on our active workspace! Tap to open Workspace Invitation.",
                                         senderId = currentUserId,
-                                        user = null
+                                        user = userProfile
                                     )
                                 },
                                 modifier = Modifier
@@ -155,11 +156,11 @@ fun DirectMessagesScreen(
                             IconButton(
                                 onClick = {
                                     chatViewModel.sendDirectMessage(
-                                        workspaceId = "dm_general",
+                                        workspaceId = dmChannelId,
                                         recipientId = activeTargetUser.id,
                                         text = "🤝 SYNDICATE PROPOSAL: Hey @${activeTargetUser.username}, I submitted a project pitch for us to co-create! Let's discuss equity and terms.",
                                         senderId = currentUserId,
-                                        user = null
+                                        user = userProfile
                                     )
                                 },
                                 modifier = Modifier

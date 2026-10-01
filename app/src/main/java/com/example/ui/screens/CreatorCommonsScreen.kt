@@ -244,7 +244,7 @@ fun CreatorCommonsScreen(
 
             // Trending Carousel
             item {
-                TrendingSection()
+                TrendingSection(feedViewModel)
             }
 
             // Sticky Category & Sort Tabs
@@ -364,6 +364,8 @@ fun CreatorCommonsScreen(
                 if (post != null) {
                     CommonsPostCard(
                         post = post,
+                        userId = userProfile?.id ?: "guest",
+                        feedViewModel = feedViewModel,
                         onVote = { type -> feedViewModel.votePost(post.id, type) },
                         onClick = { selectedPost = post },
                         onReport = { reportTarget = "POST" to post.id }
@@ -470,6 +472,8 @@ fun PostDetailDialog(
     userProfile: com.example.data.model.UserProfile?, 
     onDismiss: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     val comments by remember(post.id) { feedViewModel.getCommentsForPost(post.id) }.collectAsState(initial = emptyList())
     var commentText by remember { mutableStateOf("") }
 
@@ -491,7 +495,14 @@ fun PostDetailDialog(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                 }
                 Text("Discussion", color = Color.White, fontWeight = FontWeight.Black)
-                IconButton(onClick = { /* Share */ }) { Icon(Icons.Default.Share, null, tint = Color.White) }
+                IconButton(onClick = {
+                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_SUBJECT, post.title)
+                        putExtra(android.content.Intent.EXTRA_TEXT, "${post.title}\n\n${post.body}")
+                    }
+                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Commons Post"))
+                }) { Icon(Icons.Default.Share, null, tint = Color.White) }
             }
         },
         text = {
@@ -504,8 +515,13 @@ fun PostDetailDialog(
                     item {
                         CommonsPostCard(
                             post = post, 
+                            userId = userProfile?.id ?: "guest",
+                            feedViewModel = feedViewModel,
                             onVote = { feedViewModel.votePost(post.id, it) }, 
-                            onClick = {}, 
+                            onClick = {
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(post.body))
+                                android.widget.Toast.makeText(context, "Post content copied to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+                            }, 
                             onReport = { 
                                 val reporterId = authViewModel.currentUserId.value ?: "me"
                                 adminViewModel.reportContent("POST", post.id, "Reported from Detail", reporterId) 
@@ -672,8 +688,22 @@ fun CreatePostDialog(
 }
 
 @Composable
-fun TrendingSection() {
+fun TrendingSection(feedViewModel: CommunityFeedViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val dynamicPosts by feedViewModel.trendingPostsList.collectAsState()
+
+    val trendingTitles = remember(dynamicPosts) {
+        if (dynamicPosts.isNotEmpty()) {
+            dynamicPosts.take(5).map { it.title }
+        } else {
+            listOf(
+                "Best 4K Camera for 2026 Indie Shoots",
+                "How to negotiate equity with VFX houses",
+                "New AI upscaling plugin released!"
+            )
+        }
+    }
+
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp),
@@ -690,11 +720,7 @@ fun TrendingSection() {
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(listOf(
-                "Best 4K Camera for 2026 Indie Shoots",
-                "How to negotiate equity with VFX houses",
-                "New AI upscaling plugin released!"
-            )) { title ->
+            items(trendingTitles) { title ->
                 Box(
                     modifier = Modifier
                         .width(280.dp)
@@ -733,7 +759,21 @@ fun TrendingSection() {
 }
 
 @Composable
-fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, onReport: () -> Unit) {
+fun CommonsPostCard(
+    post: Post,
+    userId: String,
+    feedViewModel: CommunityFeedViewModel,
+    onVote: (String) -> Unit,
+    onClick: () -> Unit,
+    onReport: () -> Unit
+) {
+    val likeCount by feedViewModel.getLikeCountFlow(post.id, "LIKE").collectAsState(initial = 0)
+    val saveCount by feedViewModel.getLikeCountFlow(post.id, "SAVE").collectAsState(initial = 0)
+    val repostCount by feedViewModel.getLikeCountFlow(post.id, "REPOST").collectAsState(initial = 0)
+    val hasLiked by feedViewModel.hasLikedFlow(userId, post.id, "LIKE").collectAsState(initial = false)
+    val hasSaved by feedViewModel.hasLikedFlow(userId, post.id, "SAVE").collectAsState(initial = false)
+    val hasReposted by feedViewModel.hasLikedFlow(userId, post.id, "REPOST").collectAsState(initial = false)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -766,8 +806,8 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
                 
                 var showMenu by remember { mutableStateOf(false) }
                 Box {
-                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.MoreVert, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.MoreVert, null, tint = TextSecondary, modifier = Modifier.size(22.dp))
                     }
                     DropdownMenu(
                         expanded = showMenu,
@@ -827,13 +867,13 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
+                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.05f))
                 ) {
-                    IconButton(onClick = { onVote("up") }, modifier = Modifier.size(44.dp)) {
+                    IconButton(onClick = { onVote("up") }, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Icons.Default.KeyboardArrowUp,
                             null,
@@ -847,7 +887,7 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Black
                     )
-                    IconButton(onClick = { onVote("down") }, modifier = Modifier.size(44.dp)) {
+                    IconButton(onClick = { onVote("down") }, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Icons.Default.KeyboardArrowDown,
                             null,
@@ -857,31 +897,83 @@ fun CommonsPostCard(post: Post, onVote: (String) -> Unit, onClick: () -> Unit, o
                     }
                 }
                 
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    IconButton(onClick = onClick) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Like Interaction
+                    IconButton(onClick = { feedViewModel.togglePostInteraction(userId, post.id, "LIKE") }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.ChatBubbleOutline, null, tint = TextSecondary, modifier = Modifier.size(20.dp))
-                            if (post.commentCount > 0) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(post.commentCount.toString(), color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = if (hasLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Like",
+                                tint = if (hasLiked) AccentRed else TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            if (likeCount > 0) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("$likeCount", color = if (hasLiked) AccentRed else TextSecondary, fontSize = 11.sp)
                             }
                         }
                     }
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        IconButton(
-                            onClick = { 
-                                val sendIntent = android.content.Intent().apply {
-                                    action = android.content.Intent.ACTION_SEND
-                                    putExtra(android.content.Intent.EXTRA_TITLE, post.title)
-                                    putExtra(android.content.Intent.EXTRA_TEXT, "✨ ${post.title}\n\n${post.body}\n\nShared via Creator Co-Op (${post.spaceName})")
-                                    type = "text/plain"
-                                }
-                                val shareIntent = android.content.Intent.createChooser(sendIntent, "Share via Creator Co-Op")
-                                context.startActivity(shareIntent)
+
+                    // Save Interaction
+                    IconButton(onClick = { feedViewModel.togglePostInteraction(userId, post.id, "SAVE") }) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (hasSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = "Save",
+                                tint = if (hasSaved) CrispAmber else TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            if (saveCount > 0) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("$saveCount", color = if (hasSaved) CrispAmber else TextSecondary, fontSize = 11.sp)
                             }
-                        ) {
-                            Icon(Icons.Outlined.Share, contentDescription = "Share Post", tint = TextSecondary, modifier = Modifier.size(20.dp))
                         }
+                    }
+
+                    // Repost Interaction
+                    IconButton(onClick = { feedViewModel.togglePostInteraction(userId, post.id, "REPOST") }) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Repeat,
+                                contentDescription = "Repost",
+                                tint = if (hasReposted) AccentBlue else TextSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            if (repostCount > 0) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("$repostCount", color = if (hasReposted) AccentBlue else TextSecondary, fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    IconButton(onClick = onClick) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.ChatBubbleOutline, null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            if (post.commentCount > 0) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(post.commentCount.toString(), color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    IconButton(
+                        onClick = { 
+                            val sendIntent = android.content.Intent().apply {
+                                action = android.content.Intent.ACTION_SEND
+                                putExtra(android.content.Intent.EXTRA_TITLE, post.title)
+                                putExtra(android.content.Intent.EXTRA_TEXT, "✨ ${post.title}\n\n${post.body}\n\nShared via Creator Co-Op (${post.spaceName})")
+                                type = "text/plain"
+                            }
+                            val shareIntent = android.content.Intent.createChooser(sendIntent, "Share via Creator Co-Op")
+                            context.startActivity(shareIntent)
+                        }
+                    ) {
+                        Icon(Icons.Outlined.Share, contentDescription = "Share Post", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         }

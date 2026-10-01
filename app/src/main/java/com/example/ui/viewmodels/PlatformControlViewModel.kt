@@ -80,11 +80,15 @@ class PlatformControlViewModel(private val repository: AppRepository) : ViewMode
             val updated = existing?.copy(
                 isEnabled = enabled,
                 globalOverrideEnabled = enabled,
+                organizerEnabled = if (!enabled) false else existing.organizerEnabled,
+                participantEnabled = if (!enabled) false else existing.participantEnabled,
                 lastModifiedAt = System.currentTimeMillis()
             ) ?: FeatureFlag(
                 flagKey = key,
                 isEnabled = enabled,
                 globalOverrideEnabled = enabled,
+                organizerEnabled = enabled,
+                participantEnabled = enabled,
                 lastModifiedAt = System.currentTimeMillis()
             )
             repository.insertFeatureFlag(updated)
@@ -102,18 +106,20 @@ class PlatformControlViewModel(private val repository: AppRepository) : ViewMode
     ) {
         viewModelScope.launch {
             val existing = repository.getFeatureFlag(key)
-            val isOverallActive = globalOverrideEnabled && (organizerEnabled || participantEnabled)
+            val effectiveOrg = if (globalOverrideEnabled) organizerEnabled else false
+            val effectivePart = if (globalOverrideEnabled) participantEnabled else false
+            val isOverallActive = globalOverrideEnabled && (effectiveOrg || effectivePart)
             val updated = existing?.copy(
-                organizerEnabled = organizerEnabled,
-                participantEnabled = participantEnabled,
+                organizerEnabled = effectiveOrg,
+                participantEnabled = effectivePart,
                 globalOverrideEnabled = globalOverrideEnabled,
                 isEnabled = isOverallActive,
                 lastModifiedByAdminId = adminId,
                 lastModifiedAt = System.currentTimeMillis()
             ) ?: FeatureFlag(
                 flagKey = key,
-                organizerEnabled = organizerEnabled,
-                participantEnabled = participantEnabled,
+                organizerEnabled = effectiveOrg,
+                participantEnabled = effectivePart,
                 globalOverrideEnabled = globalOverrideEnabled,
                 isEnabled = isOverallActive,
                 lastModifiedByAdminId = adminId,

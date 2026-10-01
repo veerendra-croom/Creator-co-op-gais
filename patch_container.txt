@@ -1,0 +1,21 @@
+--- app/src/main/java/com/example/di/AppContainer.kt
++++ app/src/main/java/com/example/di/AppContainer.kt
+@@ -7,6 +7,7 @@
+ import androidx.room.Room
+ import com.example.data.local.AppDatabase
+ import com.example.data.repository.AppRepository
++import com.example.data.network.ExternalIntegrationsClient
+ 
+ class AppContainer(private val application: Application) {
+     val database: AppDatabase by lazy {
+@@ -20,6 +21,10 @@
+             .build()
+     }
+     
++    val externalClient: ExternalIntegrationsClient by lazy {
++        ExternalIntegrationsClient()
++    }
++
+     val repository: AppRepository by lazy {
+         AppRepository(database)
+     }

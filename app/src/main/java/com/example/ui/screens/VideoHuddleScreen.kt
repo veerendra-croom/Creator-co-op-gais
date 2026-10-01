@@ -90,15 +90,23 @@ fun VideoHuddleScreen(
     }
 
     // Voice speaking simulator (fluctuating volume levels for speakers)
-    LaunchedEffect(isJoined) {
+    LaunchedEffect(isJoined, micEnabled) {
         if (isJoined) {
+            if (!micEnabled) {
+                yourVoiceVolume = 0f
+            }
             while (true) {
                 delay(800)
                 alexVoiceVolume = if (randomObj.nextInt(10) > 4) 0.2f + randomObj.nextFloat() * 0.9f else 0.1f
                 mayaVoiceVolume = if (randomObj.nextInt(10) > 6) 0.2f + randomObj.nextFloat() * 0.9f else 0.1f
                 thomasVoiceVolume = if (randomObj.nextInt(10) > 5) 0.2f + randomObj.nextFloat() * 0.9f else 0.1f
-                yourVoiceVolume = if (micEnabled && randomObj.nextInt(10) > 7) 0.2f + randomObj.nextFloat() * 0.8f else 0.1f
+                yourVoiceVolume = if (micEnabled && randomObj.nextInt(10) > 7) 0.2f + randomObj.nextFloat() * 0.8f else 0f
             }
+        } else {
+            yourVoiceVolume = 0f
+            alexVoiceVolume = 0f
+            mayaVoiceVolume = 0f
+            thomasVoiceVolume = 0f
         }
     }
 
@@ -109,6 +117,20 @@ fun VideoHuddleScreen(
             huddleChatMessages.add(HuddleChatMessage("thomas", "Thomas Wright", "Audio stems are aligned. Ready to drop them in.", System.currentTimeMillis()))
             delay(12000)
             huddleChatMessages.add(HuddleChatMessage("alex", "Alex Mercer", "Excellent, let's coordinate the final export settings.", System.currentTimeMillis()))
+        }
+    }
+
+    // Teardown resources when screen is disposed or user leaves
+    DisposableEffect(Unit) {
+        onDispose {
+            isJoined = false
+            micEnabled = false
+            cameraEnabled = false
+            screenShareEnabled = false
+            yourVoiceVolume = 0f
+            alexVoiceVolume = 0f
+            mayaVoiceVolume = 0f
+            thomasVoiceVolume = 0f
         }
     }
 

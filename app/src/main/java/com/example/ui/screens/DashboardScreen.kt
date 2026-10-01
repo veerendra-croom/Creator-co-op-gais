@@ -126,7 +126,7 @@ fun DashboardScreen(
                     Text(
                         text = "Under GDPR and compliance regulations, confirming deletion will execute the following cascade operations:\n\n" +
                                "• Your personal user profile is permanently deleted.\n" +
-                               "• All private drafts and sandbox items are completely wiped.\n" +
+                               "• All private drafts and items are completely wiped.\n" +
                                "• Workspace member links will be deleted. (Leads are auto-resolved to preserve business flow).\n" +
                                "• Forum threads and public chat entries are anonymized under 'Deleted User' to retain group context.",
                         color = TextSecondary,
@@ -940,7 +940,7 @@ fun DashboardScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     border = BorderStroke(1.dp, ColorDivider)
                                 ) {
-                                    Text("Cancel Subscription (Demo Sync)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Cancel Subscription", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
                         }

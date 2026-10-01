@@ -105,7 +105,7 @@ class WorkspaceViewModel constructor(
         if (scope == "PRODUCTION_READY") {
             repository.getProductionTasks(id)
         } else {
-            repository.getRoughSandboxTasks(id, uid)
+            repository.getPrivateDraftTasks(id, uid)
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -183,6 +183,126 @@ class WorkspaceViewModel constructor(
             UserSetting(id = "${userId}_personal_draft_body", userId = userId, key = "personal_draft_body", value = body)
         )
     }
+
+    fun getPersonalNotesForUser(userId: String): Flow<List<com.example.data.model.PersonalNote>> {
+        return repository.getPersonalNotesForUser(userId)
+    }
+
+    fun insertPersonalNote(note: com.example.data.model.PersonalNote) {
+        viewModelScope.launch {
+            repository.insertPersonalNote(note)
+        }
+    }
+
+    fun deletePersonalNote(id: String) {
+        viewModelScope.launch {
+            repository.deletePersonalNote(id)
+        }
+    }
+
+    fun promoteNoteToProduction(noteId: String, workspaceId: String, userId: String) {
+        if (isWorkspaceArchived.value) return
+        viewModelScope.launch {
+            try {
+                val notes = repository.getPersonalNotesForUser(userId).first()
+                val note = notes.find { it.id == noteId } ?: return@launch
+                val formattedTitle = "[${note.category}] ${note.title}"
+                val newTask = com.example.data.model.ProductionTask(
+                    id = java.util.UUID.randomUUID().toString(),
+                    workspaceId = workspaceId,
+                    title = formattedTitle,
+                    contentBody = note.content,
+                    stateScope = "PRODUCTION_READY",
+                    kanbanLane = "IDEAS",
+                    creatorId = userId
+                )
+                repository.insertTask(newTask)
+                repository.deletePersonalNote(noteId)
+                FeedbackManager.showSuccess("Draft promoted to Team Space!")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Promotion failed: ${e.message}")
+            }
+        }
+    }
+
+    fun promoteNoteToProductionWithAI(noteId: String, workspaceId: String, userId: String) {
+        if (isWorkspaceArchived.value) return
+        viewModelScope.launch {
+            try {
+                val notes = repository.getPersonalNotesForUser(userId).first()
+                val note = notes.find { it.id == noteId } ?: return@launch
+                isAISummarizing.value = true
+                aiSummarizationError.value = null
+                FeedbackManager.showInfo("Synthesizing production brief locally...")
+                
+                val aiBrief = try {
+                    com.example.data.engine.LocalProductionEngine.synthesizeDraftToBrief(note.title, note.content)
+                } catch (e: Exception) {
+                    "Error: ${e.message}"
+                }
+                
+                isAISummarizing.value = false
+                
+                if (aiBrief.startsWith("Error")) {
+                    aiSummarizationError.value = aiBrief
+                    FeedbackManager.showError("Synthesis Failed: Internal formatting error.")
+                } else {
+                    val formattedTitle = "[${note.category}] ${note.title}"
+                    val newTask = com.example.data.model.ProductionTask(
+                        id = java.util.UUID.randomUUID().toString(),
+                        workspaceId = workspaceId,
+                        title = formattedTitle,
+                        contentBody = aiBrief,
+                        stateScope = "PRODUCTION_READY",
+                        kanbanLane = "IDEAS",
+                        creatorId = userId
+                    )
+                    repository.insertTask(newTask)
+                    repository.deletePersonalNote(noteId)
+                    FeedbackManager.showSuccess("Draft synthesized & promoted to Team Space ($0 API cost)!")
+                }
+            } catch (e: Exception) {
+                isAISummarizing.value = false
+                FeedbackManager.showError("Promotion failed: ${e.message}")
+            }
+        }
+    }
+
+    fun promoteNoteToProductionWithFallback(noteId: String, workspaceId: String, userId: String) {
+        if (isWorkspaceArchived.value) return
+        viewModelScope.launch {
+            try {
+                val notes = repository.getPersonalNotesForUser(userId).first()
+                val note = notes.find { it.id == noteId } ?: return@launch
+                val formattedTitle = "[${note.category}] ${note.title}"
+                val fallbackBrief = """
+                    === OFFLINE STRUCTURAL BRIEF ===
+                    Title: ${note.title}
+                    Category: ${note.category}
+                    
+                    === RAW CONCEPT BEATS ===
+                    ${note.content}
+                """.trimIndent()
+                val newTask = com.example.data.model.ProductionTask(
+                    id = java.util.UUID.randomUUID().toString(),
+                    workspaceId = workspaceId,
+                    title = formattedTitle,
+                    contentBody = fallbackBrief,
+                    stateScope = "PRODUCTION_READY",
+                    kanbanLane = "IDEAS",
+                    creatorId = userId
+                )
+                repository.insertTask(newTask)
+                repository.deletePersonalNote(noteId)
+                aiSummarizationError.value = null
+                FeedbackManager.showSuccess("Draft promoted with offline template!")
+            } catch (e: Exception) {
+                FeedbackManager.showError("Promotion failed: ${e.message}")
+            }
+        }
+    }
+
+
 
     fun submitTask(title: String, body: String, scope: String, userId: String, kanbanLane: String? = null) {
         if (isWorkspaceArchived.value) {
@@ -344,7 +464,7 @@ class WorkspaceViewModel constructor(
             if (member?.canModifyProduction == true || member?.assignedRoleTitle in listOf("Lead Creator", "Head", "Owner")) {
                 isAISummarizing.value = true
                 aiSummarizationError.value = null
-                FeedbackManager.showInfo("Gemini is crafting a Production-Ready Brief...")
+                FeedbackManager.showInfo("Synthesizing production brief locally...")
                 
                 val displayTitle = if (task.title.contains("]")) {
                     task.title.substringAfter("]").trim()
@@ -353,7 +473,7 @@ class WorkspaceViewModel constructor(
                 }
                 
                 val aiBrief = try {
-                    com.example.data.api.GeminiService.summarizeDraftToBrief(displayTitle, task.contentBody)
+                    com.example.data.engine.LocalProductionEngine.synthesizeDraftToBrief(displayTitle, task.contentBody)
                 } catch (e: Exception) {
                     "Error: ${e.message}"
                 }
@@ -362,14 +482,14 @@ class WorkspaceViewModel constructor(
                 
                 if (aiBrief.startsWith("Error")) {
                     aiSummarizationError.value = aiBrief
-                    FeedbackManager.showError("AI Synthesis Failed: Security policies or network fault detected.")
+                    FeedbackManager.showError("Synthesis Failed: Internal formatting error.")
                 } else {
                     repository.insertTask(task.copy(
                         contentBody = aiBrief,
                         stateScope = "PRODUCTION_READY",
                         kanbanLane = "IDEAS"
                     ))
-                    FeedbackManager.showSuccess("Draft summarized by AI & promoted to Team Space!")
+                    FeedbackManager.showSuccess("Draft synthesized & promoted to Team Space ($0 API cost)!")
                 }
             } else {
                 _toastMessage.value = "Permission Denied."
@@ -551,6 +671,26 @@ class WorkspaceViewModel constructor(
                 
                 val existingUser = repository.userDao.getUserByEmail(email)
                 val finalUserId = existingUser?.id ?: (if (email.contains("@")) email.substringBefore("@") else email)
+                
+                // Generate secure invitation details and persist to WorkspaceInviteEntity
+                val code = "COOP-" + java.util.UUID.randomUUID().toString().substring(0, 6).uppercase()
+                val digest = java.security.MessageDigest.getInstance("SHA-256").digest(code.toByteArray())
+                val sha256Token = digest.joinToString("") { "%02x".format(it) }
+                val expiration = System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000L // 7 days expiry
+                
+                val inviteEntity = com.example.data.model.WorkspaceInviteEntity(
+                    id = java.util.UUID.randomUUID().toString(),
+                    workspaceId = workspaceId,
+                    inviteCode = code,
+                    inviteeEmail = email,
+                    roleTitle = roleTitle,
+                    sha256Token = sha256Token,
+                    expirationTimestamp = expiration,
+                    isUsed = false,
+                    createdAt = System.currentTimeMillis()
+                )
+                repository.insertWorkspaceInvite(inviteEntity)
+
                 val member = WorkspaceMember(
                     id = java.util.UUID.randomUUID().toString(),
                     workspaceId = workspaceId,
@@ -568,7 +708,7 @@ class WorkspaceViewModel constructor(
                     eventType = "MEMBER_JOINED",
                     entityId = finalUserId,
                     title = "Member Joined",
-                    description = "$finalUserId was invited as $roleTitle.",
+                    description = "$finalUserId was invited as $roleTitle with Invite Code $code.",
                     createdAt = System.currentTimeMillis()
                 ))
                 
@@ -578,17 +718,46 @@ class WorkspaceViewModel constructor(
                         id = "notif_inv_" + System.currentTimeMillis(),
                         userId = finalUserId,
                         title = "Workspace Invitation",
-                        body = "You've been invited to join a workspace as $roleTitle.",
+                        body = "You've been invited to join a workspace as $roleTitle. Code: $code.",
                         type = "WORKSPACE_INVITE",
-                        deepLinkTarget = "WORKSPACE_INVITE:$workspaceId",
+                        deepLinkTarget = "WORKSPACE_INVITE:$code",
                         createdAt = System.currentTimeMillis()
                     ))
                 }
                 
-                AnalyticsManager.trackEvent("member_invited", mapOf("workspace_id" to workspaceId, "email" to email, "role" to roleTitle))
-                FeedbackManager.showSuccess("Invitation sent to $email! Added as $roleTitle.")
+                AnalyticsManager.trackEvent("member_invited", mapOf("workspace_id" to workspaceId, "email" to email, "role" to roleTitle, "code" to code))
+                FeedbackManager.showSuccess("Invitation sent to $email! Invite code: $code")
             } catch (e: Exception) {
                 FeedbackManager.showError("Invitation failed: ${e.message}")
+            }
+        }
+    }
+
+    fun acceptInviteByCode(code: String, userId: String, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val invite = repository.getInviteByCode(code)
+                if (invite == null) {
+                    FeedbackManager.showError("Invalid invitation code!")
+                    return@launch
+                }
+                if (invite.isUsed) {
+                    FeedbackManager.showError("Invitation code has already been used!")
+                    return@launch
+                }
+                if (invite.expirationTimestamp < System.currentTimeMillis()) {
+                    FeedbackManager.showError("Invitation code has expired!")
+                    return@launch
+                }
+                
+                // Mark invite as used
+                repository.insertWorkspaceInvite(invite.copy(isUsed = true))
+                
+                // Add member
+                joinWorkspace(invite.workspaceId, userId, invite.roleTitle)
+                onComplete()
+            } catch (e: Exception) {
+                FeedbackManager.showError("Failed to accept invite: ${e.message}")
             }
         }
     }

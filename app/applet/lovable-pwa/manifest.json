@@ -1,0 +1,21 @@
+{
+  "short_name": "CoOp",
+  "name": "Creator Co-Op Platform",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/index.html",
+  "background_color": "#090B0F",
+  "theme_color": "#38BDF8",
+  "display": "standalone",
+  "orientation": "portrait"
+}

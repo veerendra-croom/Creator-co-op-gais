@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import kotlinx.coroutines.launch
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -40,6 +42,7 @@ fun PublicProfileScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val repository = remember { (context.applicationContext as com.example.CreatorCoopApp).container.repository }
     var isConnected by remember { mutableStateOf(false) }
     var connectionCount by remember { mutableIntStateOf(142) }
@@ -50,6 +53,10 @@ fun PublicProfileScreen(
     val profile = remember(userId, profiles) {
         profiles.find { it.id == userId || (userId == "me" && it.id == "me") } ?: profiles.find { it.id == "me" }
     }
+
+    val isSelf = userId == "me" || userId == "" || (profile != null && profile.id == "me")
+    var isBadgeRequested by remember { mutableStateOf(false) }
+    val userPrefsStore = remember { com.example.data.repository.UserPreferencesStore(repository.userSettingsDao) }
 
     val actualUserId = profile?.id ?: userId
     val completedWorkspacesCount by remember(actualUserId) {
@@ -83,8 +90,11 @@ fun PublicProfileScreen(
 
     val initials = name.split(" ").mapNotNull { it.firstOrNull() }.joinToString("").take(2).uppercase()
 
-    LaunchedEffect(userId) {
+    LaunchedEffect(userId, actualUserId) {
         AnalyticsManager.trackEvent("portfolio_viewed", mapOf("profile_id" to userId))
+        if (isSelf) {
+            isBadgeRequested = userPrefsStore.isVerificationBadgeRequested(actualUserId)
+        }
     }
 
     Column(
@@ -212,58 +222,109 @@ fun PublicProfileScreen(
                             horizontalArrangement = Arrangement.spacedBy(DS.Space8),
                             modifier = Modifier.padding(bottom = DS.Space4)
                         ) {
-                            Button(
-                                onClick = {
-                                    isConnected = !isConnected
-                                    if (isConnected) {
-                                        connectionCount++
-                                        AnalyticsManager.trackEvent("connection_request_sent", mapOf("target_id" to userId))
-                                        FeedbackManager.showSuccess("Connected with $name!")
-                                    } else {
-                                        connectionCount--
-                                        FeedbackManager.showInfo("Disconnected.")
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isConnected) SurfaceColor else AccentRed
-                                ),
-                                border = if (isConnected) BorderStroke(1.dp, ColorDivider) else null,
-                                shape = DS.RadiusMedium,
-                                contentPadding = PaddingValues(horizontal = DS.Space12, vertical = DS.Space8)
-                            ) {
-                                Icon(
-                                    imageVector = if (isConnected) Icons.Default.Done else Icons.Default.PersonAdd,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(DS.Space6))
-                                Text(
-                                    text = if (isConnected) "Connected" else "Connect",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            if (isSelf) {
+                                Button(
+                                    onClick = {
+                                        if (!isBadgeRequested) {
+                                            coroutineScope.launch {
+                                                try {
+                                                    val request = com.example.data.model.VerificationRequest(
+                                                        id = "req_self_" + java.util.UUID.randomUUID().toString().take(8),
+                                                        userId = actualUserId,
+                                                        userDisplayName = name,
+                                                        userRole = profile?.globalRole ?: "CREATOR",
+                                                        portfolioUrl = "internal://profile/me",
+                                                        status = "PENDING",
+                                                        notes = "Self-asserted Verification Request from Creator Co-Op High Pro Max console.",
+                                                        createdAt = System.currentTimeMillis()
+                                                    )
+                                                    repository.submitVerificationRequest(request)
+                                                    userPrefsStore.saveVerificationBadgeRequest(actualUserId, true)
+                                                    isBadgeRequested = true
+                                                    FeedbackManager.showSuccess("✓ Secure verification request logged with System Core. Pending founder review!")
+                                                } catch (e: Exception) {
+                                                    FeedbackManager.showError("Failed to initiate verification request: ${e.message}")
+                                                }
+                                            }
+                                        } else {
+                                            FeedbackManager.showInfo("Your verification request is currently being reviewed by Botla Veerendra and Macha Praveen.")
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isBadgeRequested) SurfaceColor else NeonEmerald
+                                    ),
+                                    border = BorderStroke(1.dp, if (isBadgeRequested) NeonEmerald else ColorDivider),
+                                    shape = DS.RadiusMedium,
+                                    contentPadding = PaddingValues(horizontal = DS.Space12, vertical = DS.Space8)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isBadgeRequested) Icons.Default.VerifiedUser else Icons.Default.Verified,
+                                        contentDescription = null,
+                                        tint = if (isBadgeRequested) NeonEmerald else Color.Black,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(DS.Space6))
+                                    Text(
+                                        text = if (isBadgeRequested) "Verification Pending Review" else "Request Verified Pro Badge",
+                                        color = if (isBadgeRequested) Color.White else Color.Black,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                            } else {
+                                Button(
+                                    onClick = {
+                                        isConnected = !isConnected
+                                        if (isConnected) {
+                                            connectionCount++
+                                            AnalyticsManager.trackEvent("connection_request_sent", mapOf("target_id" to userId))
+                                            FeedbackManager.showSuccess("Connected with $name!")
+                                        } else {
+                                            connectionCount--
+                                            FeedbackManager.showInfo("Disconnected.")
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isConnected) SurfaceColor else AccentRed
+                                    ),
+                                    border = if (isConnected) BorderStroke(1.dp, ColorDivider) else null,
+                                    shape = DS.RadiusMedium,
+                                    contentPadding = PaddingValues(horizontal = DS.Space12, vertical = DS.Space8)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isConnected) Icons.Default.Done else Icons.Default.PersonAdd,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(DS.Space6))
+                                    Text(
+                                        text = if (isConnected) "Connected" else "Connect",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
 
-                            Button(
-                                onClick = { showInviteDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
-                                border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f)),
-                                shape = DS.RadiusMedium,
-                                contentPadding = PaddingValues(horizontal = DS.Space12, vertical = DS.Space8)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MailOutline,
-                                    contentDescription = "Invite to Workspace",
-                                    tint = AccentBlue,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(DS.Space6))
-                                Text(
-                                    text = "Invite",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Button(
+                                    onClick = { showInviteDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor),
+                                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.5f)),
+                                    shape = DS.RadiusMedium,
+                                    contentPadding = PaddingValues(horizontal = DS.Space12, vertical = DS.Space8)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MailOutline,
+                                        contentDescription = "Invite to Workspace",
+                                        tint = AccentBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(DS.Space6))
+                                    Text(
+                                        text = "Invite",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -740,7 +801,7 @@ fun PublicProfileScreen(
                         showInviteDialog = false
                         // Send active in-app notification to the target user with deepLinkTarget!
                         globalViewModel.sendNotification(
-                            userId = if (userId == "me") "DemoUser" else userId,
+                            userId = if (userId == "me") (profile?.id ?: "") else userId,
                             title = "Workspace Invite",
                             body = "You have been invited to join '$selectedWorkspaceForInvite' by ${profile?.displayName ?: "Creator"}",
                             type = "INVITES",

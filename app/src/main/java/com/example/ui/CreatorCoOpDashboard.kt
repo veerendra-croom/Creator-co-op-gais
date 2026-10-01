@@ -202,6 +202,8 @@ fun CreatorCoOpDashboard(
 
     val viewMode by workspaceViewModel.workspaceViewMode.collectAsState()
     val isWorkspaceDetail = currentTab == "WORKSPACES" && viewMode == "VIEW"
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Scaffold(
         snackbarHost = { GlobalSnackbarHost(hostState = snackbarHostState) },
@@ -272,7 +274,7 @@ fun CreatorCoOpDashboard(
                         }
                     )
                     
-                    if (syncState == com.example.data.model.SyncState.OfflineSandbox) {
+                    if (syncState == com.example.data.model.SyncState.Offline) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -293,7 +295,7 @@ fun CreatorCoOpDashboard(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Offline Mode • Running securely on local Sandbox database",
+                                    text = "Offline Mode • Running securely on local database",
                                     color = CrispAmber,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -305,7 +307,7 @@ fun CreatorCoOpDashboard(
             }
         },
         bottomBar = {
-            if (currentTab != "CREATE_WORKSPACE" && !showOnboarding && !isUnderMaintenance) {
+            if (!isLandscape && currentTab != "CREATE_WORKSPACE" && !showOnboarding && !isUnderMaintenance) {
                 NavigationBar(
                     containerColor = SurfaceColor,
                     tonalElevation = 8.dp,
@@ -401,33 +403,155 @@ fun CreatorCoOpDashboard(
         containerColor = PrimaryBackground
     ) { innerPadding ->
         val contentPadding = if (showOnboarding) PaddingValues(0.dp) else innerPadding
-        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            if (isUnderMaintenance) {
-                MaintenanceOverlay(
-                    onLogout = {
-                        authViewModel.logout()
-                    }
-                )
-            } else {
-                AnimatedContent(
-                    targetState = currentTab,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "dashboard_sub_navigation"
-                ) { tab ->
-                    if (isSuspended && tab != "PROFILE" && tab != "HOME") {
-                        SuspensionOverlay()
-                    } else {
-                    when (tab) {
-                        "HOME" -> SimpleMainHubScreen(
-                            onNavigate = { globalViewModel.navigateToTab(it) },
-                            userProfile = user,
-                            globalViewModel = globalViewModel,
-                            workspaceViewModel = workspaceViewModel,
-                            agreementViewModel = agreementViewModel
+        Row(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            if (isLandscape && currentTab != "CREATE_WORKSPACE" && !showOnboarding && !isUnderMaintenance) {
+                NavigationRail(
+                    containerColor = SurfaceColor,
+                    header = {
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 8.dp, bottom = 12.dp)
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Brush.linearGradient(listOf(AccentBlue, AccentRed)))
+                                .clickable { globalViewModel.navigateToTab("HOME") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = "Creator Co-Op",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .border(BorderStroke(1.dp, ColorDivider)),
+                    contentColor = TextSecondary
+                ) {
+                    NavigationRailItem(
+                        selected = currentTab == "HOME",
+                        onClick = { globalViewModel.navigateToTab("HOME") },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                        label = { Text("Home", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = AccentBlue,
+                            selectedTextColor = AccentBlue,
+                            indicatorColor = SurfaceLightColor,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
                         )
-                        "WORKSPACES" -> WorkspaceHub(
-                            workspaceViewModel = workspaceViewModel,
-                            agreementViewModel = agreementViewModel,
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == "WORKSPACES",
+                        onClick = { globalViewModel.navigateToTab("WORKSPACES") },
+                        icon = { Icon(Icons.Default.Folder, contentDescription = "Workspaces") },
+                        label = { Text("Workspaces", fontSize = 9.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = AccentBlue,
+                            selectedTextColor = AccentBlue,
+                            indicatorColor = SurfaceLightColor,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        )
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == "DISCOVERY",
+                        onClick = { globalViewModel.navigateToTab("DISCOVERY") },
+                        icon = { Icon(Icons.Default.Explore, contentDescription = "Discover") },
+                        label = { Text("Discover", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = AccentBlue,
+                            selectedTextColor = AccentBlue,
+                            indicatorColor = SurfaceLightColor,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        )
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == "COMMONS",
+                        onClick = { globalViewModel.navigateToTab("COMMONS") },
+                        icon = { Icon(Icons.Default.Forum, contentDescription = "Commons") },
+                        label = { Text("Commons", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = AccentBlue,
+                            selectedTextColor = AccentBlue,
+                            indicatorColor = SurfaceLightColor,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        )
+                    )
+                    NavigationRailItem(
+                        selected = currentTab == "MORE" || currentTab in listOf(
+                            "PROFILE", "SEARCH", "ADMIN", "ANALYTICS", "CONTENT_PIPELINE",
+                            "VIDEO_HUDDLE", "KNOWLEDGE_BASE", "PREMIUM_SUBSCRIPTION", "CONNECTION_REQUESTS",
+                            "BLOCKED_USERS", "SUPPORT_CENTER", "FOUNDER_CRM", "COMM_CENTER", "PLATFORM_CONTROL", "FOUNDER_COMMAND"
+                        ),
+                        onClick = { globalViewModel.navigateToTab("MORE") },
+                        icon = { Icon(Icons.Default.Menu, contentDescription = "More") },
+                        label = { Text("More", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationRailItemDefaults.colors(
+                            selectedIconColor = AccentBlue,
+                            selectedTextColor = AccentBlue,
+                            indicatorColor = SurfaceLightColor,
+                            unselectedIconColor = TextSecondary,
+                            unselectedTextColor = TextSecondary
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    IconButton(
+                        onClick = { globalViewModel.navigateToTab("PROFILE") },
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(if (currentTab == "PROFILE") AccentBlue.copy(alpha = 0.3f) else SurfaceLightColor)
+                                .border(1.5.dp, if (currentTab == "PROFILE") AccentBlue else ColorDivider, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = user?.displayName?.take(1)?.uppercase() ?: "C",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (currentTab == "PROFILE") AccentBlue else TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                if (isUnderMaintenance) {
+                    MaintenanceOverlay(
+                        onLogout = {
+                            authViewModel.logout()
+                        }
+                    )
+                } else {
+                    AnimatedContent(
+                        targetState = currentTab,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "dashboard_sub_navigation"
+                    ) { tab ->
+                        if (isSuspended && tab != "PROFILE" && tab != "HOME") {
+                            SuspensionOverlay()
+                        } else {
+                        when (tab) {
+                            "HOME" -> SimpleMainHubScreen(
+                                onNavigate = { globalViewModel.navigateToTab(it) },
+                                userProfile = user,
+                                globalViewModel = globalViewModel,
+                                workspaceViewModel = workspaceViewModel,
+                                agreementViewModel = agreementViewModel
+                            )
+                            "WORKSPACES" -> WorkspaceHub(
+                                workspaceViewModel = workspaceViewModel,
+                                agreementViewModel = agreementViewModel,
                             chatViewModel = chatViewModel,
                             userId = userId ?: "",
                             userProfile = user,
@@ -485,7 +609,7 @@ fun CreatorCoOpDashboard(
                             TaskDetailsScreen(taskId = taskId, onBack = { globalViewModel.navigateBack() })
                         }
                         "PUBLIC_PROFILE" -> {
-                            val profileUserId = globalViewModel.selectedUserId.collectAsState().value ?: "DemoUser"
+                            val profileUserId = globalViewModel.selectedUserId.collectAsState().value ?: user?.id ?: "me"
                             PublicProfileScreen(userId = profileUserId, globalViewModel = globalViewModel, onBack = { globalViewModel.navigateBack() })
                         }
                         "WORKSPACE_SETTINGS" -> {
@@ -522,7 +646,11 @@ fun CreatorCoOpDashboard(
                             analyticsViewModel = analyticsViewModel,
                             onBack = { globalViewModel.navigateBack() }
                         )
-                        "KNOWLEDGE_BASE" -> com.example.ui.screens.workspace.KnowledgeBaseScreen(onBack = { globalViewModel.navigateBack() })
+                        "KNOWLEDGE_BASE" -> com.example.ui.screens.workspace.KnowledgeBaseScreen(
+                            onBack = { globalViewModel.navigateBack() },
+                            workspaceViewModel = workspaceViewModel,
+                            userId = userId ?: ""
+                        )
                         "CONTENT_PIPELINE" -> ContentPipelineScreen(
                             workspaceViewModel = workspaceViewModel,
                             userId = userId ?: "",
@@ -609,6 +737,7 @@ fun CreatorCoOpDashboard(
                 }
             }
             }
+        }
         }
         
         FeedbackOverlay()
@@ -730,472 +859,540 @@ fun SimpleMainHubScreen(
     val notifications by remember(userProfile?.id ?: "") { globalViewModel.getNotificationsForUser(userProfile?.id ?: "") }.collectAsState(initial = emptyList())
     val unreadNotifications = remember(notifications) { notifications.filter { !it.isRead } }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PrimaryBackground),
-        contentPadding = PaddingValues(
-            top = DS.Space16,
-            bottom = DS.Space32,
-            start = DS.Space16,
-            end = DS.Space16
-        ),
-        verticalArrangement = Arrangement.spacedBy(DS.Space24)
-    ) {
-        // ==========================================
-        // 1. WELCOME HEADER (Clean & Plain Language)
-        // ==========================================
-        item {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWideScreen = maxWidth >= 680.dp
+
+        if (isWideScreen) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(PrimaryBackground)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Left Column: Welcome, Actions & Guide
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    item {
+                        HubWelcomeHeader(userProfile = userProfile, onProfileClick = { onNavigate("PROFILE") })
+                    }
+                    item {
+                        HubQuickActions(globalViewModel = globalViewModel, onNavigate = onNavigate)
+                    }
+                    item {
+                        HubFeatureGuideBanner(userProfile = userProfile, globalViewModel = globalViewModel)
+                    }
+                }
+
+                // Right Column: Telemetry Sparklines & Recent Activity
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
+                    item {
+                        HubMetricsSparklineCard(globalViewModel = globalViewModel)
+                    }
+                    item {
+                        HubRecentUpdates(
+                            userProfile = userProfile,
+                            unreadNotifications = unreadNotifications,
+                            globalViewModel = globalViewModel
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(PrimaryBackground),
+                contentPadding = PaddingValues(
+                    top = DS.Space16,
+                    bottom = DS.Space32,
+                    start = DS.Space16,
+                    end = DS.Space16
+                ),
+                verticalArrangement = Arrangement.spacedBy(DS.Space24)
+            ) {
+                item {
+                    HubWelcomeHeader(userProfile = userProfile, onProfileClick = { onNavigate("PROFILE") })
+                }
+                item {
+                    HubMetricsSparklineCard(globalViewModel = globalViewModel)
+                }
+                item {
+                    HubFeatureGuideBanner(userProfile = userProfile, globalViewModel = globalViewModel)
+                }
+                item {
+                    HubQuickActions(globalViewModel = globalViewModel, onNavigate = onNavigate)
+                }
+                item {
+                    HubRecentUpdates(
+                        userProfile = userProfile,
+                        unreadNotifications = unreadNotifications,
+                        globalViewModel = globalViewModel
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HubWelcomeHeader(
+    userProfile: com.example.data.model.UserProfile?,
+    onProfileClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            val dateStr = remember {
+                val sdf = java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.US)
+                sdf.format(java.util.Date()).uppercase()
+            }
+            Text(
+                text = "$dateStr • WELCOME BACK",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = NeonEmerald,
+                letterSpacing = 1.2.sp
+            )
+            Spacer(modifier = Modifier.height(DS.Space4))
+            Text(
+                text = "Hello, ${userProfile?.displayName?.split(" ")?.firstOrNull() ?: "Creator"}",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Here is your dashboard overview for today.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+        }
+        
+        // Active status Avatar
+        Box(
+            modifier = Modifier.size(56.dp),
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(AccentBlue.copy(alpha = 0.2f))
+                    .border(1.5.dp, AccentBlue, CircleShape)
+                    .clickable { onProfileClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = userProfile?.displayName?.take(1)?.uppercase() ?: "C",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
+                    color = AccentBlue
+                )
+            }
+            // Glowing active green indicator dot
+            Box(
+                modifier = Modifier
+                    .size(14.dp)
+                    .clip(CircleShape)
+                    .background(NeonEmerald)
+                    .border(2.dp, PrimaryBackground, CircleShape)
+            )
+        }
+    }
+}
+
+@Composable
+fun HubMetricsSparklineCard(globalViewModel: GlobalViewModel) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .guidedTourTarget("dashboard_metrics_sparkline", globalViewModel.tourManager),
+        colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, ColorDivider)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    val dateStr = remember {
-                        val sdf = java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.US)
-                        sdf.format(java.util.Date()).uppercase()
-                    }
                     Text(
-                        text = "$dateStr • WELCOME BACK",
+                        text = "COLLABORATION REAL-TIME LATENCY",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = NeonEmerald,
+                        fontWeight = FontWeight.Black,
+                        color = AccentBlue,
                         letterSpacing = 1.2.sp
                     )
-                    Spacer(modifier = Modifier.height(DS.Space4))
                     Text(
-                        text = "Hello, ${userProfile?.displayName?.split(" ")?.firstOrNull() ?: "Creator"}",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Black,
+                        text = "24ms • OPTIMAL HEALTH",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Here is your dashboard overview for today.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.TrendingDown,
+                    contentDescription = "Trending Down (Optimal)",
+                    tint = NeonEmerald,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Live Sparkline Graph using Compose Canvas
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+            ) {
+                val width = size.width
+                val height = size.height
+                val points = listOf(
+                    0.2f, 0.4f, 0.3f, 0.6f, 0.45f, 0.8f, 0.5f, 0.35f, 0.25f, 0.15f, 0.12f
+                )
+                val stepX = width / (points.size - 1)
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(0f, height * (1f - points[0]))
+                    for (i in 1 until points.size) {
+                        lineTo(i * stepX, height * (1f - points[i]))
+                    }
                 }
                 
-                // Active status Avatar
-                Box(
-                    modifier = Modifier.size(56.dp),
-                    contentAlignment = Alignment.BottomEnd
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .background(AccentBlue.copy(alpha = 0.2f))
-                            .border(1.5.dp, AccentBlue, CircleShape)
-                            .clickable { onNavigate("PROFILE") },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = userProfile?.displayName?.take(1)?.uppercase() ?: "C",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Black,
-                            color = AccentBlue
-                        )
-                    }
-                    // Glowing active green indicator dot
-                    Box(
-                        modifier = Modifier
-                            .size(14.dp)
-                            .clip(CircleShape)
-                            .background(NeonEmerald)
-                            .border(2.dp, PrimaryBackground, CircleShape)
+                drawPath(
+                    path = path,
+                    color = NeonEmerald,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 3.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round
                     )
-                }
-            }
-        }
-
-        // ==========================================
-        // NEW: METRICS SPARKLINES CARD
-        // ==========================================
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .guidedTourTarget("dashboard_metrics_sparkline", globalViewModel.tourManager),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, ColorDivider)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "COLLABORATION REAL-TIME LATENCY",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Black,
-                                color = AccentBlue,
-                                letterSpacing = 1.2.sp
-                            )
-                            Text(
-                                text = "24ms • OPTIMAL HEALTH",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.TrendingDown,
-                            contentDescription = "Trending Down (Optimal)",
-                            tint = NeonEmerald,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Live Sparkline Graph using Compose Canvas!
-                    androidx.compose.foundation.Canvas(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp)
-                    ) {
-                        val width = size.width
-                        val height = size.height
-                        val points = listOf(
-                            0.2f, 0.4f, 0.3f, 0.6f, 0.45f, 0.8f, 0.5f, 0.35f, 0.25f, 0.15f, 0.12f
-                        )
-                        val stepX = width / (points.size - 1)
-                        val path = androidx.compose.ui.graphics.Path().apply {
-                            moveTo(0f, height * (1f - points[0]))
-                            for (i in 1 until points.size) {
-                                lineTo(i * stepX, height * (1f - points[i]))
-                            }
-                        }
-                        
-                        // Draw sparkline stroke with NeonEmerald
-                        drawPath(
-                            path = path,
-                            color = NeonEmerald,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                width = 3.dp.toPx(),
-                                cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                                join = androidx.compose.ui.graphics.StrokeJoin.Round
-                            )
-                        )
-                        
-                        // Draw transparent gradient under path
-                        val filledPath = androidx.compose.ui.graphics.Path().apply {
-                            addPath(path)
-                            lineTo(width, height)
-                            lineTo(0f, height)
-                            close()
-                        }
-                        drawPath(
-                            path = filledPath,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(NeonEmerald.copy(alpha = 0.25f), Color.Transparent),
-                                startY = 0f,
-                                endY = height
-                            )
-                        )
-                        
-                        // Draw pulse glow on the last point
-                        val lastPointX = width
-                        val lastPointY = height * (1f - points.last())
-                        drawCircle(
-                            color = NeonEmerald,
-                            radius = 6.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(lastPointX, lastPointY)
-                        )
-                        drawCircle(
-                            color = NeonEmerald.copy(alpha = 0.4f),
-                            radius = 12.dp.toPx(),
-                            center = androidx.compose.ui.geometry.Offset(lastPointX, lastPointY)
-                        )
-                    }
-                }
-            }
-        }
-
-        // ==========================================
-        // FEATURE GUIDE & OPTIONS WALKTHROUGH BANNER
-        // ==========================================
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, Brush.horizontalGradient(listOf(AccentBlue.copy(alpha = 0.8f), NeonEmerald.copy(alpha = 0.8f)))), RoundedCornerShape(16.dp))
-                    .testTag("hub_feature_tour_banner"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceColor)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = CircleShape,
-                                color = AccentBlue.copy(alpha = 0.2f),
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Default.MenuBook, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "FEATURE & OPTIONS GUIDE",
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 11.sp,
-                                    color = AccentBlue,
-                                    letterSpacing = 1.sp
-                                )
-                                Text(
-                                    text = "Interactive card explanation for every button & feature",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = TextPrimary
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Learn what every option does, why it exists, and how to operate it step-by-step with live sandbox simulations.",
-                        fontSize = 11.sp,
-                        color = TextSecondary,
-                        lineHeight = 15.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val uid = userProfile?.id ?: "guest"
-                        Button(
-                            onClick = {
-                                globalViewModel.replayTour(uid, "dashboard_tour")
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.weight(1f).testTag("hub_start_user_tour_button")
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("USER TOUR", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 11.sp)
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                globalViewModel.replayTour(uid, "founder_command_tour")
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.weight(1f).testTag("hub_start_admin_tour_button")
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("ADMIN TOUR", color = Color.White, fontWeight = FontWeight.Black, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ==========================================
-        // 2. DIRECT ACTIONS (Plain English / Highly Tappable)
-        // ==========================================
-        item {
-            Column(
-                modifier = Modifier.guidedTourTarget("dashboard_quick_actions", globalViewModel.tourManager),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(
-                    text = "QUICK ACTIONS",
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.5.sp
                 )
                 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Explore Creators
-                    ActionRowCard(
-                        title = "Explore Creators",
-                        description = "Find other video creators to collaborate with on future projects.",
-                        icon = Icons.Default.Groups,
-                        accentColor = AccentBlue,
-                        testTag = "action_explore_creators",
-                        onClick = { onNavigate("DISCOVERY") }
-                    )
-
-                    // My Workspaces
-                    ActionRowCard(
-                        title = "My Workspaces",
-                        description = "Manage your collaborative projects, active channels, and tasks.",
-                        icon = Icons.Default.AddHomeWork,
-                        accentColor = NeonEmerald,
-                        testTag = "action_my_workspaces",
-                        onClick = { onNavigate("WORKSPACES") }
-                    )
-
-                    // Post a Role
-                    ActionRowCard(
-                        title = "Post a Role",
-                        description = "Invite specialized video creators to join your production team.",
-                        icon = Icons.Default.Add,
-                        accentColor = AccentRed,
-                        testTag = "action_post_role",
-                        onClick = { onNavigate("DISCOVERY") }
-                    )
+                val filledPath = androidx.compose.ui.graphics.Path().apply {
+                    addPath(path)
+                    lineTo(width, height)
+                    lineTo(0f, height)
+                    close()
                 }
+                drawPath(
+                    path = filledPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(NeonEmerald.copy(alpha = 0.25f), Color.Transparent),
+                        startY = 0f,
+                        endY = height
+                    )
+                )
+                
+                val lastPointX = width
+                val lastPointY = height * (1f - points.last())
+                drawCircle(
+                    color = NeonEmerald,
+                    radius = 6.dp.toPx(),
+                    center = androidx.compose.ui.geometry.Offset(lastPointX, lastPointY)
+                )
+                drawCircle(
+                    color = NeonEmerald.copy(alpha = 0.4f),
+                    radius = 12.dp.toPx(),
+                    center = androidx.compose.ui.geometry.Offset(lastPointX, lastPointY)
+                )
             }
         }
+    }
+}
 
-        // ==========================================
-        // 3. RECENT UPDATES (Clean & Plain English Feed / Empty State)
-        // ==========================================
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "RECENT UPDATES",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.5.sp
-                    )
-                    
-                    if (unreadNotifications.isNotEmpty()) {
+@Composable
+fun HubFeatureGuideBanner(
+    userProfile: com.example.data.model.UserProfile?,
+    globalViewModel: GlobalViewModel
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, Brush.horizontalGradient(listOf(AccentBlue.copy(alpha = 0.8f), NeonEmerald.copy(alpha = 0.8f)))), RoundedCornerShape(16.dp))
+            .testTag("hub_feature_tour_banner"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceColor)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = CircleShape,
+                        color = AccentBlue.copy(alpha = 0.2f),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
                         Text(
-                            text = "Clear All",
-                            color = AccentBlue,
-                            style = MaterialTheme.typography.labelLarge,
+                            text = "FEATURE & OPTIONS GUIDE",
                             fontWeight = FontWeight.Black,
-                            modifier = Modifier.clickable {
-                                globalViewModel.markAllNotificationsAsRead(userProfile?.id ?: "")
-                                FeedbackManager.showSuccess("All updates cleared.")
-                            }
+                            fontSize = 11.sp,
+                            color = AccentBlue,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Interactive card explanation for every button & feature",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = TextPrimary
                         )
                     }
                 }
+            }
 
-                if (unreadNotifications.isEmpty()) {
-                    // Beautiful minimalist Material 3 empty state card
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Learn what every option does, why it exists, and how to operate it step-by-step with live operational simulations.",
+                fontSize = 11.sp,
+                color = TextSecondary,
+                lineHeight = 15.sp
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val uid = userProfile?.id ?: "guest"
+                Button(
+                    onClick = {
+                        globalViewModel.replayTour(uid, "dashboard_tour")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f).testTag("hub_start_user_tour_button")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("USER TOUR", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        globalViewModel.replayTour(uid, "founder_command_tour")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f).testTag("hub_start_admin_tour_button")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("ADMIN TOUR", color = Color.White, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HubQuickActions(
+    globalViewModel: GlobalViewModel,
+    onNavigate: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.guidedTourTarget("dashboard_quick_actions", globalViewModel.tourManager),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text(
+            text = "QUICK ACTIONS",
+            color = TextSecondary,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.5.sp
+        )
+        
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ActionRowCard(
+                title = "Explore Creators",
+                description = "Find other video creators to collaborate with on future projects.",
+                icon = Icons.Default.Groups,
+                accentColor = AccentBlue,
+                testTag = "action_explore_creators",
+                onClick = { onNavigate("DISCOVERY") }
+            )
+
+            ActionRowCard(
+                title = "My Workspaces",
+                description = "Manage your collaborative projects, active channels, and tasks.",
+                icon = Icons.Default.AddHomeWork,
+                accentColor = NeonEmerald,
+                testTag = "action_my_workspaces",
+                onClick = { onNavigate("WORKSPACES") }
+            )
+
+            ActionRowCard(
+                title = "Post a Role",
+                description = "Invite specialized video creators to join your production team.",
+                icon = Icons.Default.Add,
+                accentColor = AccentRed,
+                testTag = "action_post_role",
+                onClick = { onNavigate("DISCOVERY") }
+            )
+        }
+    }
+}
+
+@Composable
+fun HubRecentUpdates(
+    userProfile: com.example.data.model.UserProfile?,
+    unreadNotifications: List<com.example.data.model.Notification>,
+    globalViewModel: GlobalViewModel
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "RECENT UPDATES",
+                color = TextSecondary,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.5.sp
+            )
+            
+            if (unreadNotifications.isNotEmpty()) {
+                Text(
+                    text = "Clear All",
+                    color = AccentBlue,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.clickable {
+                        globalViewModel.markAllNotificationsAsRead(userProfile?.id ?: "")
+                        FeedbackManager.showSuccess("All updates cleared.")
+                    }
+                )
+            }
+        }
+
+        if (unreadNotifications.isEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("empty_updates_card"),
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, ColorDivider)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(NeonEmerald.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = NeonEmerald,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "You're all caught up!",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "There are no new updates or tasks requiring your attention right now.",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                unreadNotifications.take(4).forEach { notif ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("empty_updates_card"),
+                            .testTag("update_item_${notif.id}"),
                         colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(14.dp),
                         border = BorderStroke(1.dp, ColorDivider)
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
-                                .padding(24.dp)
+                                .padding(14.dp)
                                 .fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .background(NeonEmerald.copy(alpha = 0.1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = NeonEmerald,
-                                    modifier = Modifier.size(32.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = notif.title,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = notif.body,
+                                    color = TextSecondary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    lineHeight = 16.sp
                                 )
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "You're all caught up!",
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "There are no new updates or tasks requiring your attention right now.",
-                                color = TextSecondary,
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
-                } else {
-                    // Elegant updates feed
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        unreadNotifications.take(4).forEach { notif ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("update_item_${notif.id}"),
-                                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
-                                shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, ColorDivider)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            IconButton(
+                                onClick = { globalViewModel.deleteNotification(notif) },
+                                modifier = Modifier.size(36.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .padding(14.dp)
-                                        .fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = notif.title,
-                                            color = Color.White,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = notif.body,
-                                            color = TextSecondary,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            lineHeight = 16.sp
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    IconButton(
-                                        onClick = { globalViewModel.deleteNotification(notif) },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Clear Update",
-                                            tint = NeonEmerald,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Clear Update",
+                                    tint = NeonEmerald,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     }
@@ -1710,8 +1907,8 @@ fun MainHubScreen(
                     )
                     // Seed mock agreement simulation
                     QuickActionTile(
-                        title = "Simulate Contract",
-                        subtitle = "Seed pending agreement",
+                        title = "Draft Contract",
+                        subtitle = "Initiate standard terms",
                         icon = Icons.Default.DocumentScanner,
                         tint = CrispAmber,
                         modifier = Modifier.weight(1f),
@@ -1947,17 +2144,17 @@ fun MainHubScreen(
                     EmptyStateCard(
                         headline = "Agreement ledger fully secure",
                         supportingText = "Excellent. Every workspace contract, copyright assignment, and co-op agreement is completely signed and bound.",
-                        primaryCtaLabel = "Simulate New Contract",
+                        primaryCtaLabel = "Draft New Contract",
                         onPrimaryCta = {
                             if (workspaces.isNotEmpty()) {
                                 val ws = workspaces.first()
-                                val mockAgreement = com.example.data.model.TeamAgreement(
+                                val draftAgreement = com.example.data.model.TeamAgreement(
                                     id = java.util.UUID.randomUUID().toString(),
                                     workspaceId = ws.id,
                                     contentText = "Collective production agreement: Partners establish equal IP shares on shared channels with verified co-op membership agreements.",
                                     createdAt = System.currentTimeMillis()
                                 )
-                                agreementViewModel.createTeamAgreement(ws.id, mockAgreement.contentText)
+                                agreementViewModel.createTeamAgreement(ws.id, draftAgreement.contentText)
                                 FeedbackManager.showSuccess("Crypto-Agreement queued!")
                             } else {
                                 FeedbackManager.showWarning("Create a workspace first.")
@@ -2618,7 +2815,7 @@ fun GlobalSyncTopBar(
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically, 
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
                     .clickable { showSyncDialog = true }
                     .testTag("top_bar_sync_row")
@@ -2627,16 +2824,23 @@ fun GlobalSyncTopBar(
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
-                            .minimumInteractiveComponentSize()
+                            .size(36.dp)
                             .testTag("dashboard_top_bar_back_button")
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 }
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = title, 
+                    fontSize = 15.sp, 
+                    fontWeight = FontWeight.Black, 
+                    maxLines = 1, 
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
                 Box(
                     modifier = Modifier
-                        .size(10.dp)
+                        .size(8.dp)
                         .clip(CircleShape)
                         .background(
                             if (syncState == com.example.data.model.SyncState.Synced) 
@@ -2645,19 +2849,21 @@ fun GlobalSyncTopBar(
                         )
                 )
                 
-                // Dynamic Environment State Badge
-                Box(
-                    modifier = Modifier
-                        .background(envColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
-                        .border(0.5.dp, envColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                // Dynamic Environment State Badge (Single line layout)
+                Surface(
+                    color = envColor.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(4.dp),
+                    border = BorderStroke(0.5.dp, envColor.copy(alpha = 0.5f))
                 ) {
                     Text(
                         text = envLabel,
                         color = envColor,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.8.sp
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                     )
                 }
             }
@@ -2766,7 +2972,7 @@ fun SyncAndCollaborationCenterDialog(
                                 ) {
                                     val hasSupabase = !com.example.data.supabase.SupabaseConfig.supabaseUrl.contains("your-project")
                                     Text(
-                                        text = if (hasSupabase) "Supabase Remote Database Connected" else "Standalone Offline Sandbox",
+                                        text = if (hasSupabase) "Supabase Remote Database Connected" else "Standalone Offline Database",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = Color.White
                                     )
@@ -2790,7 +2996,7 @@ fun SyncAndCollaborationCenterDialog(
                                         text = when (syncState) {
                                             com.example.data.model.SyncState.Synced -> "SYNCED & SECURE"
                                             com.example.data.model.SyncState.PendingLocalChanges -> "OFFLINE QUEUE ACTIVE"
-                                            else -> "OFFLINE SANDBOX"
+                                            else -> "OFFLINE MODE"
                                         },
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.sp,

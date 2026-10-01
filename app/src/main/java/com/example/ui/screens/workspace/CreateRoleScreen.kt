@@ -38,19 +38,6 @@ fun CreateRoleScreen(
     var boostOpportunity by remember { mutableStateOf(false) }
     var showBillingDialog by remember { mutableStateOf(false) }
 
-    if (showBillingDialog) {
-        com.example.ui.components.BillingSimulatorDialog(
-            skuName = "Open Role 48h Boost",
-            skuPrice = "$4.99",
-            skuDescription = "Feature your listing at the top of discovery feeds instantly.",
-            onDismiss = { showBillingDialog = false },
-            onPurchaseSuccess = {
-                boostOpportunity = true
-                showBillingDialog = false
-            }
-        )
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -82,7 +69,8 @@ fun CreateRoleScreen(
                         brief = description,
                         user = userProfile,
                         userId = currentUserId ?: "unknown",
-                        isBoosted = boostOpportunity
+                        isBoosted = boostOpportunity,
+                        compensationType = workType
                     )
                     FeedbackManager.showSuccess("Opportunity posted successfully!")
                     onBack()

@@ -41,6 +41,10 @@ fun TaskDetailsScreen(
     val taskState by taskFlow.collectAsState(initial = null)
     val task = taskState
     
+    val creatorProfile by remember(task?.creatorId) { 
+        if (task?.creatorId != null) repository.getUserById(task.creatorId) else kotlinx.coroutines.flow.flowOf(null)
+    }.collectAsState(initial = null)
+
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     
@@ -224,8 +228,9 @@ fun TaskDetailsScreen(
                 }
                 
                 item {
+                    val creatorDisplay = creatorProfile?.username?.let { "@$it" } ?: (task.creatorId.takeIf { it.isNotBlank() }?.take(10) ?: "Unassigned")
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        TaskMetaBadge(icon = Icons.Default.Person, title = "Assignee", value = task.creatorId.take(12))
+                        TaskMetaBadge(icon = Icons.Default.Person, title = "Creator", value = creatorDisplay)
                         TaskMetaBadge(
                             icon = Icons.Default.CalendarToday, 
                             title = "Due", 

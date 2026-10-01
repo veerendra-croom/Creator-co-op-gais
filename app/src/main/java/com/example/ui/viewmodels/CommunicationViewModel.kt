@@ -25,16 +25,9 @@ class CommunicationViewModel(private val repository: AppRepository) : ViewModel(
 
     init {
         viewModelScope.launch {
-            val isTestEnv = try {
-                Class.forName("org.robolectric.Robolectric") != null
-            } catch (e: Throwable) {
-                false
-            }
-            if (isTestEnv) {
-                repository.getAllAnnouncementsFlow().firstOrNull()?.let { list ->
-                    if (list.isEmpty()) {
-                        seedSampleAnnouncements()
-                    }
+            repository.getAllAnnouncementsFlow().firstOrNull()?.let { list ->
+                if (list.isEmpty()) {
+                    seedSampleAnnouncements()
                 }
             }
         }

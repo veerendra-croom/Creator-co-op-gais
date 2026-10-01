@@ -22,6 +22,13 @@ class DiscoveryViewModel constructor(
     val pitchAttemptCount = MutableStateFlow(0)
     val securityState = MutableStateFlow<SecurityState>(SecurityState.Idle)
 
+    val availableNiches: StateFlow<List<String>> = repository.allProjectProposals
+        .map { list ->
+            val dbNiches = list.map { it.proposal.niche }.filter { it.isNotBlank() }.distinct()
+            (listOf("All") + dbNiches + listOf("Tech", "Gaming", "Vlog", "Education")).distinct()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("All", "Tech", "Gaming", "Vlog", "Education"))
+
     private val _isSubmittingProposal = MutableStateFlow(false)
     val isSubmittingProposal: StateFlow<Boolean> = _isSubmittingProposal.asStateFlow()
 
@@ -61,7 +68,7 @@ class DiscoveryViewModel constructor(
         }
     }
 
-    fun submitProjectProposal(title: String, niche: String, brief: String, user: UserProfile?, userId: String, isBoosted: Boolean = false, onComplete: (() -> Unit)? = null) {
+    fun submitProjectProposal(title: String, niche: String, brief: String, user: UserProfile?, userId: String, isBoosted: Boolean = false, compensationType: String = "Rev Share", onComplete: (() -> Unit)? = null) {
         if (user == null || userId != user.id) {
             _toastMessage.value = "Identity verification failed. Please re-login."
             return
@@ -75,8 +82,9 @@ class DiscoveryViewModel constructor(
         val canBoost = isBoosted && (user.isVerifiedPro || user.globalRole == "ADMIN" || user.systemRole == "ADMIN")
         viewModelScope.launch {
             try {
+                val proposalId = "proj_" + UUID.randomUUID().toString().take(8)
                 val proposal = ProjectProposal(
-                    id = "proj_" + UUID.randomUUID().toString().take(8),
+                    id = proposalId,
                     title = title,
                     niche = niche,
                     brief = brief,
@@ -86,6 +94,19 @@ class DiscoveryViewModel constructor(
                     createdAt = System.currentTimeMillis()
                 )
                 repository.insertProjectProposal(proposal)
+
+                // Persist the specific Role configuration compensation details back to database
+                val roleConfig = com.example.data.model.RoleConfigurationEntity(
+                    id = "config_" + UUID.randomUUID().toString().take(8),
+                    workspaceId = proposalId,
+                    roleTitle = title,
+                    compensationType = compensationType,
+                    description = brief,
+                    requirements = niche,
+                    createdAt = System.currentTimeMillis()
+                )
+                repository.insertRoleConfig(roleConfig)
+
                 _toastMessage.value = when {
                     canBoost -> "Project proposal posted and boosted successfully!"
                     isBoosted -> "Project proposal posted. (Verified Pro required for boosted ranking)."

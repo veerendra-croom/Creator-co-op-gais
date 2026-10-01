@@ -126,3 +126,15 @@ data class LookingForWork(
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Serializable
+@Entity(tableName = "search_filters")
+data class SearchFilterEntity(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val alertName: String,
+    val queryText: String,
+    val nicheFilter: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+

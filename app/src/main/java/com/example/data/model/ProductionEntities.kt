@@ -13,7 +13,7 @@ data class ProductionTask(
     val creatorId: String,
     val title: String,
     val contentBody: String = "",
-    val stateScope: String = "PRODUCTION_READY", // PRODUCTION_READY, ROUGH_SANDBOX
+    val stateScope: String = "PRODUCTION_READY", // PRODUCTION_READY, PRIVATE_DRAFT
     val kanbanLane: String = "TODO",
     val priority: String = "MEDIUM",
     val deadline: Long? = null,
@@ -54,15 +54,30 @@ data class TaskTemplate(
 @Serializable
 enum class KanbanLane(val value: String) {
     TODO("TODO"),
-    IN_PROGRESS("IN_PROGRESS"),
-    DONE("DONE"),
     IDEAS("IDEAS"),
+    RESEARCH("RESEARCH"),
+    SCRIPT("SCRIPT"),
+    RECORD("RECORD"),
+    EDIT("EDIT"),
     REVIEW("REVIEW"),
-    PUBLISH("PUBLISH");
+    PUBLISH("PUBLISH"),
+    IN_PROGRESS("IN_PROGRESS"),
+    DONE("DONE");
 
     companion object {
         fun fromString(lane: String?): KanbanLane {
-            return values().find { it.value.equals(lane, ignoreCase = true) } ?: TODO
+            if (lane.isNullOrBlank()) return IDEAS
+            val normalized = lane.trim().uppercase()
+            return when (normalized) {
+                "TODO", "IDEAS", "IDEATION" -> IDEAS
+                "RESEARCH" -> RESEARCH
+                "SCRIPT", "SCRIPTING" -> SCRIPT
+                "RECORD", "FILMING", "RECORDING", "SHOOT" -> RECORD
+                "EDIT", "EDITING", "IN_PROGRESS" -> EDIT
+                "REVIEW", "IN_REVIEW" -> REVIEW
+                "PUBLISH", "PUBLISHED", "DONE", "COMPLETED" -> PUBLISH
+                else -> values().find { it.value.equals(normalized, ignoreCase = true) } ?: IDEAS
+            }
         }
     }
 }

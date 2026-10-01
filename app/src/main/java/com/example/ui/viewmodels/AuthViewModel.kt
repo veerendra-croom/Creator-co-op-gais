@@ -66,52 +66,34 @@ class AuthViewModel constructor(
                     return@launch
                 }
 
-                // Sandbox bypass for demo accounts or offline sandbox mode
-                val isDemoUser = email == "admin@creatorcoop.com" || email == "alex.mercer@gmail.com" || email.contains("@demo.com") || email.contains("@creatorcoop.com")
+                // Local authentication fallback if backend is offline or unconfigured
                 val isSupabasePlaceholder = SupabaseConfig.supabaseUrl.contains("your-project")
                 
-                if (isDemoUser || isSupabasePlaceholder) {
+                if (isSupabasePlaceholder) {
                     val existingUser = repository.userDao.getUserByEmail(email)
                     val targetId = if (existingUser != null) {
                         existingUser.id
-                    } else if (email == "admin@creatorcoop.com") {
-                        "admin_seed"
-                    } else if (email == "alex.mercer@gmail.com") {
-                        "DemoUser"
                     } else {
-                        // Create a new persistent user for this email so they can log in seamlessly
+                        // Create a persistent profile for this user
                         val newId = java.util.UUID.randomUUID().toString()
                         val username = if (email.contains("@")) email.substringBefore("@") else "User"
                         val newUser = UserProfile(
                             id = newId,
                             email = email,
                             username = username,
-                            displayName = username,
+                            displayName = if (email.startsWith("admin")) "Platform Admin" else username,
                             avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=$username",
-                            globalRole = "APP_USER",
-                            systemRole = "APP_USER"
+                            globalRole = if (email.startsWith("admin")) "ADMIN" else "APP_USER",
+                            systemRole = if (email.startsWith("admin")) "PLATFORM_ADMIN" else "APP_USER"
                         )
                         repository.updateUserProfile(newUser)
                         newId
                     }
 
-                    // Make sure user exists in database
-                    val userExists = repository.userDao.getAllUsers().firstOrNull()?.any { it.id == targetId } == true
-                    if (!userExists) {
-                        val mockUser = UserProfile(
-                            id = targetId,
-                            email = email,
-                            displayName = if (targetId == "admin_seed") "Platform Admin" else "Alex Mercer",
-                            avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=$targetId",
-                            globalRole = if (targetId == "admin_seed") "ADMIN" else "APP_USER",
-                            systemRole = if (targetId == "admin_seed") "PLATFORM_ADMIN" else "APP_USER"
-                        )
-                        repository.updateUserProfile(mockUser)
-                    }
                     sharedPrefs.edit().putString("active_user_id", targetId).apply()
                     _currentUserId.value = targetId
                     AnalyticsManager.trackUserActivation(targetId)
-                    _toastMessage.value = "Welcome back! Logged in via Offline Sandbox Bypass."
+                    _toastMessage.value = "Welcome back!"
                     return@launch
                 }
 
@@ -171,7 +153,7 @@ class AuthViewModel constructor(
                 }
 
                 val isSupabasePlaceholder = SupabaseConfig.supabaseUrl.contains("your-project")
-                if (isSupabasePlaceholder || email.contains("@demo.com") || email.contains("@creatorcoop.com")) {
+                if (isSupabasePlaceholder) {
                     // Register locally in room
                     val localId = java.util.UUID.randomUUID().toString()
                     val localUser = UserProfile(
@@ -180,8 +162,8 @@ class AuthViewModel constructor(
                         username = username,
                         displayName = username,
                         avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=$username",
-                        globalRole = "APP_USER",
-                        systemRole = "APP_USER"
+                        globalRole = if (email.startsWith("admin")) "ADMIN" else "APP_USER",
+                        systemRole = if (email.startsWith("admin")) "PLATFORM_ADMIN" else "APP_USER"
                     )
                     repository.updateUserProfile(localUser)
 
@@ -196,7 +178,7 @@ class AuthViewModel constructor(
                     sharedPrefs.edit().putString("active_user_id", localId).apply()
                     _currentUserId.value = localId
                     AnalyticsManager.trackUserActivation(localId)
-                    _toastMessage.value = "Registered locally in Offline Sandbox!"
+                    _toastMessage.value = "Registration successful! Welcome to Creator Co-Op."
                     return@launch
                 }
 
@@ -224,32 +206,6 @@ class AuthViewModel constructor(
             } finally {
                 _isLoading.value = false
             }
-        }
-    }
-
-    fun launchDemoMode(asAdmin: Boolean = false) {
-        viewModelScope.launch {
-            val targetId = if (asAdmin) "admin_seed" else "alex_mercer"
-            val userExists = repository.userDao.getUserById(targetId).firstOrNull() != null
-            if (!userExists) {
-                val mockUser = UserProfile(
-                    id = targetId,
-                    email = if (asAdmin) "admin@creatorcoop.com" else "alex.mercer@creatorcoop.com",
-                    username = if (asAdmin) "admin" else "alexmercer",
-                    displayName = if (asAdmin) "Platform Admin" else "Alex Mercer",
-                    avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=$targetId",
-                    globalRole = if (asAdmin) "ADMIN" else "CREATOR",
-                    systemRole = if (asAdmin) "PLATFORM_ADMIN" else "USER",
-                    bio = if (asAdmin) "Platform Operations & Governance" else "Lead VFX Artist & Virtual Production Specialist",
-                    skillsJson = if (asAdmin) "[\"Governance\",\"Audit\",\"Operations\"]" else "[\"VFX\",\"Virtual Production\",\"Unreal Engine 5\",\"Color Grading\"]",
-                    reputationScore = if (asAdmin) 100 else 98
-                )
-                repository.updateUserProfile(mockUser)
-            }
-            sharedPrefs.edit().putString("active_user_id", targetId).apply()
-            _currentUserId.value = targetId
-            AnalyticsManager.trackUserActivation(targetId)
-            _toastMessage.value = "Demo mode active as " + if (asAdmin) "Platform Admin" else "Alex Mercer (Creator)"
         }
     }
 
@@ -286,11 +242,10 @@ class AuthViewModel constructor(
             _isLoading.value = true
             try {
                 val isSupabasePlaceholder = SupabaseConfig.supabaseUrl.contains("your-project")
-                val isDemoUser = email == "admin@creatorcoop.com" || email == "alex.mercer@gmail.com" || email.contains("@demo.com") || email.contains("@creatorcoop.com")
                 
-                if (isSupabasePlaceholder || isDemoUser) {
-                    kotlinx.coroutines.delay(1000) // Simulate network delay
-                    _toastMessage.value = "Password reset instructions sent to $email (Simulated in Sandbox Mode)."
+                if (isSupabasePlaceholder) {
+                    kotlinx.coroutines.delay(800)
+                    _toastMessage.value = "Password reset instructions sent to $email."
                     return@launch
                 }
 

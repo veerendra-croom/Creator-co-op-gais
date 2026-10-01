@@ -4,10 +4,12 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -78,7 +80,7 @@ fun SyndicateScreen(
     var activeDossierPitch by remember { mutableStateOf<TalentPitch?>(null) }
     var activeDossierProposal by remember { mutableStateOf<ProjectProposal?>(null) }
 
-    val niches = listOf("All", "Tech", "Gaming", "Vlog", "Education")
+    val niches by discoveryViewModel.availableNiches.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
 
     val featureFlags by globalViewModel.featureFlags.collectAsState(initial = emptyList())
@@ -96,39 +98,142 @@ fun SyndicateScreen(
         ) {
             Spacer(modifier = Modifier.height(DS.Space12))
 
-            // 1. HERO AREA & SEARCH
-            PageHeader(
-                title = "Discovery Hub",
-                subtitle = "Find active production co-ops, open roles, and professional creative talent.",
-                action = {
-                    Button(
-                        onClick = { showPostDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                        shape = DS.RadiusMedium,
-                        modifier = Modifier.height(40.dp).testTag("post_proposal_button").guidedTourTarget("matchmaker_pitch_fab", globalViewModel.tourManager)
-                    ) {
-                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(DS.Space4))
-                        Text("New Project", fontWeight = FontWeight.Bold)
-                    }
-                }
-            )
+            Spacer(modifier = Modifier.height(DS.Space8))
 
-            // Dynamic Live Search Bar
-            SearchBar(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = "Search projects, roles, or creative skillsets...",
-                modifier = Modifier.padding(bottom = DS.Space16).testTag("discovery_search_bar")
-            )
-
-            // 2. Segmented Mode Switch Tabs
+            // 1. Sleek Header Row: Title + "New Project" Action Button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(SurfaceColor, DS.RadiusMedium)
-                    .border(1.dp, ColorDivider.copy(alpha = 0.5f), DS.RadiusMedium)
-                    .padding(DS.Space4),
+                    .padding(bottom = DS.Space8),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    IconButton(
+                        onClick = { globalViewModel.navigateBack() },
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("syndicate_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(DS.Space8))
+                    Column {
+                        Text(
+                            text = "Discovery Hub",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Find active production co-ops & creative talent",
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = { showPostDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier
+                        .height(36.dp)
+                        .testTag("post_proposal_button")
+                        .guidedTourTarget("matchmaker_pitch_fab", globalViewModel.tourManager)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "New Project", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(DS.Space4))
+                    Text("New Project", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+
+            // 2. Compact Search & Filter Utilities Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = DS.Space8),
+                horizontalArrangement = Arrangement.spacedBy(DS.Space8),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            "Search projects, roles, skills...",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    },
+                    trailingIcon = if (searchQuery.isNotBlank()) {
+                        {
+                            IconButton(
+                                onClick = { searchQuery = "" },
+                                modifier = Modifier.minimumInteractiveComponentSize()
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear Search", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    } else null,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = SurfaceColor,
+                        unfocusedContainerColor = SurfaceColor,
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = ColorDivider,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("discovery_search_bar")
+                )
+
+                // Quick Saved Filter / Alerts Action Icons
+                IconButton(
+                    onClick = { showSaveSearchDialog = true },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(SurfaceColor, RoundedCornerShape(10.dp))
+                        .border(1.dp, ColorDivider, RoundedCornerShape(10.dp))
+                        .testTag("save_search_button")
+                ) {
+                    Icon(Icons.Default.BookmarkBorder, contentDescription = "Save Filter", tint = AccentBlue, modifier = Modifier.size(20.dp))
+                }
+
+                IconButton(
+                    onClick = { showSavedSearchesDialog = true },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(SurfaceColor, RoundedCornerShape(10.dp))
+                        .border(1.dp, ColorDivider, RoundedCornerShape(10.dp))
+                        .testTag("my_saved_searches_button")
+                ) {
+                    Icon(Icons.Default.Bookmarks, contentDescription = "Saved Alerts", tint = TextSecondary, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            // 3. Compact Segmented Mode Switch Tabs
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceColor, RoundedCornerShape(8.dp))
+                    .border(1.dp, ColorDivider.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .padding(3.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 val rolesSelected = discoveryTab == "OPEN_ROLES"
@@ -138,26 +243,26 @@ fun SyndicateScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(36.dp)
-                        .clip(DS.RadiusMedium)
-                        .background(if (rolesSelected) AccentBlue.copy(alpha = 0.15f) else Color.Transparent)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (rolesSelected) AccentBlue.copy(alpha = 0.2f) else Color.Transparent)
                         .clickable { discoveryTab = "OPEN_ROLES" },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Active Listings",
                         color = if (rolesSelected) AccentBlue else TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 12.sp,
+                        fontWeight = if (rolesSelected) FontWeight.Bold else FontWeight.Normal
                     )
                 }
-                
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(36.dp)
-                        .clip(DS.RadiusMedium)
-                        .background(if (talentSelected) AccentBlue.copy(alpha = 0.15f) else Color.Transparent)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (talentSelected) AccentBlue.copy(alpha = 0.2f) else Color.Transparent)
                         .clickable {
                             if (isLookingForWorkEnabled) {
                                 discoveryTab = "AVAILABLE_TALENT"
@@ -173,13 +278,13 @@ fun SyndicateScreen(
                     ) {
                         if (!isLookingForWorkEnabled) {
                             Icon(Icons.Default.Lock, null, modifier = Modifier.size(12.dp), tint = TextSecondary)
-                            Spacer(modifier = Modifier.width(DS.Space4))
+                            Spacer(modifier = Modifier.width(4.dp))
                         }
                         Text(
                             text = "Available Talent",
                             color = if (talentSelected) AccentBlue else TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 12.sp,
+                            fontWeight = if (talentSelected) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }
@@ -187,61 +292,52 @@ fun SyndicateScreen(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(36.dp)
-                        .clip(DS.RadiusMedium)
-                        .background(if (pitchesSelected) AccentBlue.copy(alpha = 0.15f) else Color.Transparent)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (pitchesSelected) AccentBlue.copy(alpha = 0.2f) else Color.Transparent)
                         .clickable { discoveryTab = "MY_PITCHES" },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "My Applications",
                         color = if (pitchesSelected) AccentBlue else TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 12.sp,
+                        fontWeight = if (pitchesSelected) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(DS.Space12))
+            Spacer(modifier = Modifier.height(DS.Space8))
 
-            // 3. Niche Filtering Bar (using DS FilterBar)
-            FilterBar(
-                options = niches,
-                selectedOption = activeFilter,
-                onOptionSelected = { discoveryViewModel.selectedNicheFilter.value = it },
-                modifier = Modifier.fillMaxWidth().guidedTourTarget("matchmaker_pitch_filters", globalViewModel.tourManager)
-            )
-
-            Spacer(modifier = Modifier.height(DS.Space12))
-
-            // 4. Saved Search Utilities
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DS.Space12)
+            // 4. Scrollable Niche Category Pills Row
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .guidedTourTarget("matchmaker_pitch_filters", globalViewModel.tourManager),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = { showSaveSearchDialog = true },
-                    modifier = Modifier.weight(1f).height(40.dp).testTag("save_search_button"),
-                    shape = DS.RadiusMedium,
-                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.8f))
-                ) {
-                    Icon(Icons.Default.BookmarkBorder, contentDescription = "Save Search", tint = AccentBlue, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(DS.Space8))
-                    Text("Save Filter", color = AccentBlue, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                }
-                OutlinedButton(
-                    onClick = { showSavedSearchesDialog = true },
-                    modifier = Modifier.weight(1f).height(40.dp).testTag("my_saved_searches_button"),
-                    shape = DS.RadiusMedium,
-                    border = BorderStroke(1.dp, ColorDivider.copy(alpha = 0.8f))
-                ) {
-                    Icon(Icons.Default.Bookmarks, contentDescription = "My Saved Searches", tint = TextSecondary, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(DS.Space8))
-                    Text("Saved Alerts", color = TextSecondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                items(niches) { niche ->
+                    val isSelected = activeFilter == niche
+                    Surface(
+                        onClick = { discoveryViewModel.selectedNicheFilter.value = niche },
+                        color = if (isSelected) AccentBlue else SurfaceColor,
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, if (isSelected) AccentBlue else ColorDivider),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(
+                            text = niche,
+                            color = if (isSelected) Color.White else TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(DS.Space16))
+            Spacer(modifier = Modifier.height(DS.Space8))
 
             if (discoveryTab == "OPEN_ROLES") {
                 val isTestEnv = try {
@@ -697,19 +793,6 @@ fun ProjectProposalCard(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var showCardBillingDialog by remember { mutableStateOf(false) }
-
-    if (showCardBillingDialog) {
-        com.example.ui.components.BillingSimulatorDialog(
-            skuName = "Open Role 48h Boost",
-            skuPrice = "$4.99",
-            skuDescription = "Pushes this listing to the top of discovery feeds with an illuminated badge.",
-            onDismiss = { showCardBillingDialog = false },
-            onPurchaseSuccess = {
-                discoveryViewModel.boostRole(proposal.id)
-                showCardBillingDialog = false
-            }
-        )
-    }
 
     Card(
         modifier = Modifier
@@ -1946,7 +2029,7 @@ fun MySavedSearchesDialog(
                     }
                     
                 } else {
-                    // Diagnostics & Match Scan sandbox button (Start Scan)
+                    // Diagnostics & Match Scan button (Start Scan)
                     Button(
                         onClick = {
                             isScanning = true

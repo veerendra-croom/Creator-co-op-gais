@@ -97,7 +97,7 @@ fun MoreScreen(
     val currentThemeMode by globalViewModel.themeMode.collectAsState()
 
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Adaptive(minSize = 160.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(16.dp),
@@ -106,7 +106,7 @@ fun MoreScreen(
             .background(PrimaryBackground)
     ) {
         // Contextual Screen-Specific Guided Tutorials Section
-        item(span = { GridItemSpan(2) }) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             val uid = userId ?: "guest"
             val tourStatuses by globalViewModel.tourManager.tourStatuses.collectAsState()
             var isExpanded by remember { mutableStateOf(true) }
@@ -319,7 +319,7 @@ fun MoreScreen(
         }
 
         // Theme Selector Card
-        item(span = { GridItemSpan(2) }) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -398,7 +398,7 @@ fun MoreScreen(
         }
 
         // Preferences and Settings Card
-        item(span = { GridItemSpan(2) }) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
@@ -646,7 +646,7 @@ fun MoreScreen(
         }
 
         // Section Header
-        item(span = { GridItemSpan(2) }) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 text = "CO-OP DIRECTORY",
                 color = AccentBlue,
@@ -708,7 +708,7 @@ fun MoreScreen(
             }
         }
 
-        item(span = { GridItemSpan(2) }) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
             SettingsFooterSection(
                 userId = userId,
                 globalViewModel = globalViewModel,
@@ -774,7 +774,7 @@ fun SettingsFooterSection(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Enterprise-Grade Digital Media Sandbox",
+                        text = "Enterprise-Grade Digital Media Production Hub",
                         color = TextSecondary,
                         fontSize = 10.sp
                     )
@@ -794,83 +794,6 @@ fun SettingsFooterSection(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = ColorDivider)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- SECTION: DATABASE SEEDING & PRODUCTION TOGGLE ---
-            val isDemoSandbox by globalViewModel.demoSandboxMode.collectAsState()
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Storage,
-                    contentDescription = "Database Mode",
-                    tint = if (isDemoSandbox) CrispAmber else NeonEmerald,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "DATA INITIALIZATION & SANDBOX",
-                    color = TextPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.2.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = if (isDemoSandbox) {
-                    "Demo Sandbox Active: Includes pre-seeded creator profiles, demo channel workspaces, and sample syndicate proposals for sandbox testing."
-                } else {
-                    "Clean Production Mode: Running with a pristine local database for real production onboarding."
-                },
-                color = TextSecondary,
-                fontSize = 11.sp,
-                lineHeight = 15.sp
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SurfaceLightColor, RoundedCornerShape(12.dp))
-                    .border(1.dp, ColorDivider, RoundedCornerShape(12.dp))
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (isDemoSandbox) "Demo Sandbox Data" else "Clean Production DB",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (isDemoSandbox) "Prepopulated sandbox enabled" else "Zero mock records populated",
-                        color = TextSecondary,
-                        fontSize = 10.sp
-                    )
-                }
-                Switch(
-                    checked = isDemoSandbox,
-                    onCheckedChange = { globalViewModel.toggleDemoSandboxMode(it) },
-                    modifier = Modifier.testTag("sandbox_data_toggle"),
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = CrispAmber,
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = SurfaceColor
-                    )
-                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
